@@ -52,8 +52,8 @@
 ### 정리
 
 1. 파서는 시맨틱 체킹을 위해 **DB 타입**을 **PT 타입**으로 변환합니다.
-2. `DB_TYPE_VECTOR`를 변환해야 하는 상황에서 변환 로직이 없었기 때문에 **`assert(false)`**가 발생했습니다.
-3. 이를 해결하기 위해 `DB_TYPE_VECTOR`를 **`PT_TYPE_VECTOR`**로 변환하는 처리를 **`pt_db_to_type_enum`** 함수에 추가했습니다.
+2. `DB_TYPE_VECTOR`를 변환해야 하는 상황에서 변환 로직이 없었기 때문에 `assert(false)`가 발생했습니다.
+3. 이를 해결하기 위해 `DB_TYPE_VECTOR`를 `PT_TYPE_VECTOR`로 변환하는 처리를 `pt_db_to_type_enum` 함수에 추가했습니다.
 
 ## Implementation
 

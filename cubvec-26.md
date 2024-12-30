@@ -74,6 +74,28 @@ CUBRID의 `set` 내부 구조는 `setobj`로 구성되어 있습니다.
 TP_DOMAIN tp_Vector_domain = { NULL, NULL, &tp_Vector, DOMAIN_INIT3 };
 ```
 
+6. **`db_make_vector` 함수 구현**
+
+   - VECTOR 타입의 DB_SET을 DB_VALUE로 변환하는 함수를 구현했습니다.
+   - 입력받은 DB_SET이 유효한 VECTOR 타입인지 검증하고, 이를 DB_VALUE로 변환합니다.
+
+   ```c
+   int
+   db_make_vector (DB_VALUE * value, DB_SET * set)
+   {
+       // DB_VALUE의 타입을 DB_TYPE_VECTOR로 설정
+       value->domain.general_info.type = DB_TYPE_VECTOR;
+       value->data.set = set;
+
+       if (set)
+       {
+           // VECTOR 타입이거나 disk_set인 경우 정상 처리
+           if ((set->set && setobj_type (set->set) == DB_TYPE_VECTOR)
+
+               ...
+   }
+   ```
+
 ---
 
 ### Acceptance Criteria

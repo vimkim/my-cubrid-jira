@@ -1,2 +1,2 @@
 serve:
-    echo use grip
+    markserv .

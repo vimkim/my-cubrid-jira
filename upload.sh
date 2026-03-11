@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ISSUES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXCLUDE_PATTERN="issue-template|pr-template|nix"
+ISSUES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/issues"
 
-# Collect markdown files, excluding non-issue files
+# Collect markdown files
 mapfile -t FILES < <(
-  find "$ISSUES_DIR" -maxdepth 1 -name "*.md" \
-    | grep -vE "$EXCLUDE_PATTERN" \
-    | sort
+  find "$ISSUES_DIR" -maxdepth 1 -name "*.md" -printf '%T@\t%p\n' \
+    | sort -rn \
+    | cut -f2-
 )
 
 if [ ${#FILES[@]} -eq 0 ]; then

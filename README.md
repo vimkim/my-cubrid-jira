@@ -16,7 +16,7 @@ This runs `upload.sh`, which:
 
 1. Lists all `.md` files in the directory (excluding templates)
 2. Opens an interactive `fzf` picker with a preview pane
-3. Detects the Jira issue key from the filename (e.g. `CBRD-25356.md`) or prompts you to enter one
+3. Detects the Jira issue key from the filename (e.g. `CBRD-25356-some-descriptive-name.md`) or prompts you to enter one.
 4. Confirms before uploading
 
 ### Requirements

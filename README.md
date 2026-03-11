@@ -2,6 +2,8 @@
 
 Personal CUBRID Jira issue notes in Markdown format.
 
+Issue files live in the `issues/` directory. Templates (`issue-template.md`, `pr-template.md`) stay in the root.
+
 ## Upload to Jira
 
 Use the `upload` just recipe to interactively upload a Markdown file to Jira:

@@ -14,11 +14,11 @@
 * `midxkey.length >= 4096` 인 경우
   → 별도의 메모리를 **heap allocation** 으로 할당
 
-문제는 **OOS(Overflow Object Storage) 값 ** 을 처리할 때 발생한다.
+문제는 **OOS(Overflow Object Storage) 값** 을 처리할 때 발생한다.
 
 OOS 값의 실제 크기가 4096보다 훨씬 클 수 있음에도 불구하고, `midxkey.length` 계산 과정에서 이를 제대로 반영하지 못해 여전히 **stack buffer를 사용하게 된다.**
 
-예를 들어 길이가 **10000 bytes 이상인 OOS 값 ** 이 `midxkey` 에 저장되는 경우,
+예를 들어 길이가 **10000 bytes 이상인 OOS 값** 이 `midxkey` 에 저장되는 경우,
 
 ```
 memcpy(buf, oos_value, 10000)
@@ -74,7 +74,7 @@ OOS 값을 읽어온 이후, `is_oos` 인 경우 실제 필요한 `midxkey` 의 
 
 ### Remarks
 
-분석 결과, core dump의 stack 정보가 정상적으로 출력되지 않는 이유는 **stack overflow로 인해 stack 자체가 손상되었기 때문 ** 이다.
+분석 결과, core dump의 stack 정보가 정상적으로 출력되지 않는 이유는 **stack overflow로 인해 stack 자체가 손상되었기 때문** 이다.
 
 또한 다음과 같은 현상이 관찰되었다.
 
@@ -87,7 +87,7 @@ OOS 값을 읽어온 이후, `is_oos` 인 경우 실제 필요한 `midxkey` 의 
 * `db_type = DB_TYPE_STRING`
 * `sort_args` 변수가 문자열 값으로 덮어쓰여짐
 
-이는 **buffer overflow 발생 가능성을 시사 ** 하며, 최종적으로 stack overflow가 root cause임을 확인하였다.
+이는 **buffer overflow 발생 가능성을 시사** 하며, 최종적으로 stack overflow가 root cause임을 확인하였다.
 
 ---
 
@@ -108,5 +108,6 @@ create index i_test_overflow_id_vc on test_overflow(id, vc);
 
 다음 두 경우 모두 core dump가 발생한다.
 
-1. **create index 수행 후 insert 수행 **
-2. **insert 수행 후 create index 수행 **
+1. **create index 수행 후 insert 수행**
+2. **insert 수행 후 create index 수행**
+

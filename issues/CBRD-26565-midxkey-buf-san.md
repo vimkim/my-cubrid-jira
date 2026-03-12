@@ -24,7 +24,7 @@ OOS 값의 실제 크기가 4096보다 훨씬 클 수 있음에도 불구하고,
 memcpy(buf, oos_value, 10000)
 ```
 
-과 같이 **4096 크기의 stack buffer에 10000 bytes 이상의 데이터를 복사 ** 하게 되며, 그 결과 **stack 영역이 overwrite되는 stack overflow** 가 발생한다.
+과 같이 **4096 크기의 stack buffer에 10000 bytes 이상의 데이터를 복사** 하게 되며, 그 결과 **stack 영역이 overwrite되는 stack overflow** 가 발생한다.
 
 이로 인해 다음과 같은 문제가 발생한다.
 

@@ -6,37 +6,69 @@ from pathlib import Path
 KOREAN = r"[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]"
 
 
+INLINE_RE = re.compile(
+    r"""
+    (?<!\*)\*\*([^\n]*?[^\s*])\*\*(?!\*)   |   # **bold**
+    (?<!\*)\*([^\s*\n][^\n]*?[^\s*])\*(?!\*) | # *italic* (not list bullet)
+    `([^\s`\n][^\n]*?[^\s`])`                  # `code`
+    """,
+    re.VERBOSE,
+)
+
+
+def is_korean_char(ch: str) -> bool:
+    return re.match(KOREAN, ch) is not None
+
+
+def normalize_span(span: str) -> str:
+    if span.startswith("**") and span.endswith("**"):
+        return f"**{span[2:-2].strip()}**"
+    if span.startswith("*") and span.endswith("*"):
+        return f"*{span[1:-1].strip()}*"
+    if span.startswith("`") and span.endswith("`"):
+        return f"`{span[1:-1].strip()}`"
+    return span
+
+
 def fix_spacing(text: str) -> str:
-    patterns = [
-        r"\*\*[^*\n]+?\*\*",  # **bold**
-        r"\*[^*\n]+?\*",      # *italic*
-        r"`[^`\n]+?`",        # `code`
-    ]
+    result = []
+    last = 0
 
-    for p in patterns:
-        # 한국어 바로 뒤에 inline markup이 오면, markup 앞에 space
-        text = re.sub(rf"({KOREAN})({p})", r"\1 \2", text)
+    for m in INLINE_RE.finditer(text):
+        start, end = m.span()
+        span = normalize_span(m.group(0))
 
-        # inline markup 바로 뒤에 한국어가 오면, markup 뒤에 space
-        text = re.sub(rf"({p})({KOREAN})", r"\1 \2", text)
+        result.append(text[last:start])
 
-    return text
+        prev_char = text[start - 1] if start > 0 else ""
+        next_char = text[end] if end < len(text) else ""
+
+        if prev_char and is_korean_char(prev_char):
+            if not result[-1].endswith(" "):
+                result.append(" ")
+
+        result.append(span)
+
+        if next_char and is_korean_char(next_char):
+            result.append(" ")
+
+        last = end
+
+    result.append(text[last:])
+    return "".join(result)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Ensure spaces around inline markdown spans next to Korean text"
+        description="Ensure spacing around inline markdown spans next to Korean text"
     )
     parser.add_argument("-i", "--input", required=True, help="Input markdown file")
     parser.add_argument("-o", "--output", required=True, help="Output markdown file")
     args = parser.parse_args()
 
-    input_path = Path(args.input)
-    output_path = Path(args.output)
-
-    text = input_path.read_text(encoding="utf-8")
-    fixed = fix_spacing(text)
-    output_path.write_text(fixed, encoding="utf-8")
+    src = Path(args.input).read_text(encoding="utf-8")
+    dst = fix_spacing(src)
+    Path(args.output).write_text(dst, encoding="utf-8")
 
 
 if __name__ == "__main__":

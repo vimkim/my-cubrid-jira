@@ -6,13 +6,13 @@
 
 현재 OOS 변수 속성이 heap recdes에 저장될 때, 인라인 데이터에는 OOS OID(8바이트)만 저장된다.
 
-이로 인해 OOS 데이터의 실제 크기를 파악해야 하는 경우(예: midxkey 버퍼 크기 추정), `oos_get_length()` 를 호출하여 OOS 페이지를 읽는 **추가 I/O가 발생**한다.
+이로 인해 OOS 데이터의 실제 크기를 파악해야 하는 경우(예: midxkey 버퍼 크기 추정), `oos_get_length()` 를 호출하여 OOS 페이지를 읽는 **추가 I/O가 발생** 한다.
 
 특히 `heap_midxkey_get_oos_extra_size()` 에서 OOS 컬럼마다 `oos_get_length()` 를 호출하므로, OOS 컬럼이 여러 개인 경우 불필요한 페이지 I/O가 누적된다.
 
 ### 목적
 
-- OOS OID 옆에 OOS 데이터 길이(4바이트)를 함께 인라인으로 저장하여, **I/O 없이 OOS 데이터 크기를 파악**할 수 있도록 한다.
+- OOS OID 옆에 OOS 데이터 길이(4바이트)를 함께 인라인으로 저장하여, **I/O 없이 OOS 데이터 크기를 파악** 할 수 있도록 한다.
 - 인라인 OOS 데이터 포맷: `[OOS OID (8B) | OOS length (4B)]` = 12바이트 (`OR_OOS_INLINE_SIZE`)
 
 ---

@@ -106,11 +106,37 @@ recovery.c 테이블에 이미 등록된 핸들러:
 
 ```
 heap_update
-  → (이전 OOS OID 추출)
+  → heap record를 PEEK/COPY로 읽어 이전 recdes 획득
+  → recdes 내 OOS OID 필드에서 이전 OOS OID 추출
   → oos_delete (이전 OOS 레코드 물리 삭제)
   → oos_insert (새 OOS 레코드 삽입)
   → heap record에 새 OOS OID 기록
 ```
+
+**이전 버전 읽기 메커니즘:**
+`heap_update` 진입 시 대상 heap record를 `spage_get_record`(PEEK)로 읽어 현재 recdes를 획득한다.
+이 recdes의 OOS OID 필드(heap record 내 고정 위치)에서 기존 OOS 레코드의 위치(VPID + slotid)를 추출하여 `oos_delete`에 전달한다.
+
+**추후 개선 가능성 — OOS 컬럼 변경 유무에 따른 최적화:**
+현재 M1 구현은 OOS 컬럼 변경 여부와 무관하게 항상 `oos_delete` → `oos_insert` 를 수행한다.
+만약 UPDATE가 OOS 대상 컬럼을 변경하지 않는 경우(예: inline 컬럼만 변경), OOS 레코드는 그대로 유효하므로 `oos_delete` + `oos_insert` 를 생략하고 기존 OOS OID를 그대로 유지할 수 있다.
+이 최적화를 적용하면 OOS 페이지 I/O 및 WAL 로깅을 줄여 UPDATE 성능을 개선할 수 있다.
+
+**MVCC와 OOS 이전 버전 접근:**
+UPDATE 시 `oos_delete`로 이전 OOS 레코드를 즉시 물리 삭제하더라도 MVCC 가시성에는 문제가 없다.
+오래된 트랜잭션이 이전 버전을 읽어야 하는 경우, heap record의 LSA(log sequence address)를 통해 로그에서 이전 버전의 heap record를 복원한다.
+복원된 heap record에는 이전 OOS OID가 그대로 포함되어 있으므로, 해당 OOS 레코드에 접근할 수 있다.
+
+단, 이는 `oos_delete`의 undo 로그에 원본 OOS recdes가 기록되어 있기 때문에 가능하다.
+로그 기반 복원 경로에서 이전 OOS 레코드가 필요하면, undo 로그를 통해 OOS 레코드 자체도 복원된다.
+
+이 이전 버전 OOS 레코드는 해당 버전을 참조하는 활성 트랜잭션이 모두 종료된 후, vacuum에 의해 최종적으로 정리된다.
+
+**OOS delete 컨텍스트:**
+`oos_delete`는 OOS 페이지에서 슬롯을 `spage_delete`로 물리 삭제하여 `total_free`를 회수한다.
+Multi-chunk 레코드의 경우 `next_chunk_oid` 체인을 따라 모든 청크를 순차 삭제한다.
+삭제 시 undo 로그에 원본 recdes를 기록하므로, rollback 시 `oos_rv_redo_insert`로 원본을 복원할 수 있다.
+회수된 free 공간은 추후 `spage_compact` 또는 새로운 `oos_insert` 시 재활용된다.
 
 #### DELETE + vacuum 경로 (M2 Story 4)
 

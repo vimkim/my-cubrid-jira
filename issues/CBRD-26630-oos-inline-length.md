@@ -12,7 +12,7 @@
 
 ### 목적
 
-- OOS OID 옆에 OOS 데이터 길이(4바이트)를 함께 인라인으로 저장하여, **I/O 없이 OOS 데이터 크기를 파악** 할 수 있도록 한다.
+- OOS OID 옆에 OOS 데이터 길이(8바이트)를 함께 인라인으로 저장하여, **I/O 없이 OOS 데이터 크기를 파악** 할 수 있도록 한다.
 - 인라인 OOS 데이터 포맷: `[OOS OID (8B) | OOS length (4B)]` = 12바이트 (`OR_OOS_INLINE_SIZE`)
 
 ---
@@ -25,7 +25,7 @@
 |---|---|---|
 | 인라인 크기 | 8바이트 (`OR_OID_SIZE`) | 12바이트 (`OR_OOS_INLINE_SIZE`) |
 | 인라인 내용 | OOS OID | OOS OID + OOS length |
-| 레코드당 추가 비용 | — | OOS 컬럼당 4바이트 |
+| 레코드당 추가 비용 | — | OOS 컬럼당 8바이트 |
 
 ### 신규 매크로
 
@@ -77,6 +77,6 @@
 
 ## Remarks
 
-- 레코드당 OOS 컬럼마다 4바이트 추가 사용 (기존 8B → 12B)
+- 레코드당 OOS 컬럼마다 8바이트 추가 사용 (기존 8B → 12B)
 - CBRD-26565 에서 도입된 `heap_midxkey_get_oos_extra_size()` 의 `oos_get_length()` I/O를 제거하는 후속 최적화
 - PR: https://github.com/CUBRID/cubrid/pull/6921

@@ -42,7 +42,7 @@ if [[ "$BASENAME" =~ ^([A-Z]+-[0-9]+) ]]; then
   echo "Detected issue key: $ISSUE_KEY"
 else
   echo "File: $BASENAME"
-  read -rp "Enter Jira issue key (e.g. CBRD-12345): " ISSUE_KEY
+  read -rp "Enter Jira issue key (e.g. CBRD-12345, CUBRIDQA-12345): " ISSUE_KEY
   [ -z "$ISSUE_KEY" ] && echo "No issue key provided. Aborting." && exit 1
 fi
 

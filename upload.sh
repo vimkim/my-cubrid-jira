@@ -47,10 +47,35 @@ else
 fi
 
 echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  File : $SELECTED"
 echo "  Key  : $ISSUE_KEY"
 echo ""
-read -rp "Upload? [y/N] " CONFIRM
+
+# Fetch existing JIRA issue to prevent accidental overwrites
+echo "  [Fetching existing issue from JIRA...]"
+JIRA_JSON=$(curl -sf "http://jira.cubrid.org/rest/api/2/issue/${ISSUE_KEY}?fields=summary,status" 2>/dev/null || true)
+if [ -n "$JIRA_JSON" ]; then
+  JIRA_TITLE=$(echo "$JIRA_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['fields']['summary'])" 2>/dev/null || echo "(parse error)")
+  JIRA_STATUS=$(echo "$JIRA_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['fields']['status']['name'])" 2>/dev/null || echo "?")
+  echo "  Existing issue title  : $JIRA_TITLE"
+  echo "  Existing issue status : $JIRA_STATUS"
+else
+  echo "  (Could not fetch existing issue — may be a new issue or network error)"
+fi
+
+echo ""
+# Show local file preview (first heading + first few content lines)
+LOCAL_TITLE=$(grep -m1 '^#' "$SELECTED" 2>/dev/null | sed 's/^#\+ *//' || echo "(no heading found)")
+LOCAL_PREVIEW=$(grep -v '^#' "$SELECTED" | grep -v '^$' | head -3 2>/dev/null || true)
+echo "  Local file title : $LOCAL_TITLE"
+if [ -n "$LOCAL_PREVIEW" ]; then
+  echo "  Local content preview:"
+  echo "$LOCAL_PREVIEW" | sed 's/^/    /'
+fi
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -rp "Upload to $ISSUE_KEY? [y/N] " CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
 echo "Sanitizing Korean spacing..."

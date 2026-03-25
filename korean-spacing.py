@@ -55,14 +55,7 @@ def fix_spacing(text: str) -> str:
         last = end
 
     result.append(text[last:])
-    text = "".join(result)
-
-    # Second pass: catch Korean adjacent to special delimiters missed by the
-    # span-level regex (e.g. nested markup like *`hello`하이*).
-    text = re.sub(r'(' + KOREAN + r')([*`{}])', r'\1 \2', text)
-    text = re.sub(r'([*`{}])(' + KOREAN + r')', r'\1 \2', text)
-
-    return text
+    return "".join(result)
 
 
 def main() -> None:

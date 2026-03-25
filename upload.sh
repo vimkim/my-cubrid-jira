@@ -78,9 +78,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 read -rp "Upload to $ISSUE_KEY? [y/N] " CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
-echo "Stripping bold/italic markers..."
-python3 "$(dirname "${BASH_SOURCE[0]}")/strip-stars.py" -i "$SELECTED"
-
 echo "Sanitizing Korean spacing..."
 python3 "$(dirname "${BASH_SOURCE[0]}")/korean-spacing.py" -i "$SELECTED" -o "$SELECTED"
 

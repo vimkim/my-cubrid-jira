@@ -79,7 +79,7 @@ read -rp "Upload to $ISSUE_KEY? [y/N] " CONFIRM
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
 echo "Sanitizing Korean spacing..."
-python3 "$(dirname "${BASH_SOURCE[0]}")/korean-spacing.py" -i "$SELECTED" -o "$SELECTED"
+korean-spacing -i "$SELECTED" -o "$SELECTED"
 
 echo ""
 jira-md-upload "$ISSUE_KEY" "$SELECTED"

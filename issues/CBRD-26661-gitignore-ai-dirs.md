@@ -6,7 +6,7 @@
 
 최근 AI 코딩 도구(Claude Code, Cursor, GitHub Copilot, Aider, Continue 등)의 사용이 급증하면서, 각 도구가 프로젝트 루트에 자체 설정/캐시 디렉토리를 생성하고 있다. 이러한 디렉토리들이 `git status` 에 untracked file로 표시되어 개발자의 작업 흐름을 방해하고, 실수로 커밋될 위험이 있다.
 
-현재 CUBRID `.gitignore` 에는 `.vscode/*`, `.omc/`, `/.cache/` 등 일부 도구 디렉토리만 등록되어 있으며, AI 도구 관련 디렉토리는 체계적으로 관리되지 않고 있다.
+현재 CUBRID `.gitignore` 에는 `.vscode/*`, `/.cache/` 등 일부 도구 디렉토리만 등록되어 있으며, AI 도구 관련 디렉토리는 체계적으로 관리되지 않고 있다.
 
 ### 목적
 

@@ -41,6 +41,11 @@
 
 ---
 
+### RECDES length 는 4바이트, 2기가 제한
+
+- 문제: OOS 최대 크기가 2GB로, recdes length가 4바이트이므로 OOS recdes의 최대 크기는 2GB로 제한됨
+- 해결 방안: OOS recdes의 length를 8바이트로 확장하여 최대 크기 16EB로 확장하는 방안 검토 필요
+
 ## 최적화 아이디어
 
 ### A. update 시 불변 컬럼에 대해 OOS OID 재사용
@@ -86,6 +91,14 @@
 - **개선 방향**:
   - `is_oos` 인자를 제거하고, PEEK 모드의 `oos_read` 를 통해 dbvalue를 생성하는 방식으로 최적화
   - `spage_get_record()`, `spage_insert()` 등의 인자를 `oos_recdes` 또는 `oos_spage_insert()` 형태로 분리하여 가독성 향상
+
+---
+
+## 코드 정리
+
+### PAGE_OOS type enum 에 static assert 추가
+
+- 컴파일 시간에 perf page type 와 page type enum 의 일치 여부를 검증하는 static assert 추가
 
 ---
 

@@ -1,0 +1,351 @@
+# [OOS] [M2] [Survey] 다중 OOS 페이지 동시 fix 최적화 시 데드락 리스크 분석
+
+<http://jira.cubrid.org/browse/CBRD-26759>
+
+**상위 이슈**: [CBRD-26583](http://jira.cubrid.org/browse/CBRD-26583) -- OOS Milestone 2 Epic
+
+> **TL;DR**: 현 OOS 모듈은 한 번에 OOS 페이지를 1장만 latch하는 single-page-hold invariant 덕에 데드락-free하지만, M3에서 검토 중인 다중 페이지 최적화(`oos_insert` packing, `oos_read` PEEK prefetch, `oos_delete` batch)가 도입되면 AB-BA 사이클 가능성이 생긴다. 본 Survey는 현 안전성의 구조적 근거를 명문화하고 M3에 선결되어야 할 invariant(VPID 오름차순 ordered fix 등)를 정리하며, M2 시점에는 회귀 방어용 디버그 진입 assertion만 ship한다.
+
+## Summary
+
+- **문제 / 목적**: 다중 OOS 페이지 동시 fix 최적화 도입 전, 데드락 리스크 사전 식별과 선결 invariant 정리.
+- **원인 / 배경**: 현 OOS 코드는 single-page-hold로 데드락-free; M3에서 검토 중인 최적화 3종이 이 불변식을 깨뜨릴 수 있다.
+- **제안 / 변경**: M2 ship 범위는 공개 API 진입 assertion(AC-1)만, M3 다중 페이지 경로에는 VPID 오름차순 ordered fix를 의무화한다.
+- **영향 범위**: `oos_insert`/`oos_read`/`oos_delete` 공개 API, vacuum-OOS 연동 (CBRD-26592), M3 최적화 후속 티켓 전반.
+
+---
+
+## Description
+
+### 배경
+
+현재 `feat/oos` 브랜치의 OOS 모듈은 `oos_insert`, `oos_read`, `oos_delete` 모든 경로에서 **한 번에 OOS 페이지를 1장만 latch한다는 불변식(single-page-hold invariant)** 을 지키고 있어 OOS 레이어 내부에서는 트랜잭션 간 데드락이 발생하지 않는다.
+
+그러나 향후 검토 중인 최적화 아이디어가 적용되면 이 불변식이 깨진다. 동시에 여러 OOS 페이지를 latch한 채 다음 페이지를 fix하는 경로가 생기면 두 트랜잭션이 서로 다른 순서로 페이지를 잡아 AB-BA 사이클을 만들 수 있다.
+
+본 분석이 다루는 최적화 아이디어는 다음 세 가지이다 (내부 설계 노트에서 각각 *Optimization C*, *Optimization D*, *batch delete* 로 식별되어 왔으나, 본 문서에서는 동일한 항목을 다음과 같은 서술적 명칭으로 참조한다).
+
+- **Optimization 1: `oos_insert` 다중 청크 packing** *(내부 설계 노트의 Optimization C -- "Minimize `pgbuf_fix` for multiple `oos_insert`")*: 같은 페이지에 여러 청크를 묶어 한 번의 `pgbuf_fix` 로 처리하거나, N개의 페이지를 동시에 잡고 packing 결정을 한다.
+- **Optimization 2: `oos_read` PEEK + prefetch** *(내부 설계 노트의 Optimization D -- "`oos_read` PEEK mode")*: PEEK 모드에서 reader가 chunk_i를 latch한 채 chunk_{i+1} 을 미리 fix하여 I/O를 overlap시킨다.
+- **Optimization 3: `oos_delete_chain` batch delete**: 체인 전체를 한 sysop 안에서 처리하기 위해 모든 청크 페이지를 동시에 latch하고 일괄 log + delete한다.
+
+이는 M2 Epic의 Remarks 표에 이미 식별된 리스크 ("한 레코드 읽기에 여러 OOS page fix 시 데드락 -- ordered fix 정책 검토 필요") 의 구체적 분석 및 대응 방안을 정리한 문서이다.
+
+### 목적
+
+1. 현재 OOS 모듈이 데드락-free한 **구조적 근거** 를 명문화한다.
+2. 향후 최적화 (`oos_insert` 다중 페이지 packing, `oos_read` PEEK + prefetch, `oos_delete` batch) 가 도입될 때 발생 가능한 **데드락 시나리오** 를 사전 식별한다.
+3. 최적화와 함께 도입해야 할 **선결 invariant** 와 구현 가이드라인을 제시한다.
+
+---
+
+### AS-IS: 현재 OOS 모듈의 데드락 안전성
+
+OOS 레이어 내부의 모든 페이지 latch 흐름을 audit한 결과, 네 가지 주요 시나리오가 모두 SAFE이다.
+
+| 시나리오 | 결과 | 근거 |
+|---|---|---|
+| INSERT x INSERT | SAFE | bestspace 후보는 `PGBUF_CONDITIONAL_LATCH` 로 zero-wait 탐색 (`oos_file.cpp:544`). 헤더는 데이터 페이지 unconditional re-fix 이전에 release됨 (`:1537` -> `:1543`) |
+| INSERT x READ | SAFE | 양측 모두 동시에 잡는 OOS 페이지는 1장. 차단되는 측은 그 시점에 다른 페이지를 잡고 있지 않음 |
+| READ x READ | SAFE | READ latch는 호환 |
+| INSERT x VACUUM | SAFE (NEEDS-INVARIANT) | M2 vacuum 연동 (CBRD-26592) 시 cross-layer 순서 (heap page -> OOS page) 를 어겨서는 안 됨 |
+
+이 안전성은 두 가지 구조적 invariant 위에 성립한다.
+
+#### Invariant A: Single-page-hold
+
+OOS 코드 어느 경로에서도 동시에 2장 이상의 OOS 페이지를 latch하지 않는다.
+
+| 경로 | 보장 메커니즘 |
+|---|---|
+| `oos_insert_within_page` | `auto_unfix_page_ptr` RAII (`page_buffer_util.hpp:39`) -- 함수 종료 시 자동 unfix |
+| `oos_insert_across_pages` | 청크 루프 한 회당 `oos_insert_within_page` 호출 후 모든 page 해제 (`oos_file.cpp:1117-1148`) |
+| `oos_read_within_page` | `scope_exit page_unfixer` (`:1305-1308`) |
+| `oos_read_across_pages` | 청크별 `oos_read_within_page` 직렬 호출, 다음 청크 fix 전 이전 청크 해제 (`:1251-1275`) |
+| `oos_delete_chain` | while 루프 본문의 `scope_exit page_unfixer` (`:1675-1678`) -- 다음 OID로 진행 전 unfix |
+
+**Invariant A의 조건부 경로 검증 (Critique 7 대응)**: `oos_find_best_page` 의 conditional-success 경로, 즉 `oos_stats_find_page_in_bestspace` 가 `found_page != NULL` 을 반환하는 경우에도 헤더 동시 보유 여부를 확인한다.
+
+`oos_find_best_page` 내부 흐름:
+
+1. `:1438` -- `hdr_page` = `pgbuf_fix(hdr_vpid, WRITE, UNCONDITIONAL)` -> 헤더 취득
+2. `:1460-1463` -- `oos_stats_find_page_in_bestspace` 호출. 이 함수 내부에서 conditional latch로 `found_page` 취득 (`:544-545`). 함수 반환 시 `found_page` 는 caller 소유
+3. `:1464` -- `result == OOS_FINDSPACE_FOUND` 시 while 루프를 break
+4. `:1528` -- `if (found_page != NULL)` 분기 진입
+5. `:1536-1537` -- 헤더에 dirty mark 후 **`pgbuf_unfix_and_init(hdr_page)`** -> 헤더 즉시 해제
+6. `:1541` -- **`pgbuf_unfix_and_init(found_page)`** -> conditional 후보도 해제
+7. `:1543-1544` -- `pgbuf_fix_auto_unfix(vpid, WRITE, UNCONDITIONAL)` -> unconditional re-fix
+
+즉, conditional-success 경로에서 `found_page` 를 보유한 시점(`:1464` break 이후)에 `hdr_page` 도 여전히 보유 상태이다. **두 페이지를 동시에 보유하는 창이 `:1528`-`:1537` 구간에 존재한다**. 그러나 이 창은 실질적 데드락 위험이 없다.
+
+- `found_page` 는 conditional latch 성공으로 취득되었으므로 해당 시점에 경쟁자가 없었다.
+- `hdr_page` 는 이 창에서 새로운 pgbuf_fix 를 호출하지 않는다 (dirty/unfix만 수행).
+- Invariant A의 정확한 표현은 "unconditional latch를 기다리는 시점에 다른 OOS 페이지를 보유하지 않는다" 이다.
+
+Invariant A를 다음과 같이 정확히 재기술한다.
+
+> OOS 코드의 어느 경로에서도 **unconditional** pgbuf_fix 호출 시점에 다른 OOS 페이지 latch를 보유하지 않는다. Conditional latch 성공 후 헤더와 일시적으로 공존하는 창 (`oos_find_best_page:1528-1537`) 은 새로운 blocking wait을 포함하지 않으므로 데드락 위험이 없다.
+
+#### Invariant B: Release-before-unconditional-refix
+
+`oos_find_best_page` 는 unconditional re-fix 직전에 헤더와 conditional 후보 페이지를 모두 release한다.
+
+```
+oos_file.cpp:1537  pgbuf_unfix_and_init (hdr_page);    // 헤더 해제
+oos_file.cpp:1541  pgbuf_unfix_and_init (found_page);  // conditional 후보 해제
+oos_file.cpp:1543  pgbuf_fix_auto_unfix (vpid, WRITE, UNCONDITIONAL);
+```
+
+unconditional fix가 차단될 가능성이 있는 시점에 호출자는 다른 어떤 OOS latch도 잡고 있지 않다.
+
+---
+
+### TO-BE: 최적화가 도입되면 깨지는 가정
+
+#### Optimization 1: `oos_insert` 다중 청크 packing
+
+같은 페이지에 여러 청크를 묶어 한 번의 `pgbuf_fix` 로 처리하거나, N개의 페이지를 동시에 잡고 packing 결정을 한다.
+
+**데드락 시나리오 -- 구체적 코드 경로 (Critique 1 대응)**:
+
+현재 `oos_insert_across_pages` (`:1101`) 는 각 청크를 독립적으로 `oos_insert_within_page` -> `oos_find_best_page` 를 통해 삽입하고, 각 호출 후 페이지를 완전히 해제한다. Optimization C는 이 패턴을 바꿔 "여러 청크를 위한 페이지를 미리 묶어 fix한 뒤 한 sysop에서 일괄 삽입"하는 형태가 될 것이다. 이 경우 두 트랜잭션이 반대 순서로 페이지를 선택하는 경로가 생긴다.
+
+- T1: chunk_0 -> `oos_find_best_page` -> 페이지 A 선택 (conditional 성공), 보유 유지
+- T1: chunk_1 -> `oos_find_best_page` -> 페이지 B 선택 시도 -> unconditional wait
+- T2: chunk_0 -> 페이지 B 선택, 보유 유지
+- T2: chunk_1 -> 페이지 A 선택 시도 -> unconditional wait -> **AB-BA**
+
+bestspace 해시는 VFID 기반으로 조회하므로 (`:480-515`) 두 트랜잭션이 동일한 후보 집합에서 서로 다른 순서로 선택하는 상황이 실제로 가능하다. 이 시나리오는 Optimization C 구현 시점에만 해당한다 (AS-IS 안전성은 위의 분석 표 참조).
+
+bestspace 휴리스틱이 두 트랜잭션을 다른 페이지로 유도할 가능성이 높지만, 그것은 확률적 완화이지 구조적 보장이 아니다. 따라서 ordered-fix 요건은 유지한다.
+
+#### Optimization 2: `oos_read` PEEK + prefetch
+
+PEEK 모드에서 reader는 chunk_i를 latch한 채 chunk_{i+1} 을 미리 fix하여 I/O를 overlap시킨다.
+
+**데드락 시나리오 -- 현실성 평가 (Critique 3 대응)**:
+
+현재 `oos_read_within_page` (`:1288`) 는 READ latch를 사용하고 (`:1296`), PEEK으로 spage_get_record 후 데이터를 복사하고 페이지를 즉시 해제한다. 실제 prefetch AB-BA가 발생하려면 다음 조건이 동시에 성립해야 한다.
+
+1. reader가 chunk_i를 READ로 보유한 채 chunk_{i+1} 을 unconditional READ로 대기
+2. inserter가 chunk_{i+1} 을 WRITE로 보유한 채 chunk_i 를 WRITE로 대기
+
+조건 2는 삽입 시 이미 존재하는 페이지를 재방문하는 경우에만 발생하는데, 현재 `oos_insert_across_pages` 는 새 슬롯을 역순으로 할당하므로 (`:1117`) 기존 체인 페이지를 재방문하지 않는다. **따라서 이 시나리오는 현재 코드에서도 Optimization D에서도 현실적으로 발생하기 어렵고, 이론적 최악 사례에 해당한다.** 분석 문서에는 포함하되, 권장 사항은 간소화한다: PEEK prefetch는 conditional latch + fallback으로만 구현하면 충분하며, ordered fix까지 요구하지 않는다.
+
+#### Optimization 3: `oos_delete_chain` batch delete
+
+체인 전체를 한 sysop 안에서 처리하기 위해 모든 청크 페이지를 동시에 latch하고 일괄 log + delete한다.
+
+**2-pass 설계와 현재 코드의 동작 (Critique 2 대응)**:
+
+현재 `oos_delete_chain` (`:1659`) 은 while 루프를 1-페이지씩 진행하며, 각 이터레이션에서 `scope_exit page_unfixer` (`:1675`) 가 현재 페이지를 unfix한 뒤 `current_oid = next_chunk_oid` (`:1721`) 로 이동한다. 즉, **pass-1 (VPID 수집)에 해당하는 단계가 현재 구현에서는 없다** -- 체인 walk와 삭제가 동시에 이루어지기 때문에 latch를 보유하는 구간은 한 페이지씩이다.
+
+Batch delete 최적화에서 2-pass 도입 시 검토해야 할 사항:
+
+- **pass-1 latch 미보유 방식 -- X_LOCK 선결 조건 미검증**: pass-1에서 `spage_get_record(PEEK)` 로 next_chunk_oid를 읽고 즉시 unfix한다. 체인이 pass-1과 pass-2 사이에 변경되지 않음을 보장하려면, 동일 체인을 동시에 삭제하는 다른 트랜잭션이 없어야 한다. `oos_delete_chain` 바로 앞 TODO 주석 (`:1643`) 은 "caller holds row-level X_LOCK" 를 가정하지만, 이는 caller-wiring 검증이 아직 완료되지 않은 **가정** 이다. **pass-1 latch-free가 안전하다는 주장은 이 X_LOCK 선결 조건이 실제 caller에서 보장됨을 확인한 이후에만 성립한다.** 따라서 M3 batch-delete 2-pass 설계는 caller-wiring 검증 완료 -- [TBD: caller-wiring 검증 티켓] -- 에 의존(blocked)된다. 검증 전에 pass-1을 latch-free로 구현하는 것은 안전하다고 단언할 수 없다.
+- **비용 비교**: 현재 1-page-at-a-time walk는 N청크 체인에 대해 N회의 pgbuf_fix/unfix이다. 2-pass batch는 2N회의 fix/unfix가 되어 비용이 증가한다. 단, batch의 이점은 하나의 sysop으로 묶어 log I/O를 줄이는 데 있다. M3 시점에 측정 후 결정한다.
+
+**데드락 시나리오**:
+
+```
+체인 X: 페이지 A -> 페이지 B  (체인 X의 청크가 A, B 페이지에 분산)
+체인 Y: 페이지 B -> 페이지 A  (체인 Y의 청크가 B, A 페이지에 분산)
+T0: vacuum1 -- 체인 X 처리, A WRITE 보유, B fix 시도
+T1: vacuum2 -- 체인 Y 처리, B WRITE 보유, A fix 시도
+==> AB-BA 데드락
+```
+
+체인의 OID 순서는 bestspace 결정에 따른 것이므로 VPID-ordered가 아니다 -- 순서대로 walk하는 것만으로는 데드락을 막을 수 없다. VPID 정렬 + ordered fix가 필수이다.
+
+---
+
+### 도입해야 할 Invariant
+
+#### Invariant 1: VPID 오름차순 ordered fix
+
+동시에 2장 이상 OOS 페이지를 latch하는 모든 경로는 다음 절차를 따른다.
+
+1. 대상 VPID 목록을 수집한다 (예: 체인 walk 1차 패스, pass-1은 latch 미보유).
+2. `(volid, pageid)` 오름차순으로 정렬한다.
+3. 정렬된 순서대로 `pgbuf_fix` 한다.
+
+체인 자체는 VPID 순서가 아니므로 batch delete는 필연적으로 **2-pass** 가 된다 (1차: latch 없이 VPID 수집, 2차: 정렬 후 fix + delete + log).
+
+#### Invariant 2: `pgbuf_ordered_fix` API 활용 -- 도입 전 비용 평가 필요
+
+CUBRID는 이미 heap/btree 경로에서 다중 페이지 fix용 `pgbuf_ordered_fix` 를 사용한다. 이 API는 deadlock detection + retry를 내장한다. OOS 측에서도 다중 페이지를 잡는 신규 경로의 후보 API이다.
+
+단, `pgbuf_ordered_fix` 의 retry 비용은 heap/btree 기존 callers를 기준으로 측정된 데이터가 현재 없다. OOS에 도입하기 전에 `heap_file.c`, `btree.c` 의 `pgbuf_ordered_fix` 호출부에서 retry rate를 확인하거나 벤치마크를 수행해야 한다. **측정 없이 도입을 권장하지 않는다** -- VPID 정렬 ordered fix (Invariant 1) 가 더 단순하고 예측 가능하다.
+
+#### Invariant 3: Opportunistic prefetch는 conditional latch + fallback
+
+PEEK reader prefetch처럼 "가능하면 좋고, 안 되면 직렬로 가도 되는" 경로는 `PGBUF_CONDITIONAL_LATCH` 로 시도하고 실패 시 현재 페이지를 release하고 직렬 walk로 fallback한다. 이렇게 하면 unconditional blocking wait이 없으므로 사이클이 형성되지 않는다. Optimization D (PEEK prefetch) 에는 ordered fix가 아닌 이 패턴으로 충분하다.
+
+#### Invariant 4: Cross-layer 호출 순서 -- 실제 코드와의 정합
+
+heap/vacuum 레이어가 OOS API를 호출할 때의 latch 순서를 고정한다. 다음 순서는 **M2 vacuum 연동 (CBRD-26592) 에서 진입하는 미래 경로** 에 대한 제약이다.
+
+```
+heap page -> OOS header -> OOS data pages (VPID asc)
+```
+
+**현재 코드에서 3-레벨 중첩은 존재하지 않는다.** `oos_find_best_page` (`:1438-1569`) 를 보면, 헤더 latch(`:1438`) -> bestspace search(`:1460`) -> conditional candidate 취득(`:544`) -> `OOS_FINDSPACE_FOUND` 시 break -> 헤더 해제(`:1537`) -> candidate 해제(`:1541`) -> data page unconditional fix(`:1543`) 순서이다. 즉 헤더와 데이터 페이지가 동시에 unconditional로 보유되는 구간은 없으며, "OOS header -> OOS data" 는 사실상 2개의 분리된 critical section이다.
+
+Invariant 4는 현재 구현 설명이 아닌 **미래 경로에 대한 설계 제약** 이다: vacuum이 heap page를 보유한 채 `oos_delete_chain` 또는 `oos_find_best_page` 를 호출하는 경로가 생기면 위 순서를 위반하지 않음을 코드 주석으로 명시해야 한다. 역순 (OOS page 보유 중 heap page fix) 은 절대 금지한다.
+
+#### Invariant 5: bestspace mutex와 pgbuf_fix 의 비중첩 -- 스타일 규칙으로 재분류
+
+`oos_Bestspace->bestspace_mutex` 가 `pgbuf_fix` 를 감싸는 역방향 경로가 현재 존재하는지를 코드로 검증한다.
+
+모든 `bestspace_mutex` lock/unlock 호출부:
+
+- `:271-325` -- `oos_stats_add_bestspace`: lock -> hashtable 조작 -> unlock. `pgbuf_fix` 없음.
+- `:337-351` -- `oos_stats_del_bestspace_by_vpid`: lock -> hashtable 조작 -> unlock. `pgbuf_fix` 없음.
+- `:363-379` -- `oos_stats_del_bestspace_by_vfid`: lock -> hashtable 조작 -> unlock. `pgbuf_fix` 없음.
+- `:480-515` -- `oos_stats_find_page_in_bestspace` (Phase A): lock -> candidate_vpid 선택 -> **unlock** (`:515`) -> **그 이후** Phase C에서 `pgbuf_fix` (`:544`).
+
+`pgbuf_fix` 가 mutex 보유 상태에서 호출되는 경로는 현재 코드에 존재하지 않는다. 따라서 Invariant 5는 **데드락 불변식이 아닌 스타일 규칙** 이다. "bestspace mutex 내부에서 `pgbuf_fix` 를 호출하지 않는다"는 코딩 컨벤션으로 문서화하되, 데드락 invariant 목록에서 제거한다.
+
+---
+
+## Specification Changes
+
+N/A -- 본 이슈의 산출물은 (1) 분석/Survey 문서와 (2) 디버그 진입 assertion 추가뿐이며, 사용자 가시 스펙 변경 없음.
+
+다중 페이지 최적화 시점(M3 이후)에 도입할 invariant(VPID 오름차순 ordered fix, conditional + fallback prefetch 등)는 본 이슈가 아닌 후속 M3 티켓에서 스펙으로 반영한다.
+
+---
+
+## Implementation
+
+### 권장 구현 순서
+
+| 순서 | 작업 | 비고 | M 단계 |
+|---|---|---|---|
+| 1 | 디버그 빌드 assertion 추가 | 공개 API (`oos_insert`, `oos_read`, `oos_delete`) 진입 시점에 thread가 보유한 OOS 페이지 수와 VPID 순서 검증 | M2 즉시 |
+| 2 | cross-layer 호출 순서 주석 명문화 | CBRD-26592 내부에서 실제 call-site 코드 작성 시 해당 경로에 직접 명문화 | CBRD-26592 |
+| 3 | `oos_delete_chain` batch 화 (선택) | 1차 패스 latch-free VPID 수집 -> 정렬 -> sysop 안에서 ordered fix. M3 전 비용 측정 필요 | M3 |
+| 4 | `oos_read` PEEK prefetch (선택) | conditional latch + fallback 패턴. ordered fix 불필요 | M3 |
+| 5 | `oos_insert` packing (선택) | 다중 페이지 동시 fix 시 VPID 정렬 ordered fix 적용 | M3 이후 |
+
+### M2 시점의 범위 정의
+
+M2에서 본 이슈가 ship하는 실체는 다음 한 가지로 한정한다.
+
+1. **디버그 assertion**: `oos_insert`, `oos_read`, `oos_delete` 공개 진입점에서 thread가 OOS 페이지를 0장 보유 중임을 assert하는 코드 (단, `oos_find_best_page` 내부의 conditional + 헤더 공존 창은 assertion 대상에서 제외 -- Invariant A 재기술 참조).
+
+Invariant 4 (cross-layer 호출 순서) 는 vacuum-OOS 연동 코드가 실제로 작성되는 CBRD-26592 내부에서 해당 call-site에 직접 명문화한다. 현재 `oos_file.cpp:1000` 및 `:1755` 는 TODO 플레이스홀더만 존재하며 실제 vacuum 호출 경로가 없으므로, M2 시점에 선제적으로 주석을 삽입하지 않는다.
+
+다중 페이지 최적화 (ordered fix 헬퍼, batch delete, PEEK prefetch) 는 M3 이후 별도 티켓으로 분리한다.
+
+### Stress Test 추가
+
+다음 워크로드를 deadlock detection (`er_lk_unilaterally_aborted_due_to_deadlock`) + 짧은 `lock_timeout` 하에서 실행한다.
+
+**파라미터 명세 (Critique 9 대응)**:
+
+- **N** = 8 concurrent inserter threads (multi-chunk records, 3 chunks each)
+- **M** = 4 concurrent reader threads (`oos_read` on existing chains)
+- **vacuum** = 1 thread
+- **페이지 크기** = 4096 bytes (기본값)
+- **레코드 크기** = 3 x (max_chunk_size - sizeof(OOS_RECORD_HEADER)) -- 3-chunk 체인 강제
+- **runtime** = 60초 또는 10,000 operation 완료 중 빠른 쪽
+- **pass 기준** = deadlock abort 0건, `ER_LK_UNILATERALLY_ABORTED` 로그 0건
+
+**결정론적 AB-BA 단위 테스트**: 확률적 stress 테스트 외에, 다음 조건을 주입하는 단위 테스트를 추가한다.
+
+1. 두 스레드 T1, T2를 생성한다.
+2. T1이 페이지 A conditional latch 성공 후 sleep(주입된 wait) 하도록 `pgbuf_fix` wrapper를 interpose한다.
+3. T2가 동시에 페이지 B를 취득 후 페이지 A를 시도하도록 배치한다.
+4. Optimization C/batch-delete 코드가 ordered fix를 사용할 경우 retry/재정렬이 발생하고 deadlock이 없어야 한다.
+
+이 테스트는 ordered fix Invariant 1의 회귀 방어선이 된다.
+
+---
+
+## Acceptance Criteria
+
+M2에서 ship하는 코드 (AC-1) 와 M3 구현 시 요구되는 AC (AC-3 - AC-5) 를 명확히 구분한다.
+
+**[M2 -- 코드 ship 대상]**
+
+- [ ] **AC-1**: `oos_insert`, `oos_read`, `oos_delete` 공개 진입점에, debug 빌드에서 thread가 OOS 페이지 0장 보유를 assert하는 코드가 추가된다. 검증 방법: debug 빌드에서 해당 함수 진입 시 OOS 페이지 1장을 의도적으로 보유하면 assert 실패. 디버그 assertion은 `oos_insert`/`oos_read`/`oos_delete` public entry points에서만 발동; `oos_find_best_page` 내부 헬퍼에서는 발동하지 않는다.
+
+cross-layer 호출 순서 문서화 (Invariant 4) 는 본 이슈 M2 범위에서 제외된다. 실제 vacuum-OOS call-site 코드가 작성되는 CBRD-26592 에서 해당 경로에 직접 명문화한다.
+
+**[M3 이후 -- 다중 페이지 최적화 구현 시 요구]**
+
+- [ ] **AC-3**: `oos_delete_chain` batch 화 시, VPID 수집 pass (latch-free) -> 정렬 -> ordered fix 순서가 코드로 구현된다. 검증 방법: 두 vacuum 스레드가 역순 체인을 동시에 처리하는 단위 테스트에서 deadlock abort 0건.
+- [ ] **AC-4**: `oos_read` PEEK prefetch 구현 시, 다음 청크 fix는 `PGBUF_CONDITIONAL_LATCH` 만 사용하고 실패 시 직렬 fallback한다. 검증 방법: conditional latch 실패 경로를 강제하는 단위 테스트에서 UNCONDITIONAL wait 없이 완료됨.
+- [ ] **AC-5**: 다중 OOS 페이지 동시 fix를 포함하는 모든 신규 경로에 대해, N=8 inserter + M=4 reader + 1 vacuum, 60초 stress test가 deadlock abort 0건으로 통과된다.
+
+**[트래킹]**
+
+- [ ] **AC-6**: M2 Epic Remarks 표의 ordered fix 항목이 본 이슈 CBRD-26759 로 close 처리됨.
+
+---
+
+## Definition of done
+
+- [ ] AC-1 (M2 ship 범위) 구현 및 디버그 빌드 통과
+- [ ] AC-6 (트래킹) -- 상위 Epic CBRD-26583 의 Remarks에 본 이슈 closure 반영
+- [ ] 본 분석 문서가 JIRA 이슈 본문 또는 첨부로 업로드됨
+- [ ] QA 통과 (디버그 빌드 진입 assertion 회귀 없음)
+- [ ] AC-3, AC-4, AC-5 (M3 이후) 는 별도 티켓에서 추적되며 본 이슈 close 시점의 DoD 항목이 아니다
+
+---
+
+## Remarks
+
+### M2 시점에 분석을 작성하는 이유 (Critique 8 대응)
+
+본 분석은 "지금 구현하라"가 아닌 다음 이유로 M2 시점에 작성된다.
+
+1. **진입 assertion (AC-1)** 은 지금 추가해야 한다. 단순하고 비용이 낮으며, 향후 잘못된 최적화가 들어올 때 즉시 포착된다. 구현 후에 assertion을 추가하면 그 사이 슬며시 도입된 버그를 놓친다.
+
+M2에서 본 이슈가 ship하는 코드는 AC-1 (디버그 assertion) 하나뿐이다.
+
+Invariant 4 (cross-layer 호출 순서) 는 CBRD-26592 내부에서 실제 vacuum-OOS call-site 코드가 작성될 때 해당 경로에 직접 명문화한다. 현재 `oos_file.cpp` 에는 `:1000` 과 `:1755` 에 TODO 플레이스홀더만 존재하고 실제 vacuum 호출 경로가 없다. 따라서 "M2 vacuum 연동 (CBRD-26592) cross-layer ordered fix 요건을 이미 건드린다"는 주장은 사실이 아니며, Invariant 4 문서화는 선제적으로 M2에 포함시키지 않는다.
+
+다중 페이지 최적화 자체 (ordered fix 헬퍼, batch delete, PEEK prefetch) 는 M2에서 구현하지 않으며 AC에도 포함하지 않았다.
+
+### 우선순위
+
+| 단계 | 시점 | 근거 |
+|---|---|---|
+| 즉시 (M2) | 디버그 assertion 추가 (AC-1) | 회귀 방지 비용이 매우 낮음 |
+| CBRD-26592 내부 | cross-layer 호출 순서 명문화 (Invariant 4) | 실제 vacuum-OOS call-site가 작성될 때 해당 경로에 직접 적용; 현재 코드에는 TODO 플레이스홀더만 존재 |
+| M3 이후 | OOS API 다중 페이지 최적화 본 구현 | Invariant 1-3 선결, caller-wiring 검증([TBD: caller-wiring 검증 티켓]) 완료 후, 비용 측정 후 결정 |
+
+### 관련 이슈
+
+| 이슈 | 관련도 |
+|---|---|
+| CBRD-26583 (M2 Epic) | 상위 이슈, 본 분석의 트리거 |
+| CBRD-26592 (Vacuum 연동) | cross-layer 순서 검토 필요 |
+| CBRD-26609 (`oos_delete` 구현) | 현재 single-page-hold 패턴의 기준 구현 |
+| CBRD-26658 (3-Tier Bestspace) | conditional latch 정책의 적용 사례 |
+
+---
+
+## 참고 코드
+
+- `src/storage/oos_file.cpp:447-621` -- `oos_stats_find_page_in_bestspace` (conditional latch, mutex 해제 순서: mutex unlock :515, `pgbuf_fix` CONDITIONAL :544)
+- `src/storage/oos_file.cpp:627-795` -- `oos_stats_sync_bestspace` (페이지별 CONDITIONAL fix-use-unfix :698-714, latch 미보유 중 bestspace hash 업데이트)
+- `src/storage/oos_file.cpp:1101-1154` -- `oos_insert_across_pages` (청크간 0-page-hold 보장: 각 청크 `oos_insert_within_page` 호출 후 RAII 해제)
+- `src/storage/oos_file.cpp:1157-1217` -- `oos_insert_within_page` (`auto_unfix_page_ptr` RAII: `:1171` `pgbuf_fix_auto_unfix`)
+- `src/storage/oos_file.cpp:1220-1285` -- `oos_read_across_pages` (forward 직렬 walk: 청크별 scope 종료 시 해제 `:1262-1265`)
+- `src/storage/oos_file.cpp:1288-1333` -- `oos_read_within_page` (`scope_exit` unfix :1305, UNCONDITIONAL READ :1296)
+- `src/storage/oos_file.cpp:1422-1582` -- `oos_find_best_page` (헤더 취득 :1438, conditional 결과 취득 후 공존 창 :1528-1537, 헤더 unfix :1537, candidate unfix :1541, unconditional re-fix :1543)
+- `src/storage/oos_file.cpp:1659-1725` -- `oos_delete_chain` (1-page-at-a-time: scope_exit :1675, next_oid 전진 :1721)
+- `src/storage/page_buffer_util.hpp:26-56` -- `auto_unfix_page_ptr` 정의
+- CUBRID 기존 ordered fix 사용처: `src/storage/heap_file.c`, `src/storage/btree.c` 의 `pgbuf_ordered_fix` 호출부
+
+---
+
+## Related Issues
+
+- **parent**: [CBRD-26583](http://jira.cubrid.org/browse/CBRD-26583)
+- **CBRD-26592**: Vacuum 연동 (cross-layer 호출 순서 명문화 위치)
+- **CBRD-26609**: `oos_delete` 구현 (현재 single-page-hold 패턴의 기준 구현)
+- **CBRD-26658**: 3-Tier Bestspace (conditional latch 정책의 적용 사례)

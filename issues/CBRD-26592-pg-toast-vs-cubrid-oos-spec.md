@@ -8,15 +8,15 @@
 
 | 항목 | PostgreSQL TOAST | CUBRID OOS | QA 관점 시사점 |
 |---|---|---|---|
-| 외부 저장 트리거 조건 | 행 전체 크기가 페이지의 1/4를 초과하면 큰 컬럼부터 단계적으로 외부화 | 레코드 추정 크기가 페이지의 1/8을 넘는 시점에서, 그 시점에 한해 512바이트 초과 가변 길이 컬럼을 모두 외부화 (두 단계 게이팅: 레코드 임계 + 컬럼 임계) | 기본 빌드(PG 8KB 페이지, CUBRID 16KB 페이지)에서 두 임계 절댓값은 ~2KB로 거의 같음 (PG ~2040 B, CUBRID 2048 B). 임계 근처 (~2040 B for PG, 2048 B for CUBRID) 와 컬럼 단독 임계 (CUBRID 512 B) 부근의 boundary TC 필수 |
+| 외부 저장 트리거 조건 | 행 전체 크기가 페이지의 1/4를 초과하면 큰 컬럼부터 단계적으로 외부화 | 레코드 추정 크기가 페이지의 1/8을 넘는 시점에서, 그 시점에 한해 512바이트 초과 가변 길이 컬럼을 모두 외부화 (두 단계 게이팅: 레코드 임계 + 컬럼 임계). **추후 변경 가능** | 기본 빌드(PG 8KB 페이지, CUBRID 16KB 페이지)에서 두 임계 절댓값은 ~2KB로 거의 같음 (PG ~2040 B, CUBRID 2048 B). 임계 근처 (~2040 B for PG, 2048 B for CUBRID) 와 컬럼 단독 임계 (CUBRID 512 B) 부근의 boundary TC 필수. 단, CUBRID 임계 정책은 추후 변경 가능성이 있어 임계값을 하드코드하지 않고 스펙 갱신 시 따라가도록 TC 설계 권장 |
 | 외부화 진행 방식 | 가장 큰 컬럼부터 한 라운드씩 처리하다가 임계 아래로 떨어지면 즉시 멈춤 (잔여 큰 컬럼이 행 안에 남을 수 있음) | 조건이 만족되면 적격 컬럼을 단일 패스로 일괄 외부화 (잔여 인라인된 큰 가변 컬럼 없음. 단, 고정 길이 컬럼은 크기와 무관하게 항상 인라인) | CUBRID는 가변 컬럼에 대해 더 공격적으로 외부화함. "외부 저장된 컬럼 수"를 검증하는 TC에서 동일 입력에 대해 두 제품 결과가 다르게 나오는 것은 사양상 정상 |
 | 압축 사용 가능 여부 | 기본 활성, 알고리즘 2종(pglz/lz4) 지원, 외부 저장 시에도 압축 상태 유지 | 미지원 (압축 단계 자체 부재) | 동일 데이터셋 INSERT 후 디스크 사용량 차이의 상당 부분이 압축에서 기인하므로, CUBRID-PG 디스크 사용량 비교 TC는 PG 측 압축 끄기 (`SET COMPRESSION pglz` 무력화 또는 `EXTERNAL` storage option) 조건도 함께 측정해야 fair comparison |
 | 컬럼별 사용자 정책 (DDL 옵션) | `ALTER TABLE ... ALTER COLUMN ... SET STORAGE` 4종 옵션, `SET COMPRESSION` 으로 알고리즘 지정 가능 | DDL 옵션 없음. 가변 길이 컬럼이면 자동 분류 | DDL 기반 컬럼 정책 시나리오는 CUBRID 대상으로는 작성 불가. CUBRID TC는 자동 분류 기준(가변 길이 + 크기) 검증에 집중 |
-| 단일 외부값 최대 크기 | 약 1GB | 약 2GB (실효 상한은 청크 수·슬롯 페이지·OID 공간 결합으로 더 작을 수 있음 — 미검증, Open Question 6) | 거대 LOB-like 값 경계 TC 한계가 다름. CUBRID는 더 큰 값을 받을 수 있으나 실효 상한이 미검증이므로 거대 값 TC 설계 시 Open Question 6의 결합 한계를 함께 검증 필요 |
-| UPDATE 시 외부값 재사용 | 변경되지 않은 컬럼은 기존 외부 저장값을 그대로 재참조하여 재기록 비용 절약 | 동일 최적화 여부 코드상 미확인 (Open Question 1) | 이 시나리오에 대한 회귀 TC를 명시적으로 작성: 동일 행에 대한 무관 컬럼 UPDATE N회 후 디스크 사용량/실행 시간 측정. PG와의 절대 비교가 아닌 CUBRID 자체의 회귀 검출이 목적 (미검증) |
+| 단일 외부값 최대 크기 | 약 1GB | 약 2GB (실효 상한은 청크 수·슬롯 페이지·OID 공간 결합으로 더 작을 수 있음 — 미검증, Open Question 4) | 거대 LOB-like 값 경계 TC 한계가 다름. CUBRID는 더 큰 값을 받을 수 있으나 실효 상한이 미검증이므로 거대 값 TC 설계 시 Open Question 4의 결합 한계를 함께 검증 필요 |
+| UPDATE 시 외부값 재사용 | 변경되지 않은 컬럼은 기존 외부 저장값을 그대로 재참조하여 재기록 비용 절약 | 현재 미지원 (변경되지 않은 외부 컬럼도 UPDATE 시 재기록됨) | 거대 외부 컬럼이 포함된 행에 대해 무관 컬럼만 UPDATE하는 시나리오에서 CUBRID는 외부 데이터 재기록 비용이 발생함이 사양. 회귀 TC: 동일 행에 대한 무관 컬럼 UPDATE N회 후 디스크 사용량/실행 시간 측정 (CUBRID 자체의 회귀 검출이 목적이며, PG와의 절대 비교가 아님) |
 | 백업/롤백/복구 동작 | 외부 데이터도 일반 행과 동일한 트랜잭션 단위로 자동 롤백/복구 | 청크 단위 개별 undo 기록을 역순으로 재생하여 복구. 트랜잭션 단위 일관성은 보장되지만 메커니즘이 다름 | 둘 다 ACID 보장. 다만 CUBRID는 청크 수에 선형 비례하는 undo 로그가 발생 (예: 1 GB 값 = 약 500개 청크 분량 undo 레코드). 거대 값 ROLLBACK TC에서 WAL 사이즈/log volume 모니터링 권장 |
-| 동시성/MVCC 관점 동작 | 외부 데이터 자체가 MVCC 가시성 평가 대상 (자체 버전 보유) | 외부 청크는 별도 가시성 슬롯이 없고 메인 행 가시성을 따라간다고 가정 (Open Question 4) | 사용자 관점 기대치는 동일한 결과지만, CUBRID 측 가시성 상속 메커니즘은 코드 trace 미완 (Open Question 4) — 격리 수준별 multi-session TC가 사양 검증 자체의 핵심 (미검증) |
-| 사용자 가시 카탈로그 | `pg_class.reltoastrelid` 컬럼으로 외부 저장 테이블 OID가 노출 (테이블당 1개) | 사용자에게 노출되는 카탈로그 정보 미확인 (Open Question 2) | "이 테이블이 외부 저장을 사용하고 있는가"를 SQL로 확인하는 시나리오는 CUBRID에서는 현재 명확한 경로가 없음. 관측성 관련 TC/요청 사항 발굴 대상 (미검증) |
+| 동시성/MVCC 관점 동작 | 외부 데이터 자체가 MVCC 가시성 평가 대상 (자체 버전 보유) | 외부 청크는 별도 가시성 슬롯이 없고 메인 행 가시성을 따라간다고 가정 (Open Question 2) | 사용자 관점 기대치는 동일한 결과지만, CUBRID 측 가시성 상속 메커니즘은 코드 trace 미완 (Open Question 2) — 격리 수준별 multi-session TC가 사양 검증 자체의 핵심 (미검증) |
+| 사용자 가시 카탈로그 | `pg_class.reltoastrelid` 컬럼으로 외부 저장 테이블 OID가 노출 (테이블당 1개) | 현재 미지원 (사용자에게 노출되는 카탈로그 컬럼/뷰 없음) | "이 테이블이 외부 저장을 사용하고 있는가"를 SQL로 확인하는 시나리오는 CUBRID에서는 현재 사용자에게 제공되는 경로가 없음. 관측성 관련 기능 요청 사항으로 트래킹 |
 
 상세 메커니즘, 코드 라인 단위 출처, 페이지 크기·헤더 크기 등 정확한 수치는 아래 ## Trigger Conditions 부터의 축별 비교표와 ## Differences Summary 절을 참고한다.
 
@@ -120,7 +120,7 @@
 
 | 축 | PostgreSQL TOAST | CUBRID OOS | 차이 요약 | 출처 |
 |---|---|---|---|---|
-| UPDATE 시 외부값 처리 | 컬럼이 변경되지 않으면 기존 TOAST 행 재참조 (포인터 복사). 변경되면 새 chunk_id로 재삽입, 구버전은 vacuum 대상 | 매 INSERT마다 OOS 청크 재생성. UPDATE도 새 OID 생성 추정 | PG=불변 컬럼 재참조 최적화, CUBRID 측 동일 최적화 여부 미확인 (Open Question 1) | survey §1.1 |
+| UPDATE 시 외부값 처리 | 컬럼이 변경되지 않으면 기존 TOAST 행 재참조 (포인터 복사). 변경되면 새 chunk_id로 재삽입, 구버전은 vacuum 대상 | 매 INSERT마다 OOS 청크 재생성. UPDATE 시 변경되지 않은 외부 컬럼도 재기록됨 (재참조 최적화 미지원) | PG=불변 컬럼 재참조 최적화 보유, CUBRID=현재 미지원 — 동일 행에 대한 무관 컬럼 UPDATE 반복 시 외부 데이터 재기록 비용이 누적됨 | survey §1.1 |
 | 삭제 가시성 | TOAST 행은 일반 MVCC 가시성 (`xmin`/`xmax`) 적용. main heap dead tuple 후 vacuum이 TOAST 행도 회수 | OOS는 별도 MVCC 헤더 없음. main heap row 삭제 시 OOS chunk를 동기 삭제하는 forward walk 채택 | PG=MVCC 가시성으로 lazy 회수, CUBRID=동기 cleanup 또는 vacuum forward walk | `oos_file.cpp:1758-1763`; `vacuum.c:2417-2447` (`vacuum_heap_oos_delete`); CBRD-26668 |
 | Vacuum 책임 | `VACUUM` (autovacuum 포함)이 main과 TOAST 테이블 모두 처리 | OOS 전용 vacuum 경로 (forward walk OOS cleanup) — `vacuum_heap_oos_delete()` 가 helper의 `oos_oids` 벡터를 순회하며 `oos_delete()` 호출 | PG=공통 vacuum, CUBRID=OOS 전용 path | `vacuum.c:2410-2447`; `vacuum.c:2538-2602`; CBRD-26668 |
 | 빈 페이지 회수 | TOAST 테이블 vacuum truncation | `oos_delete()` 는 페이지 회수 안 함; vacuum이 빈 페이지 회수 | 둘 다 vacuum이 회수 | `oos_file.cpp:1754-1755` |
@@ -147,12 +147,12 @@
 
 | 축 | PostgreSQL TOAST | CUBRID OOS | 차이 요약 | 출처 |
 |---|---|---|---|---|
-| MVCC 헤더 | TOAST 테이블 행에 `xmin`/`xmax`/`cmin`/`cmax` 등 일반 MVCC 슬롯 존재 | OOS 슬롯에 별도 MVCC 헤더 없음 (`OOS_RECORD_HEADER` 는 `total_size`/`chunk_index`/`next_chunk_oid` 3 필드만 보유) | CUBRID OOS는 자체 MVCC 슬롯 미보유. main heap MVCC 상속 가정은 추정 — 가시성 판정 코드 경로 미인용 (Open Question 4) | survey §5.4; `oos_file.hpp:25-30` |
-| 가시성 평가 | TOAST 행 자체가 MVCC 스냅샷 평가 대상 | OOS chunk는 가시성 평가 대상 아님; main row가 보이면 OOS도 따라 보이는 구조로 추정. `heap_file.c:10642-10652` 에서 `OR_IS_OOS(offset)` 분기 후 `oos_read()` 직접 호출 (스냅샷 재평가 없음) | PG=독립 평가, CUBRID=상속 가시성 (가시성 판정 코드 경로 정밀 trace는 Open Question 4) | `oos_file.hpp:25-30`; `heap_file.c:10642-10652` |
+| MVCC 헤더 | TOAST 테이블 행에 `xmin`/`xmax`/`cmin`/`cmax` 등 일반 MVCC 슬롯 존재 | OOS 슬롯에 별도 MVCC 헤더 없음 (`OOS_RECORD_HEADER` 는 `total_size`/`chunk_index`/`next_chunk_oid` 3 필드만 보유) | CUBRID OOS는 자체 MVCC 슬롯 미보유. main heap MVCC 상속 가정은 추정 — 가시성 판정 코드 경로 미인용 (Open Question 2) | survey §5.4; `oos_file.hpp:25-30` |
+| 가시성 평가 | TOAST 행 자체가 MVCC 스냅샷 평가 대상 | OOS chunk는 가시성 평가 대상 아님; main row가 보이면 OOS도 따라 보이는 구조로 추정. `heap_file.c:10642-10652` 에서 `OR_IS_OOS(offset)` 분기 후 `oos_read()` 직접 호출 (스냅샷 재평가 없음) | PG=독립 평가, CUBRID=상속 가시성 (가시성 판정 코드 경로 정밀 trace는 Open Question 2) | `oos_file.hpp:25-30`; `heap_file.c:10642-10652` |
 | 외부 행 락 | TOAST 테이블 행에 일반 행 락 적용 가능 | 명시적 OOS 행 락 없음. `oos_delete_chain()` 은 caller가 row-level lock 보유 가정 | CUBRID는 caller 책임 명시 | `oos_file.cpp:1643-1644` |
 | 동시 INSERT | TOAST 테이블 페이지 잠금 | OOS 페이지 latch (`PGBUF_LATCH_WRITE`) + bestspace cache mutex | 페이지 latch + bestspace mutex | `oos_file.cpp:105`, `1417-1418` |
 | 동시 DELETE 보호 | MVCC `xmax` | caller-supplied X-LOCK 가정 (행 락) | CUBRID는 외부 행 락에 의존 | `oos_file.cpp:1643-1644` |
-| Multi-version 가시성 | 같은 TOAST 데이터에 여러 버전 공존 가능 (snapshot isolation) | OOS 청크는 단일 물리 인스턴스. main row 신규 버전마다 OOS chunk 새로 만들어진다고 가정 (코드상 미확인) | PG는 multi-version 자연스러움, CUBRID는 동일 데이터 중복 가능성 있음(추정) — 재참조 최적화 부재 시. 코드상 미확인(Open Question 1) | survey §1.1 |
+| Multi-version 가시성 | 같은 TOAST 데이터에 여러 버전 공존 가능 (snapshot isolation) | OOS 청크는 단일 물리 인스턴스. main row 신규 버전마다 OOS chunk가 새로 생성됨 (재참조 최적화 미지원) | PG는 multi-version 자연스럽고 동일 외부값을 다수 버전이 공유. CUBRID는 재참조 최적화가 없으므로 신규 버전마다 OOS chunk 중복 발생 | survey §1.1 |
 
 ---
 
@@ -174,7 +174,7 @@
 
 | 축 | PostgreSQL TOAST | CUBRID OOS | 차이 요약 | 출처 |
 |---|---|---|---|---|
-| TOAST 테이블 조회 | `pg_class.reltoastrelid` 로 전용 테이블 OID 노출 | OOS VFID는 `heap_hdr->oos_vfid` 내부 필드, 시스템 카탈로그 노출 여부 확인필요(근거 부재) | PG는 카탈로그로 노출 | `heap_file.c:12246-12273` |
+| TOAST 테이블 조회 | `pg_class.reltoastrelid` 로 전용 테이블 OID 노출 | OOS VFID는 `heap_hdr->oos_vfid` 내부 필드. 사용자에게 노출되는 카탈로그 컬럼/뷰 없음 (현재 미지원) | PG는 카탈로그로 노출, CUBRID는 사용자 노출 경로 부재 — 관측성 기능 요청 후보 | `heap_file.c:12246-12273` |
 | 통계 뷰 | `pg_statistic` (TOAST 컬럼 포함), `pg_stat_user_tables` 등 | OOS 전용 통계 미확인 (확인필요(근거 부재)) | PG는 표준 통계 통합 | survey 미인용 |
 | 로깅/디버그 | `log_min_duration_statement` 등 일반 로깅 | `oos_error`/`oos_warn` 항상 활성, `oos_trace`/`oos_debug`/`oos_info` 는 debug 빌드 한정 (release no-op) | CUBRID 전용 로깅 매크로 (severity별 활성 조건 분리) | `oos_log.hpp:143-148` (always-active error/warn), `oos_log.hpp:152`, `oos_log.hpp:155`, `oos_log.hpp:158`, `oos_log.hpp:162-166` |
 | 페이지 검사 도구 | `pageinspect` extension의 `heap_page_items` 등 | 확인필요(근거 부재) — OOS 페이지 검사 유틸리티 존재 여부 미확인 | PG는 확장 모듈 존재 | survey 미인용 |
@@ -190,7 +190,7 @@
 2. **정지 의미론** (see ## Stop Conditions): PG는 라운드형 점진 외부화로 임계 충족 즉시 멈춰 인라인을 최대화한다. CUBRID는 단일 패스로 512B 초과 가변 컬럼을 모두 외부화하여 더 공격적이다. PG는 1 GB - 1, CUBRID는 약 2 GB - 1로 외부값 최대 크기 자체도 약 2배 차이가 있다 (실 워크로드 영향은 별도 평가 필요).
 3. **압축 부재** (see ## Compression): CUBRID OOS는 압축 단계 자체가 없다. PG는 컬럼별 알고리즘 선택 + 외부저장 시 상태 보존 + 폴백까지 포함한 완성 파이프라인이다.
 4. **저장 백엔드** (see ## Storage Backend): PG는 `pg_toast_<oid>` 일반 힙 + B-tree 인덱스, CUBRID는 전용 `FILE_OOS` slotted page + `next_chunk_oid` 링크드 리스트. PG는 인덱스 비용 + 일관 vacuum, CUBRID는 직접 접근 + 전용 cleanup 경로.
-5. **MVCC 통합** (see ## Concurrency & MVCC): PG TOAST 행은 자체 MVCC 슬롯을 가져 독립 가시성 평가; CUBRID OOS chunk는 MVCC 헤더가 없고 main heap row의 가시성을 상속한다고 가정 (UPDATE 시 미변경 OOS 컬럼 재참조 최적화 부재 — Open Question 1; 가시성 판정 코드 path 정밀 trace — Open Question 4).
+5. **MVCC 통합** (see ## Concurrency & MVCC): PG TOAST 행은 자체 MVCC 슬롯을 가져 독립 가시성 평가; CUBRID OOS chunk는 MVCC 헤더가 없고 main heap row의 가시성을 상속한다고 가정 (UPDATE 시 미변경 OOS 컬럼 재참조 최적화는 현재 미지원이므로 신규 버전마다 OOS chunk 중복 발생; 가시성 판정 코드 path 정밀 trace — Open Question 2).
 6. **컬럼 옵션** (see ## Trigger Conditions, ## Limits): PG는 `attstorage` 4종 + `SET COMPRESSION` DDL을 제공해 사용자가 컬럼 단위로 정책 결정. CUBRID는 사용자 옵션이 없고 자동 분류 (`!is_fixed && >512B`)에 고정.
 7. **다중 청크 삽입 순서** (see ## Storage Backend): CUBRID는 `next_chunk_oid` 를 알기 위해 마지막 청크부터 역순 삽입(`oos_file.cpp:1116`). PG는 `toast_save_datum()` 이 chunk_seq=0부터 순방향으로 INSERT (`toast_internals.c:119`).
 8. **인라인 포인터의 메타데이터와 N배 길이 중복** (see ## External Reference Pointer): PG `varatt_external` ~= 18 B에 `va_rawsize`, `va_extinfo`(압축 정보 포함), `va_toastrelid` 등 다수 포함. CUBRID는 16 B(OID 8 B + BIGINT length 8 B)로 압축/메타 확장 여지가 적다. 추가로 N-청크 기록 시 N개 청크 헤더 모두에 `total_size`(int 4 B)가 중복 저장되며 (`oos_file.cpp:1132` + TODO 1127-1131), 헤더 슬림화는 spec 변경 후보다.
@@ -199,12 +199,12 @@
 
 ## Open Questions
 
-1. **CUBRID UPDATE 시 미변경 OOS 컬럼 재참조 여부**: PG는 미변경 컬럼은 동일 chunk_id 포인터를 복사한다. CUBRID도 같은 최적화가 있는지 코드상 확인필요(근거 부재).
-2. **CUBRID OOS 통계/카탈로그 노출**: PG의 `pg_class.reltoastrelid` 같이 사용자에게 OOS 사용 여부를 노출하는 카탈로그 컬럼이 있는지 확인필요.
-3. **CUBRID 페이지 검사 도구**: PG `pageinspect` 같은 OOS 페이지 디버깅 유틸리티 존재 여부 확인필요.
-4. **OOS 가시성 평가 메커니즘 정확성**: 본 문서는 "main heap row의 MVCC를 상속"이라 정리했으나, 정확한 코드 경로(예: `heap_get_visible_version` 호출 경로 안에서 `OR_IS_OOS` 분기와 `oos_read()` 가 어떤 스냅샷 조건 하에서 호출되는지)는 정밀 trace 미완료. `heap_file.c:10642-10652` 분기 상위 호출 path 확인 필요.
-5. **`spage_max_record_size()` 캐시 가능성**: `oos_file.cpp:1765-1771` 의 TODO 주석(라인 1765 캐시화, 라인 1770 `spage_max_record_size` 버그)대로 빌드 상수화 가능 여부와 스레드 안전성 검토 필요.
-6. **CUBRID 단일 OOS 값 실효 상한**: `total_size`(int)/`recdes.length`(int)/인라인 BIGINT(8 B) 중 가장 작은 한계는 `int` 2 GB - 1. 페이지당 청크 수 한계와 결합한 실효 상한(슬롯 페이지 수, OID 공간, 헤더 페이지 통계 한계 등)은 확인필요.
+1. **CUBRID 페이지 검사 도구**: PG `pageinspect` 같은 OOS 페이지 디버깅 유틸리티 존재 여부 확인필요.
+2. **OOS 가시성 평가 메커니즘 정확성**: 본 문서는 "main heap row의 MVCC를 상속"이라 정리했으나, 정확한 코드 경로(예: `heap_get_visible_version` 호출 경로 안에서 `OR_IS_OOS` 분기와 `oos_read()` 가 어떤 스냅샷 조건 하에서 호출되는지)는 정밀 trace 미완료. `heap_file.c:10642-10652` 분기 상위 호출 path 확인 필요.
+3. **`spage_max_record_size()` 캐시 가능성**: `oos_file.cpp:1765-1771` 의 TODO 주석(라인 1765 캐시화, 라인 1770 `spage_max_record_size` 버그)대로 빌드 상수화 가능 여부와 스레드 안전성 검토 필요.
+4. **CUBRID 단일 OOS 값 실효 상한**: `total_size`(int)/`recdes.length`(int)/인라인 BIGINT(8 B) 중 가장 작은 한계는 `int` 2 GB - 1. 페이지당 청크 수 한계와 결합한 실효 상한(슬롯 페이지 수, OID 공간, 헤더 페이지 통계 한계 등)은 확인필요.
+
+> 본 절은 추후 검증이 필요한 항목만 남긴다. **UPDATE 시 미변경 외부 컬럼 재참조 최적화**(과거 OQ1)와 **사용자 노출 카탈로그 컬럼/뷰**(과거 OQ2)는 현재 미지원으로 확정되어 본 절에서 제외했고, 해당 사실은 ## User-Level Summary, ## Update / Vacuum Semantics, ## Concurrency & MVCC, ## Observability, ## Differences Summary 의 본문에 반영되어 있다.
 
 ---
 

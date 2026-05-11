@@ -2,18 +2,20 @@
 
 ## Issue Triage
 
-> **이슈 수행 목적**: 카탈로그/메타클래스 직렬화기가 만드는 VOT(Variable Offset Table) 엔트리가 항상 4-byte 정렬된 오프셋만 담도록 보정하여, `OR_GET_VAR_OFFSET()` 마스킹 손실과 OOS 오탐을 제거한다.
->
-> **이슈 수행 이유**:
-> - **현재 동작 / 배경**: `OR_GET_VAR_OFFSET()` 는 VOT 엔트리의 하위 2비트(`OR_VAR_BIT_OOS`, `OR_VAR_BIT_LAST_ELEMENT`) 를 마스킹해서 떼어 내므로, 모든 오프셋은 4의 배수여야 한다. 사용자 데이터 레코드(`heap_attrinfo_transform_*`) 는 이미 정렬된 오프셋을 만들지만, `transform_cl.c` 의 13개 메타클래스 직렬화기(`tf_class_size`, `domain_to_disk`, `attribute_to_disk`, `method_to_disk` 등)와 `catalog_class.c` 의 `catcls_put_or_value_into_buffer()` 는 `or_put_offset()` 직전에 정렬을 보장하지 않아 홀수 오프셋이 생성될 수 있다.
-> - **영향**: 홀수 오프셋의 하위 비트 0 이 `OR_VAR_BIT_OOS` 위치이므로 `heap_recdes_check_has_oos()` 가 OOS 가 아닌 카탈로그 레코드를 OOS 로 오탐(false positive)한다. `createdb` 직후 vacuum 경로에서 OOS-flag-vs-VOT-scan consistency mismatch 가 다수 발생(작성자 환경에서 6건 관측). 또한 마스킹된 1-3바이트만큼 가변 컬럼 영역의 read offset 이 어긋날 수 있어 데이터 영역 해석 오류로 이어질 위험이 있다.
->
-> **이슈 수행 방안**:
-> - `transform_cl.c` 의 모든 `*_to_disk` / `*_size` 함수에서 `or_put_offset()` 호출 직전, 그리고 size 함수의 각 가변 컬럼 size 누적 직전에 `DB_ALIGN(offset, 4)` 을 적용한다 (총 13개 메타클래스 직렬화기 + 대응 size 함수).
-> - `catalog_class.c::catcls_put_or_value_into_buffer()` 의 가변 컬럼 루프와 last-offset 기록 직전에 `or_pad()` 로 현재 buffer write 위치를 4-byte 경계까지 패딩한다.
-> - `heap_recdes_check_has_oos()` 에 1차 sanity check 를 추가하여, 첫 VOT 엔트리가 레코드 길이를 넘으면 false 를 반환한다 (class/root 레코드처럼 VOT 포맷이 아닌 레코드를 OOS 후보에서 조기 배제).
-> - `heap_recdes_contains_oos()` 의 diagnostic cross-validation 추가 작업은 본 이슈 범위 밖이며, 별도로 진행한다.
-> - 사용자 인용: "vimkim:oos-vacuum <- in this branch (#6986), there was an alignment bug in transform_cl.c so there was a fix for it. recdes 정렬은 이슈/PR 분리하는게 리뷰하기 용이"
+**이슈 수행 목적**: 카탈로그/메타클래스 직렬화기가 만드는 VOT(Variable Offset Table) 엔트리가 항상 4-byte 정렬된 오프셋만 담도록 보정하여, `OR_GET_VAR_OFFSET()` 마스킹 손실과 OOS 오탐을 제거한다.
+
+**이슈 수행 이유**:
+
+- **현재 동작 / 배경**: `OR_GET_VAR_OFFSET()` 는 VOT 엔트리의 하위 2비트(`OR_VAR_BIT_OOS`, `OR_VAR_BIT_LAST_ELEMENT`) 를 마스킹해서 떼어 내므로, 모든 오프셋은 4의 배수여야 한다. 사용자 데이터 레코드(`heap_attrinfo_transform_*`) 는 이미 정렬된 오프셋을 만들지만, `transform_cl.c` 의 13개 메타클래스 직렬화기(`tf_class_size`, `domain_to_disk`, `attribute_to_disk`, `method_to_disk` 등)와 `catalog_class.c` 의 `catcls_put_or_value_into_buffer()` 는 `or_put_offset()` 직전에 정렬을 보장하지 않아 홀수 오프셋이 생성될 수 있다.
+- **영향**: 홀수 오프셋의 하위 비트 0 이 `OR_VAR_BIT_OOS` 위치이므로 `heap_recdes_check_has_oos()` 가 OOS 가 아닌 카탈로그 레코드를 OOS 로 오탐(false positive)한다. `createdb` 직후 vacuum 경로에서 OOS-flag-vs-VOT-scan consistency mismatch 가 다수 발생(작성자 환경에서 6건 관측). 또한 마스킹된 1-3바이트만큼 가변 컬럼 영역의 read offset 이 어긋날 수 있어 데이터 영역 해석 오류로 이어질 위험이 있다.
+
+**이슈 수행 방안**:
+
+- `transform_cl.c` 의 모든 `*_to_disk` / `*_size` 함수에서 `or_put_offset()` 호출 직전, 그리고 size 함수의 각 가변 컬럼 size 누적 직전에 `DB_ALIGN(offset, 4)` 을 적용한다 (총 13개 메타클래스 직렬화기 + 대응 size 함수).
+- `catalog_class.c::catcls_put_or_value_into_buffer()` 의 가변 컬럼 루프와 last-offset 기록 직전에 `or_pad()` 로 현재 buffer write 위치를 4-byte 경계까지 패딩한다.
+- `heap_recdes_check_has_oos()` 에 1차 sanity check 를 추가하여, 첫 VOT 엔트리가 레코드 길이를 넘으면 false 를 반환한다 (class/root 레코드처럼 VOT 포맷이 아닌 레코드를 OOS 후보에서 조기 배제).
+- `heap_recdes_contains_oos()` 의 diagnostic cross-validation 추가 작업은 본 이슈 범위 밖이며, 별도로 진행한다.
+- 사용자 인용: "vimkim:oos-vacuum <- in this branch (#6986), there was an alignment bug in transform_cl.c so there was a fix for it. recdes 정렬은 이슈/PR 분리하는게 리뷰하기 용이"
 
 ---
 

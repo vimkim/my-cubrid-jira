@@ -22,7 +22,7 @@ OOS 경로에서 별도 압축을 추가하기 전에 **현재 어떤 타입이 
 
 본 조사 결과를 토대로 다음과 같이 결정한다.
 
-**결정** (2026-05-08 OOS 회의): CUBRID OOS 는 **PostgreSQL TOAST 의 `EXTENDED` 정책을 OOS 레이어 자체에서 구현**하는 방향으로 진행한다 (P사 스펙을 따르도록 결정). 즉 OOS 진입 직전(또는 OOS 인서트 경로 공통 단계)에 **압축 -> 외부 저장** 의 2 단계를 두어, OOS 적재 대상 모든 가변 타입에 균일하게 압축이 적용되도록 한다. (PG `EXTENDED` 라운드 1 = "압축 후 그래도 크면 외부화" 와 동일한 구조 — 출처: [CBRD-26592](http://jira.cubrid.org/browse/CBRD-26592) Compression Behavior 표)
+**결정** (2026-05-08 OOS 회의): CUBRID OOS 는 **PostgreSQL TOAST 의 `EXTENDED` 정책을 OOS 레이어 자체에서 구현** 하는 방향으로 진행한다 (P사 스펙을 따르도록 결정). 즉 OOS 진입 직전(또는 OOS 인서트 경로 공통 단계)에 **압축 -> 외부 저장** 의 2 단계를 두어, OOS 적재 대상 모든 가변 타입에 균일하게 압축이 적용되도록 한다. (PG `EXTENDED` 라운드 1 = "압축 후 그래도 크면 외부화" 와 동일한 구조 — 출처: [CBRD-26592](http://jira.cubrid.org/browse/CBRD-26592) Compression Behavior 표)
 
 **현재 코드 상태 (본 조사 결과)**:
 

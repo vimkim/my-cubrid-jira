@@ -1,161 +1,282 @@
-# [OOS] vacuum 의 OOS 빈 페이지 `file_dealloc` 회수 보류 — sector-reclaim 인프라 의존성 (슬롯 삭제는 무관)
+# [OOS] vacuum 의 OOS 빈 페이지 회수 — bestspace cache 한계 (cap 1000 / no eviction / no persistence) 보완
 
 ## Issue Triage
 
-**이슈 수행 목적**: 본 이슈가 다루는 페이지 단위 `file_dealloc` 회수 단계를 보류 (Won't Fix / Defer) 하고 그 근거를 본문에 남긴다. 슬롯 단위 데이터 회수 (`oos_delete`, CBRD-26668, PR #6986) 는 이 결정과 무관하며 그대로 동작한다. 본 보류는 페이지 단위 dealloc 단계에만 한정한다.
+**이슈 수행 목적**: vacuum 이 OOS 슬롯을 모두 비운 페이지를 `file_dealloc` 로 OOS 파일에 반환해, bestspace cache 가 추적하지 못하는 빈 페이지를 file manager 의 partial sector table 에 영구 등록한다. 페이지 회수 후 `file_alloc` 가 그 sector 안에서 fresh page 를 재할당할 수 있어 OOS 파일의 확장 빈도가 줄어든다. 슬롯 단위 회수 (`oos_delete`, CBRD-26609 / CBRD-26668) 는 이 결정과 별개이며 그대로 동작한다.
 
 **이슈 수행 이유**:
 
-- **현재 동작**:
-  - 슬롯 단위 회수는 vacuum 이 dead OOS slot 을 `oos_delete` 로 지운 뒤 `oos_delete_chain` 안에서 `oos_stats_update` (`oos_file.cpp:1774`) 를 호출해 bestspace 캐시의 free space 통계를 갱신한다. PR #6986 / CBRD-26668 로 마무리됐고 정상 작동 중.
-  - 페이지 단위 회수 (본 이슈 범위) 는 미구현이다. `oos_remove_page` (`oos_file.cpp:1007`, 선언 `oos_file.hpp:80`) 가 `file_dealloc(... FILE_OOS)` 호출 본문을 가지고 있으나 caller 가 0 건이다. `grep oos_remove_page` 가 선언과 정의 두 줄만 잡는다. 바로 위 `oos_file.cpp:1005` 의 `// TODO: will be called by vacuum when OOS vacuum is implemented` 주석이 미완 상태를 명시한다.
-  - `file_dealloc` (`file_manager.c:6122`) 의 permanent file 분기는 `RVFL_DEALLOC` postpone record 만 등록한다 (`file_manager.c:6186`). 실제 dealloc 은 run-postpone 시점에 `file_perm_dealloc` (`file_manager.c:6315-6612`) 이 수행한다.
-  - `file_perm_dealloc` 은 sector bitmap 의 페이지 비트 clear, full sector 의 partial table 이동, 파일 헤더 통계 갱신, 페이지 버퍼 비움까지만 한다. `is_empty == true` 분기에서도 `disk_unreserve_ordered_sectors` 를 호출하지 않는다.
-  - permanent file 의 sector 가 disk manager 로 반환되는 경로는 `file_destroy` (`file_manager.c:4330`) 한 곳뿐이다. `file_destroy` 는 `bool is_temp` 인자로 permanent / temp 양쪽을 다루므로 4330 자체는 "destroy 전용" 경로다. 다른 `disk_unreserve_ordered_sectors` 호출처 `file_manager.c:3890` 은 temp file reservation rollback 전용이다.
-  - 접근 모델 측면에서 OOS 는 OOS OID 의 (volid, pageid, slotid) 로의 point-access 만 한다. `oos_read` (`oos_file.cpp:1406`) -> `oos_read_within_page` (`oos_file.cpp:1347`), 다중 청크는 `oos_read_across_pages` (`oos_file.cpp:1279`) 가 청크 체인을 따라간다. heap 의 `prev_vpid` / `next_vpid` 같은 페이지 chain 순회 구조가 없다.
+- **현재 동작 / 배경**:
+  - 슬롯 회수: `oos_delete_chain` (`oos_file.cpp:1717`) 이 청크 슬롯을 비운 직후 `oos_stats_update` (`oos_file.cpp:1774`) 로 bestspace cache 에 free space 를 등록한다. CBRD-26609 / CBRD-26668 로 마무리.
+  - bestspace cache 의 한계 — 코드로 확인된 사실 셋:
+    - **용량 상한 1000**: `OOS_BESTSPACE_CACHE_CAPACITY` = 1000 (`oos_file.cpp:85`).
+    - **No eviction**: `oos_stats_add_bestspace` (`oos_file.cpp:269`) 가 cap 도달 시 `num_stats_entries >= OOS_BESTSPACE_CACHE_CAPACITY` 조건에서 그냥 NULL 반환 (`oos_file.cpp:286-290`). 기존 entry 의 freespace 만 update 되고, 새 VPID 는 추가되지 않는다.
+    - **No persistence**: `oos_Bestspace` 는 in-memory hash table (mht). `oos_bestspace_initialize` / `oos_bestspace_finalize` (`oos_file.cpp:183, 227`) 가 lifecycle 을 관리하고, 모든 entry 는 malloc 으로 만들어진다 (`oos_file.cpp:300`). server restart 시 cache 는 비워진다.
+  - 페이지 단위 회수 부재: `oos_remove_page` (`oos_file.cpp:1007`, 헤더 `oos_file.hpp:80`) 가 `file_dealloc(... FILE_OOS)` 호출 본문을 가지고 있으나 caller 0 건. 바로 위 `oos_file.cpp:1005` 의 `TODO: will be called by vacuum when OOS vacuum is implemented` 주석이 미완 명시.
+  - 본 이슈의 범위 밖 (참고): `file_perm_dealloc` (`file_manager.c:6315-6612`) 은 sector bitmap 비트만 clear 하고 partial table 갱신만 한다. `is_empty == true` 여도 `disk_unreserve_ordered_sectors` 를 호출하지 않으므로 sector 가 disk manager 로 반환되어 다른 파일이 가져가는 동작은 일어나지 않는다. 호출처는 `file_destroy` (`file_manager.c:4330`) 뿐. 즉 본 이슈가 줄여 주는 것은 OOS 파일의 **확장 빈도** 이지 OOS 파일이 점유한 sector 의 총량이 아니다.
 
-- **한계 / 영향** — 본 이슈를 구현해도 다음 다섯 카테고리 모두에서 의미 있는 이득이 없다:
-  - **고객 장애**: 없음. 사용자 가시 SQL 동작과 데이터 회수에 영향이 없고, 슬롯 회수가 정상 동작하므로 OOS 파일은 계속 새 데이터를 받는다.
-  - **QA 실패**: 없음. 빈 OOS 페이지 누적이 회귀 fail 을 일으키는 케이스가 현재까지 보고되지 않았다.
-  - **성능 저하**: 미미. heap 처럼 sequential scan 으로 빈 페이지를 walk 하는 경로가 OOS 에 없다 (point-access 모델). 빈 페이지가 매달려 있어도 query 비용은 늘지 않는다. `db_volume_info` / `db_space` 같은 DBA 가시 지표에는 영향이 있을 수 있으나, 사용자가 체감할 만한 비용은 아니다 (실측 미확보).
-  - **설계 의도 훼손**: 부분적이지만 손실은 작다. `oos_delete` header 주석 (`oos_file.cpp:1812-1813`) 의 "Empty pages will be reclaimed by vacuum after the transaction commits." 라는 design intent 가 미충족이다. 그러나 이 intent 가 가정한 "회수 = sector 가 disk 로 돌아감" 자체가 현 disk manager 구조에서 성립하지 않으므로, 본 이슈를 구현해도 intent 의 본래 목적은 달성되지 않는다.
-  - **기술 부채**: 본 이슈 자체보다는 외부 인프라 (disk manager sector-level reclaim) 의 후속 작업에 가깝다. 다만 dead 함수 `oos_remove_page` 와 그 TODO 주석이 코드에 남아 있는 작은 부채가 있고, 본 이슈 close 시 함께 정리한다 (AC 참조).
+- **영향** — 다섯 카테고리 중 두 곳에서 측정 가능한 손실이 발생한다:
+  - **고객 장애**: 없음. 사용자 가시 SQL 동작은 영향 없음.
+  - **QA 실패**: 없음 (현행). 단, 본 이슈가 도입되지 않으면 다수 OOS 파일을 가진 대규모 워크로드 회귀 테스트에서 OOS 파일 page count 누적이 더 두드러질 수 있어 향후 QA 시나리오 추가 시 노출될 수 있다.
+  - **성능 저하**: 측정 가능한 저하 — bestspace 가 cap 1000 에 도달하거나 server restart 직후 cold 상태일 때 빈 OOS 페이지는 insert 경로에서 **invisible** 해진다. 결과적으로 다음 insert 가 `file_alloc` 를 통해 새 페이지를 요청하고, 이때 비어 있는 기존 페이지를 못 쓰고 파일을 확장하게 된다. 슬롯이 재사용 가능한데도 그렇다.
+  - **설계 의도 훼손**: `oos_delete` header 주석 (`oos_file.cpp:1812-1813`) 의 "Empty pages will be reclaimed by vacuum after the transaction commits." 가 미완 상태로 남아 있다.
+  - **기술 부채**: dead 함수 `oos_remove_page` 와 그 TODO 주석이 1 차 OOS 작업 (CBRD-26609) 이후 caller 없이 보존돼 있다. 본 이슈가 그 함수를 superset helper 로 교체한다.
 
 **이슈 수행 방안**:
 
-- 본 이슈를 Resolution: Won't Fix 로 close 한다. JIRA close 코멘트에 결정 요지와 본 문서 link, 그리고 코드 검증 근거 (`file_manager.c:6315-6612`, `oos_file.cpp:1406`) 를 함께 남긴다.
-- 보류 범위를 명시한다. 슬롯 단위 회수 (`oos_delete`) 는 본 결정 밖이며 정상 동작이 유지된다. 본 이슈는 페이지 단위 `file_dealloc` (`oos_remove_page` 의 caller 추가) 만 보류한다.
-- 코드 정리: `oos_remove_page` (`oos_file.cpp:1005-1017`, 선언 `oos_file.hpp:80`) 와 위 TODO 주석을 본 이슈 close 와 함께 삭제한다. `oos_delete` 의 `oos_file.cpp:1812-1813` 주석은 "deferred, see CBRD-26786" 로 갱신한다.
-- 부활 트리거: disk manager 가 permanent file 의 빈 sector 를 `file_destroy` 외 경로로 disk manager 에 반환하는 인프라가 도입되는 시점에 본 이슈를 link 로 부활시킨다. 현재 관련 JIRA 미존재.
+- 페이지 회수 mechanic 은 storage 레이어 helper 한 곳에 모은다 — `oos_try_reclaim_empty_page` 신설. 책임: in-use slot 검사 -> sticky first page 가드 -> `file_dealloc(... FILE_OOS)` -> bestspace cache 무효화 (`oos_stats_del_bestspace_by_vpid` 재사용).
+- helper 호출 trigger 는 vacuum 두 경로 + SA_MODE eager 한 경로, 총 세 caller 의 batch boundary 에서 일괄 호출. `oos_delete` 의 inner per-OID loop 핫패스에는 검사 안 넣음.
+- 기존 dead 함수 `oos_remove_page` 는 신설 helper 가 superset 이므로 삭제. 위 TODO 주석도 함께 정리.
+- `oos_delete` header 주석 (`oos_file.cpp:1812-1813`) 은 본 이슈 PR 에서 "Reclaimed by vacuum via `oos_try_reclaim_empty_page`." 로 갱신.
+- ANALYSIS 단계 first task: 실측 검증. bestspace cap 도달 / restart cold start 시나리오에서 OOS 파일 page count 가 본 helper 도입 전/후로 얼마나 차이 나는지를 CTP 회귀 테스트로 측정. `TBD - ANALYSIS 단계에서 결정` 항목들 (sysop 경계, batch 단위, container, recovery 호환성, idempotency) 은 본문 `## Open Design Questions` 의 후보안을 출발점으로 ANALYSIS 단계에서 확정.
+
+상세 설계 결정 / 구현 / 트레이드오프는 아래 AI-Generated Context 섹션 참조.
 
 ---
 
 ## AI-Generated Context
 
-> 아래 내용은 AI 가 코드와 맥락을 분석해 작성한 상세 자료다. 빠른 triage 에는 위 Issue Triage 블록만으로 충분하며, 본문은 결정 근거 확인과 향후 부활 시 출발점으로 참조하면 된다.
+> 아래 내용은 AI 가 코드/맥락을 분석해 작성한 상세 자료다. 빠른 triage 에는 위 **Issue Triage** 블록만으로 충분하며, 본문은 구현/리뷰 단계에서 참고하면 된다.
 
 ### Summary
 
-- **문제 / 목적**: 페이지 단위 OOS 회수 (`file_dealloc`) 도입의 실효성을 코드 사실관계로 검증하고 보류 여부를 확정한다.
-- **원인 / 배경**: 원안의 motivation (다른 파일로의 sector 재할당, 페이지 누적 회피) 이 현 disk manager 구조와 OOS 의 접근 모델에 맞지 않는다.
-- **제안 / 변경**: 페이지 회수 단계만 보류한다. 슬롯 회수는 무관하게 정상 동작한다. dead 함수와 미완 주석은 close 시 함께 정리한다.
-- **영향 범위**: 코드 변경은 `oos_file.cpp` 와 `oos_file.hpp` 의 minor 한 줄 (dead 함수 + 주석 정리) 이다. 사용자 가시 변경 없음. epic CBRD-26583 의 status 메모 한 줄.
+- **문제 / 목적**: OOS 슬롯 회수 후 남는 빈 페이지가 bestspace cache 의 cap / persistence 한계로 invisible 해지면 다음 insert 가 파일을 불필요하게 확장한다. `file_dealloc` 로 file manager 의 partial sector table 에 영구 등록해 이 손실을 막는다.
+- **원인 / 배경**: bestspace 는 cap 1000, no eviction, no persistence 의 in-memory MHT cache. 슬롯 회수는 `oos_delete` 가 처리하지만 페이지 회수는 caller 0 건의 미연결 helper (`oos_remove_page`) 로 방치돼 있다.
+- **제안 / 변경**: storage 레이어 helper (`oos_try_reclaim_empty_page`) 신설 + vacuum 두 경로 + SA_MODE eager 경로 총 세 caller 의 batch boundary 에서 호출. 기존 `oos_remove_page` 와 TODO 주석은 정리.
+- **영향 범위**: `src/storage/oos_file.{cpp,hpp}`, `src/query/vacuum.c`, `src/storage/heap_file.c`. 사용자 가시 호환성 영향 없음. WAL 호환성 영향 없음 (기존 `RVFL_DEALLOC` postpone 재사용).
 
 ---
 
 ## Description
 
-### 보류 결정의 발단
+### 발단 — 1 차 draft 의 motivation 수정 경위
 
-본 이슈의 1 차 draft 는 vacuum 이 OOS 슬롯을 다 비운 페이지를 `file_dealloc` 으로 회수하는 helper (`oos_try_reclaim_empty_page`) 신설을 제안했다. 리뷰어가 triage 전에 다음을 지적했다.
+1 차 draft 의 motivation 두 줄 ("다른 OOS 파일로의 페이지 재할당", "OOS 파일 page count 단조 누적") 은 코드 사실관계와 맞지 않다는 리뷰어 지적을 받았다. 검증 결과:
 
-> [원문 그대로] heap 의 빈 페이지 제거는 heap scan 비용 때문이라 정당화되지만 OOS 는 scan 자체가 없어 그 시나리오에 해당하지 않는다. "다른 파일에서의 재사용" 도 sector 를 disk manager 에 반환해야 성립하는데 현재 그 메커니즘이 없는 것으로 안다. triage 전에 확인 후 의견 달라.
+- "다른 파일로 재할당" 부분은 `file_perm_dealloc` 가 sector 를 disk manager 로 반환하지 않으므로 (`file_manager.c:6315-6612`, 호출처는 `file_destroy` 의 `file_manager.c:4330` 뿐) 본 이슈 구현 후에도 그대로 불가능하다. heap 의 sequential scan 처럼 빈 페이지가 비용을 키우는 모델 (`heap_remove_page_on_vacuum`, `heap_file.c:4716`) 도 OOS 엔 적용되지 않는다 — OOS read 는 OOS OID 의 (volid, pageid) 로의 point-access 만 한다 (`oos_read` -> `oos_read_within_page`, `oos_file.cpp:1406, 1347`; 다중 청크는 `oos_read_across_pages`, `oos_file.cpp:1279`).
+- "page count 단조 누적" 부분은 bestspace 가 hit 상태일 때는 같은 OOS 파일 안에서 슬롯 / 페이지 재사용이 일어나 page count 가 일정 수준에서 안정화된다. 따라서 무조건 누적은 아니다.
 
-코드로 두 지적을 검증한 결과 둘 다 코드 동작과 일치했다. 본 이슈는 페이지 회수 단계만 보류로 결정하고, 슬롯 회수 동작은 그대로 둔다.
+하지만 bestspace cache 자체의 한계를 코드로 들여다보면 새 motivation 이 나온다.
 
-### 검증 1 — OOS scan 부재
+### Bestspace cache 한계 — 코드 인용
 
-OOS 의 모든 read 경로는 caller 가 미리 알고 있는 OOS OID 의 (volid, pageid, slotid) 로의 point-access 다.
+```c
+// oos_file.cpp:85
+#define OOS_BESTSPACE_CACHE_CAPACITY 1000
 
-- 단일 청크는 `oos_read` (`oos_file.cpp:1406`) 가 `oos_read_within_page` (`oos_file.cpp:1347`) 를 호출하고, 후자가 OID 의 (volid, pageid) 로 직접 `pgbuf_fix` 한다.
-- 다중 청크는 첫 청크 header 에서 다음 청크의 OID 를 꺼내 `oos_read_across_pages` (`oos_file.cpp:1279`) 가 chained point-access 로 순차 fetch 한다.
-- 진입점에서는 caller 가 heap 레코드의 variable area 에서 OOS OID 를 꺼내 들어온다 (`heap_file.c:10652` 의 `oos_read` 호출).
+// oos_file.cpp:286-290 (oos_stats_add_bestspace 내부)
+if (oos_Bestspace->num_stats_entries >= OOS_BESTSPACE_CACHE_CAPACITY)
+{
+    pthread_mutex_unlock (&oos_Bestspace->bestspace_mutex);
+    return NULL;
+}
+```
 
-대조 케이스로 `heap_remove_page_on_vacuum` (`heap_file.c:4716`) 이 빈 heap 페이지를 떼어내는 작업의 본체는 `prev_vpid` / `next_vpid` 의 chain 링크 재연결이다 (`heap_file.c:4784-4789` 의 `heap_vpid_prev` / `heap_vpid_next` 호출과 그 후 chain 갱신 블록). heap 에서 빈 페이지 제거가 정당화되는 이유가 바로 이 chain 을 heap scan 이 walk 하기 때문인데, OOS 에는 이 chain 자체가 없다.
+- 1000 은 **모든 OOS 파일 합산** 으로 hash table 에 들어가는 (VFID, VPID) entry 의 총 상한이다. 한 인스턴스에 OOS 컬럼을 가진 테이블이 여럿이고 각각의 빈 슬롯을 가진 페이지가 누적되면 도달 가능한 수치.
+- cap 도달 시 새 VPID 는 `mht_put` 까지 가지 않고 함수가 NULL 반환으로 끝난다. 기존 entry 의 `freespace` 만 update 가능 (`oos_file.cpp:278-284`). 한 번 invisible 해진 VPID 는 다시 등록될 기회가 없다.
+- entry 저장소는 `oos_Bestspace_cache_area` 의 mht 두 개 (`vpid_ht`, `vfid_ht`) + malloc 된 free list. 모두 메모리. `oos_bestspace_initialize` / `oos_bestspace_finalize` 사이의 lifetime 안에서만 유효 (`oos_file.cpp:183-263`).
+- server 재기동 시 cache 가 비워지므로 그동안 누적된 dead-slot 페이지의 free space 정보는 file system 어디에도 남지 않는다.
 
-결론: heap 식 "빈 페이지가 scan 비용을 키운다" 모델은 OOS 에 적용할 수 없다.
+### Stranded-page 시나리오
 
-### 검증 2 — permanent file 의 sector 가 disk manager 로 돌아가지 않음
+위 한계가 작동하는 구체 시나리오:
 
-`file_dealloc` (`file_manager.c:6122`) 의 permanent file 분기는 `RVFL_DEALLOC` postpone record 만 등록한다 (`file_manager.c:6186` 의 `log_append_postpone`). 실제 dealloc 은 run-postpone 시점에 `file_perm_dealloc` (`file_manager.c:6315-6612`) 이 수행하며, 그 동작은 다음이다.
+1. **Cap-bound stranded**: OOS 컬럼이 있는 테이블이 다수이고 각각의 OOS 파일이 여러 dead-slot 페이지를 가진 상태. 1000 번째 (VFID, VPID) 가 등록된 이후의 신규 dead-slot 페이지는 bestspace 에 들어가지 못한다. 다음 insert 는 그 페이지에 free space 가 있는지 모르므로 `file_alloc` 로 새 페이지를 요청하고, 빈 페이지는 그 자리에 그대로 남는다.
+2. **Restart-cold stranded**: server 재기동 직후 cache 는 비었지만 OOS 파일들 안엔 dead-slot 페이지가 그대로 매달려 있다. cache 는 page lookup 시 lazy 하게 populate 되지만 populate 가 안 일어난 페이지는 invisible 상태로 남는다.
 
-- sector bitmap 의 페이지 비트 clear (`file_manager.c:6376` 의 `file_partsect_clear_bit`).
-- `is_empty = file_partsect_is_empty (partsect)` 로 sector 가 모두 비었는지 판정 (`file_manager.c:6377`).
-- was_full 이었던 sector 면 full table 에서 제거하고 partial table 로 이동 (`file_manager.c:6402` 이후 else 분기).
-- 파일 헤더 통계 갱신 (`file_manager.c:6580` 의 `file_header_dealloc`).
-- 페이지 버퍼 비움 (`file_manager.c:6599` 의 `pgbuf_dealloc_page`).
+두 시나리오 모두 슬롯 회수 (`oos_delete`) 가 이미 끝난 페이지가 insert 경로에서 보이지 않게 되는 손실이다.
 
-`disk_unreserve_ordered_sectors` 는 `file_perm_dealloc` 어디서도 호출되지 않는다. `is_empty == true` 분기에서도 호출되지 않는다. `file_manager.c` 내 `disk_unreserve_ordered_sectors` 호출처를 `grep` 으로 모두 나열하면 두 곳이다.
+### File manager 의 partial sector table 이 보완책인 이유
 
-- `file_manager.c:3890` — `file_create` 의 temp file reservation rollback 경로 (`DB_TEMPORARY_DATA_PURPOSE`).
-- `file_manager.c:4330` — `file_destroy` (`file_manager.c:4119-4128`) 의 cleanup. `file_destroy` 는 `bool is_temp` 인자로 permanent / temp 양쪽을 모두 다루므로, permanent file 의 sector 가 disk manager 로 반환되는 경로는 `file_destroy` 한 곳뿐이다.
+`file_perm_dealloc` (`file_manager.c:6315-6612`) 가 한 페이지를 회수할 때 하는 일은 sector bitmap 의 페이지 비트 clear (`file_manager.c:6376`, `file_partsect_clear_bit`) + sector 가 was_full 이면 full table 에서 partial table 로 이동 (`file_manager.c:6402-` else branch) + 파일 헤더 통계 갱신 (`file_manager.c:6580`, `file_header_dealloc`).
 
-즉 permanent file 의 한 페이지를 dealloc 해도 그 sector 는 그 파일의 partial table 에 남아 같은 파일의 다음 `file_alloc` 요청에만 재사용된다. 본 이슈를 구현해도 OOS 파일에 묶인 sector 를 다른 파일이 가져가지 못한다. 다른 파일의 disk footprint 는 줄지 않는다.
+partial sector table 은 OOS 파일 헤더 페이지에 영구화돼 있고 `file_alloc` 진입점이 그 테이블에서 free page 를 찾는다. bestspace 와 달리 cap 도 없고 restart 후에도 살아남는다. 즉 본 이슈의 helper 가 `file_dealloc` 까지 마치면 회수된 페이지는 bestspace 가 어떤 상태든 다음 `file_alloc` 가 partial sector table 로부터 fresh page 로 즉시 재사용할 수 있다.
 
-### 검증 3 — 같은 파일 내 슬롯 재사용은 이미 동작 중
+이 효과는 OOS 파일의 disk 사용량을 직접 줄이지는 않는다 (sector 는 그 파일에 묶인 채로 남는다). 줄이는 것은 **확장 빈도** — 새 데이터를 받기 위해 disk manager 에서 새 sector 를 reserve 받을 빈도가 감소한다.
 
-`oos_delete_chain` (`oos_file.cpp:1717`) 이 청크 슬롯을 비운 직후 `oos_stats_update` (`oos_file.cpp:1774`) 를 호출해 bestspace 캐시에 해당 페이지의 free space 를 등록한다. bestspace 에 등록되어 있는 동안에는 같은 OOS 파일의 다음 OOS 청크 insert 가 bestspace 후보로 그 페이지를 받아 슬롯을 재사용할 수 있다. 이 부분은 본 이슈 보류와 무관하게 그대로 동작한다.
+### 영향 받지 않는 경로
 
-다만 bestspace 는 캐시이므로 memory budget 초과나 server restart 의 cold start 직후엔 evict 되어 잊혀진다. eviction 이후의 해당 페이지는 새 insert 의 후보로 잡히지 못하고 dead 슬롯들이 살아 있는 상태로 남는다. 본 이슈를 구현하면 이 evict-후-잊힘 페이지를 `file_dealloc` 으로 정리할 수 있긴 하나, 검증 2 에 따라 그 sector 는 같은 파일에 묶인 채라 다른 파일로 흘러가지 않는다. evict-후-잊힘 시나리오가 실측상 누적되는지 모르는 상태에서 본 이슈를 구현하는 것은 측정값 없는 최적화에 해당한다.
+- DROP TABLE 의 OOS 파일 통째 reclaim 경로는 본 이슈와 무관. `xheap_destroy` (`heap_file.c:5921`) 가 `oos_remove_file` (`oos_file.cpp:994-1003`) 를 호출하고 `oos_remove_file` 가 `file_postpone_destroy` 로 위임 (`oos_file.cpp:1000`). 파일 단위 reclaim 은 이미 구현.
+- REC_BIGONE + OOS 의 경우는 vacuum 측 invariant (`assert (!heap_recdes_contains_oos (&helper->record))`, `vacuum.c:2589`) 로 막혀 있어 본 이슈 범위 밖.
+- `RVVAC_NOTIFY_DROPPED_FILE` 게이트와 OOS 처리의 상호작용은 검증된 상태. REMOVE 경로는 `vacuum_collect_heap_objects` (`vacuum.c:3671`) 로 큐잉되고 forward-walk 진입점도 같은 dropped-file 게이트 (`vacuum.c:3643`) 의 하류에 있어 별도 조치 불필요.
 
-### 부활 시 재활용 가능한 설계 메모
+### 책임 분리 결정
 
-부활 시점에 다음 결정이 필요하다. 1 차 draft 의 Open Design Questions 를 현 검증 결과로 정리한 것이다.
+| 책임 | 위치 | 이유 |
+|---|---|---|
+| mechanic (빈 페이지 판정 + dealloc + cache 무효화) | storage 레이어 (`oos_file.cpp`) | 페이지 헤더 레이아웃, sticky first-page 체크, bestspace cache 무효화 — 모두 storage 내부 지식. caller 가 storage 내부 구조를 모르고도 정확히 호출하도록 한 군데로 가둔다. |
+| trigger (언제 검사할지) | caller (vacuum 2 + SA_MODE eager 1) | `oos_delete` 의 inner per-OID 루프에 검사를 넣으면 O(deleted OIDs) 비용이지만 caller batch boundary 에서 한 번 호출하면 O(touched pages) 로 줄어든다. `file_dealloc` 가 fhead 페이지를 fix 하므로 inner loop 안 호출 시 chunk-삭제와 page-회수의 latch 보유 구간이 겹치는 문제도 회피. |
 
-- **Q1. vacuum worker 의 transaction 컨텍스트에서 `RVFL_DEALLOC` postpone 의 정상 run 가능 여부**: permanent file 의 `file_dealloc` 은 `RVFL_DEALLOC` postpone 으로 deferred dealloc 을 등록한다 (검증 2). vacuum worker 의 outer transaction / sysop 종료 시점에 그 postpone 이 정상 run 되는지, vacuum 의 호출 컨텍스트가 postpone 메커니즘이 요구하는 transaction 상태를 만족하는지 확인이 필요하다.
-- **Q2. helper 호출 batch 단위 (per-record / per-page / per-block)**: vacuum 의 호출 빈도와 회수 latency 의 트레이드오프. SA_MODE eager 경로는 per-UPDATE 고정이 자연스럽다.
-- **Q3. touched VPID 집합 컨테이너**: small-N (한 자릿수에서 수십 개) 가정 시 `std::vector` 와 호출 직전 sort 와 unique 가 메모리 locality 와 단순성에서 유리하다. 실측에서 N 이 커지면 hash 기반으로 재검토한다.
-- **Q4. `RVFL_DEALLOC` 의 vacuum / SA_MODE recovery 경로 호환성**: 동일 메커니즘이 SA_MODE crash recovery 와 충돌하지 않는지 확인이 필요하다. SA_MODE 에서는 server-side vacuum 이 없고 SA_MODE 종료 시점에 즉시 cleanup 이 일어나므로, vacuum 이 등록한 postpone 의 timing 과 SA_MODE recovery 의 replay timing 사이 race 가 있는지 검증해야 한다. Q1 과 묶여 있다.
-- **Q5. helper idempotency**: 이미 dealloc 된 VPID, 동시 insert 가 재점유한 VPID, sticky first page VPID — 세 케이스를 NO_ERROR 로 흡수하는 가드.
+---
 
-위 Q1 과 Q4 가 가장 load-bearing 한 미결 사항이고 나머지는 구현 디테일이다.
+## Open Design Questions
+
+ANALYSIS 단계에서 확정할 결정들. 각 항목은 후보안과 트레이드오프를 정리.
+
+### Q1. `file_dealloc` postpone 의 vacuum worker transaction 모델 호환성
+
+`file_dealloc` 의 permanent file 분기는 `RVFL_DEALLOC` postpone record 만 등록하고 (`file_manager.c:6186`, `log_append_postpone`), 실제 dealloc 은 run-postpone 시점에 `file_perm_dealloc` 가 한다. 따라서 "sysop 안/밖" 의 결정은 부분적으로 postpone 메커니즘이 이미 답을 정한다. 남는 질문:
+
+- vacuum worker 의 outer transaction / sysop 종료 시점에 그 postpone 이 정상 run 되는지 (`log_sysop_attach_to_outer` / `log_sysop_end_logical_run_postpone`, `log_manager.c:4015, 4109` 부근).
+- SA_MODE crash 후 recovery 가 vacuum 의 postpone 와 충돌하지 않는지.
+- `FILE_OOS` 자체의 `RVFL_DEALLOC` recovery 분기가 다른 file type 과 동일하게 동작하는지 (`FILE_OOS` 가 비교적 신규 file type 이라 검증 안 된 분기 가능성).
+
+**잠정 권고**: ANALYSIS 단계에서 위 세 항목을 코드 inspection + crash injection 으로 확인.
+
+### Q2. helper 호출 batch 단위
+
+언제 helper 를 호출할지. 너무 자주면 페이지 fix 가 잦고, 너무 늦으면 페이지가 빈 채로 살아 있는 시간이 길어진다.
+
+| 후보안 | 동작 | 장점 | 단점 |
+|---|---|---|---|
+| **A. per-record** | 한 dead heap record (vacuum) / 한 UPDATE context (SA_MODE) 의 OOS OID 들을 모두 처리한 직후 helper 호출. | 회수 latency 짧음. caller 코드 변경 작음. | 한 record 의 OOS OID 가 여러 페이지에 걸치면 record 마다 여러 번 호출. |
+| **B. per-page** (vacuum 의 heap page 단위) | vacuum 의 한 heap page 처리 종료 시점에 그 page 내 모든 dead record 의 touched VPID 를 모아 helper 호출. | 호출 빈도 amortize. 같은 OOS 파일의 여러 record 가 같은 OOS 페이지 touch 시 dedup. | SA_MODE 엔 적용 불가 (heap-page 단위 batch 가 없음). |
+| **C. per-block** (vacuum log block) | vacuum 의 한 log block 처리 끝에 한 번. | 호출 빈도 최소. | latency 가 block 처리 시간만큼 늘어남. SA_MODE 엔 무의미. |
+
+**잠정 권고**: vacuum 두 caller 는 **A** 시작 후 측정 결과에 따라 B 로 격상 검토. SA_MODE eager 는 **A (per-UPDATE)** 고정.
+
+### Q3. touched VPID 집합 컨테이너
+
+| 후보안 | 장점 | 단점 |
+|---|---|---|
+| **A. `std::set<VPID>`** | 자동 정렬 + 자동 dedup. 코드 단순. | 노드 단위 할당 — small-N 에서 오버헤드. |
+| **B. `std::unordered_set<VPID>`** | O(1) 삽입/조회. | hasher 필요. small-N 에서 hash table overhead. |
+| **C. `std::vector<VPID>` + 호출 직전 sort + unique** | 메모리 locality. small-N 에 최적. | 호출 직전 정렬/dedup 비용. dedup 누락 시 같은 VPID 두 번 호출. |
+
+**잠정 권고**: **C**. 한 record/page 의 touched VPID 수는 실측상 한 자릿수 ~ 수십 개 예상.
+
+### Q4. helper idempotency
+
+vacuum worker 가 helper 호출 도중 크래시 후 재기동되면 다음 worker 가 같은 블록을 재처리한다 (`VACUUM_BLOCK_FLAG_INTERRUPTED`). 다음 케이스를 NO_ERROR 로 흡수해야 한다.
+
+- 이미 dealloc 된 VPID — `file_dealloc` 의 동작 (NO_ERROR / error / assert) 을 코드로 확인 후 helper 가 그 케이스를 흡수.
+- 동시 insert 가 빈 페이지를 재점유한 경우 — helper 가 in-use slot > 0 검사로 dealloc 건너뜀.
+- sticky first page 강제 호출 — `file_get_sticky_first_page` (`file_manager.c:5786`) 로 확인 후 NO_ERROR 로 빠져나감.
+
+### Q5. ANALYSIS 단계의 실측 검증 시나리오
+
+본 이슈의 motivation 자체가 "bestspace 한계가 실제 워크로드에서 빈 페이지를 stranded 시키는가" 에 달려 있다. 다음 시나리오 측정 후 결과에 따라 본 이슈 진행 / 보류 / 재설계 결정.
+
+- 시나리오 1 (cap-bound): OOS 컬럼이 있는 테이블 N 개 (N 값은 ANALYSIS 단계에서 결정) 에 대해 대량 insert / delete 사이클 반복. bestspace 의 `num_stats_entries` 가 1000 에 도달하는 지점부터 OOS 파일 page count 증가 추이를 helper 도입 전/후로 비교.
+- 시나리오 2 (restart-cold): 대량 delete 후 server 재기동. 재기동 직후 insert workload 의 OOS 파일 확장 빈도를 helper 도입 전/후로 비교.
+- 시나리오 3 (UPDATE-heavy): 한 row 를 N 번 UPDATE 하여 옛 OOS OID 가 누적되는 경로 — SA_MODE eager + forward-walk 양쪽.
+
+측정 결과 helper 도입 효과가 통계상 유의미하지 않으면 본 이슈는 보류 (Won't Fix) 로 변경하고 dead 함수 `oos_remove_page` 정리만 minor 패치로 처리한다.
 
 ---
 
 ## Specification Changes
 
-N/A. 사용자 가시 스펙 변경이 없다. 데이터 회수 동작 변경도 없다.
+사용자 가시 스펙 변경 없음. 내부 storage 관리 동작만 변경.
+
+성능 특성:
+
+- bestspace cap 도달 / restart cold 상태에서 OOS 파일 확장 빈도 감소 (예상). 정량 측정은 Q5 의 ANALYSIS 단계 시나리오로 확인.
+- vacuum 워커당 추가 비용: touched VPID 집합 유지 + record 처리 종료 시점의 helper 호출. 한 record 의 OOS OID 들은 보통 같은 페이지에 몰려 있어 집합 크기는 작다.
 
 ---
 
 ## Implementation
 
-본 이슈 보류로 새 helper 와 caller 추가가 없다. close 와 함께 처리할 minor 코드 정리만 다음과 같다.
+### 신규 함수
 
-- `oos_file.cpp:1007` 의 `oos_remove_page` 와 `oos_file.hpp:80` 의 선언을 삭제한다. caller 가 0 건이고, 부활 시 새 helper 를 설계할 예정이므로 보존 가치가 낮다. 삭제 PR 의 description 에 CBRD-26786 close 를 link 한다.
-- `oos_file.cpp:1005` 의 `// TODO: will be called by vacuum when OOS vacuum is implemented` 주석을 위 함수 삭제와 함께 제거한다.
-- `oos_file.cpp:1812-1813` 의 `oos_delete` header 주석 ("Empty pages will be reclaimed by vacuum after the transaction commits.") 을 "Empty pages are not reclaimed; see CBRD-26786 for the deferral rationale." 로 갱신한다.
+| 함수 | 파일 | 책임 |
+|---|---|---|
+| `oos_try_reclaim_empty_page` | `oos_file.cpp` | `oos_vfid` 안의 한 VPID 가 빈 페이지인지 판정 후 `file_dealloc` + bestspace cache 무효화 (`oos_stats_del_bestspace_by_vpid` 재사용). Idempotent. |
 
-부활 시 재시작 출발점은 위 Description 의 Q1 ~ Q5 항목과 본 이슈 close 직전 commit 의 git history 다.
+helper 시그니처 초안:
+
+```cpp
+// 빈 페이지면 dealloc + bestspace 무효화. 이미 dealloc 된 경우 NO_ERROR.
+// header page (sticky first page) 는 절대 dealloc 하지 않는다.
+int oos_try_reclaim_empty_page (THREAD_ENTRY *thread_p, const VFID &oos_vfid, const VPID &vpid);
+```
+
+### Caller 변경
+
+세 caller 모두 동일 패턴:
+
+```
+1. 기존 oos_delete 루프를 그대로 둔다.
+2. 루프 동안 touched VPID 집합을 caller 컨텍스트에 누적 (Q3 잠정 권고: vector + sort/unique).
+3. 루프 종료 후 집합을 순회하며 oos_try_reclaim_empty_page 호출 (Q2 잠정 권고: per-record).
+4. helper 실패는 warning 으로 기록하고 vacuum 진행을 막지 않는다 — 회수 실패는 다음 vacuum 사이클의 후보로 남으면 충분.
+```
+
+대상:
+
+- `vacuum_heap_oos_delete` (`vacuum.c:2419`) — dead heap 레코드 처리 종료 시점.
+- `vacuum_forward_walk_delete_old_oos` (`vacuum.c:3458`) — `RVHF_UPDATE_NOTIFY_VACUUM` log record 처리 종료 시점.
+- `heap_update_home_delete_replaced_oos` (`heap_file.c:24131`, oos_delete 루프 `heap_file.c:24178`) — UPDATE 의 옛 OID 회수 종료 시점.
+
+### Header page 예외
+
+OOS 파일의 첫 페이지는 sticky first page 로 마킹돼 있다 (`file_alloc_sticky_first_page`, `oos_file.cpp:940`). `file_manager.c:123` 의 `vpid_sticky_first` 필드 주석은 "This page should never be deallocated." 명시. helper 는 dealloc 전에 `file_get_sticky_first_page` (`file_manager.c:5786`) 로 sticky first VPID 를 읽어 일치하면 NO_ERROR 로 빠져나간다. `file_dealloc` 자체에도 sticky-first dealloc 시 assert 가 있으나 (`file_manager.c:6178`) dev 빌드 전용이라 release 빌드 가드를 위해 helper 에서 한 번 더 검사.
+
+### `oos_remove_page` 처분
+
+기존 `oos_remove_page` (`oos_file.cpp:1007`) 와 `oos_file.hpp:80` 의 선언은 본 이슈 helper 가 sticky-first 가드 + in-use slot 검사 + bestspace cache 무효화 superset 이므로 삭제. `oos_file.cpp:1005` 의 TODO 주석도 함께 제거. `oos_delete` header 주석 (`oos_file.cpp:1812-1813`) 은 "Reclaimed by vacuum via `oos_try_reclaim_empty_page`." 로 갱신.
+
+### 동시 insert race
+
+동시 insert 가 빈 페이지를 재점유한 경우 helper 는 in-use slot > 0 검사로 dealloc 를 건너뛴다. 정상 동작이며, 그 페이지는 다음 vacuum batch 의 회수 후보로 남는다.
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] JIRA 본 이슈를 Resolution: Won't Fix 로 close 한다.
-- [ ] close 코멘트에 결정 요지 (3 줄 이내), 본 문서 link, 검증 1 / 2 의 핵심 코드 reference (`file_manager.c:6315-6612`, `oos_file.cpp:1406`) 를 포함한다.
-- [ ] `oos_file.cpp:1007` 와 `oos_file.hpp:80` 의 `oos_remove_page` 함수와 선언, `oos_file.cpp:1005` 의 TODO 주석, `oos_file.cpp:1812-1813` 주석 갱신을 한 minor 패치 / 단일 commit 으로 묶어 처리한다. commit message 에 CBRD-26786 reference 를 포함한다.
-- [ ] epic CBRD-26583 status 메모에 "페이지 단위 회수는 sector-level reclaim 인프라 도입까지 보류 (CBRD-26786 참조). 슬롯 회수는 영향 없음." 한 줄을 기재한다.
-- [ ] 보류 결정에 대해 epic CBRD-26583 owner 의 동의를 JIRA 코멘트로 확보한다.
+- [ ] **(ANALYSIS gate)** Q5 의 시나리오 1/2/3 중 적어도 하나에서 helper 도입 전/후의 OOS 파일 page count 또는 확장 빈도가 통계상 유의미하게 (시나리오 정의 시 임계치 합의) 다르다. 유의미하지 않으면 본 이슈를 Won't Fix 로 close 하고 dead 함수 정리만 별도 minor 패치로 처리.
+- [ ] `oos_try_reclaim_empty_page` 가 `oos_file.cpp` 에 추가된다.
+- [ ] helper 가 sticky first page 를 dealloc 하지 않는다 (강제 호출 시 NO_ERROR 로 빠져나간다).
+- [ ] helper 가 idempotent 하다 (이미 dealloc 된 페이지에 대해 NO_ERROR 반환).
+- [ ] helper 의 in-use slot 검사 결과 > 0 이면 `file_dealloc` 을 호출하지 않는다.
+- [ ] `vacuum_heap_oos_delete`, `vacuum_forward_walk_delete_old_oos`, `heap_update_home_delete_replaced_oos` 세 경로에서 touched VPID 추적 + helper 호출이 이뤄진다.
+- [ ] bestspace cache entry 가 dealloc 된 페이지에 대해 자동으로 제거된다 (helper 가 `oos_stats_del_bestspace_by_vpid` 호출).
+- [ ] 기존 dead 함수 `oos_remove_page` + 헤더 선언 + `oos_file.cpp:1005` TODO 주석이 삭제된다. `oos_delete` header 주석 (`oos_file.cpp:1812-1813`) 이 helper 이름으로 갱신된다.
+- [ ] 10000-row insert + 10000-row delete 사이클을 5 회 반복 후 OOS 파일 페이지 수가 첫 사이클 종료 시점 대비 +-10% 이내 (insert/delete heavy 회귀).
+- [ ] OOS 페이로드가 페이지당 N 개 들어가는 크기일 때, 동일 row 를 10000 회 UPDATE 후 vacuum 완료 시점에서 OOS 파일 페이지 수가 `ceil(10000/N) * 2` 페이지 이하 (UPDATE heavy 회귀, forward-walk + SA_MODE eager 양쪽).
+- [ ] vacuum 워커가 helper 호출 도중 크래시 후 재기동되어도 같은 블록을 재처리해 안전하게 회수.
+- [ ] 동시 워크로드 CTP: 10000-row delete 트랜잭션 commit 직후 vacuum 처리와 동시에 별 세션에서 10000-row insert 실행. 모든 세션 종료 후 `SELECT COUNT(*)` 결과가 일관되고 `ER_` 로그 0 건.
+- [ ] 기존 CI (`test_sql`, `test_medium`) 통과.
 
 ---
 
 ## Definition of done
 
-- [ ] 위 Acceptance Criteria 모든 항목 충족.
-- [ ] 본 이슈가 Resolution: Won't Fix 로 close 되고 label / fix version 정리가 끝나 검색 가능 상태로 남는다.
+- [ ] 위 A/C 충족.
+- [ ] Q1-Q5 가 ANALYSIS 단계에서 모두 결정 (각 Q 의 잠정 권고를 출발점으로 검증).
+- [ ] CTP 회귀 테스트 추가 (OOS 파일 페이지 수 추이 측정 시나리오, Q5 시나리오 1/2/3 기반).
+- [ ] QA 통과.
 
 ---
 
 ## 참고 코드
 
-- `oos_file.cpp:1005-1017` — 미연결 `oos_remove_page` 와 그 위 TODO 주석 (본 이슈 close 시 삭제)
-- `oos_file.hpp:80` — `oos_remove_page` 선언 (본 이슈 close 시 삭제)
-- `oos_file.cpp:1812-1813` — `oos_delete` header 주석 (본 이슈 close 시 갱신)
-- `oos_file.cpp:1717, 1774` — `oos_delete_chain` 과 `oos_stats_update` (슬롯 회수가 보류 결정 후에도 동작하는 근거)
-- `oos_file.cpp:1279, 1347, 1406` — OOS read 의 point-access 경로 (검증 1)
-- `file_manager.c:6122, 6186` — `file_dealloc` 진입점과 `RVFL_DEALLOC` postpone 등록 (검증 2)
-- `file_manager.c:6315-6612` — `file_perm_dealloc` (sector bitmap 처리, `disk_unreserve_ordered_sectors` 미호출 근거)
-- `file_manager.c:3890, 4330` — `disk_unreserve_ordered_sectors` 호출처 (3890 은 temp file reservation rollback, 4330 은 `file_destroy`)
-- `heap_file.c:4716, 4784-4789` — `heap_remove_page_on_vacuum` 의 chain 갱신 (heap 대조 사례)
+- `oos_file.cpp:85` — `OOS_BESTSPACE_CACHE_CAPACITY` 정의 (1000)
+- `oos_file.cpp:269-333` — `oos_stats_add_bestspace`, cap 도달 NULL 반환 로직
+- `oos_file.cpp:183-263` — bestspace lifecycle (`oos_bestspace_initialize` / `oos_bestspace_finalize`)
+- `oos_file.cpp:1717, 1774` — `oos_delete_chain` + `oos_stats_update` (슬롯 회수, 본 이슈 unaffected)
+- `oos_file.cpp:1005-1017` — dead 함수 `oos_remove_page` 와 TODO 주석 (본 이슈에서 정리)
+- `oos_file.cpp:1812-1813` — `oos_delete` header 주석 (본 이슈에서 갱신)
+- `oos_file.cpp:1279, 1347, 1406` — OOS read 의 point-access 경로 (scan 모델 부재 근거)
+- `oos_file.cpp:940` — sticky first page 마킹
+- `file_manager.c:5786` — `file_get_sticky_first_page` (helper 의 sticky 가드)
+- `file_manager.c:6122, 6186` — `file_dealloc` 진입점 + `RVFL_DEALLOC` postpone 등록
+- `file_manager.c:6315-6612` — `file_perm_dealloc` (partial sector table 갱신, `disk_unreserve_ordered_sectors` 미호출 근거)
+- `file_manager.c:3890, 4330` — `disk_unreserve_ordered_sectors` 의 두 호출처 (3890 = temp rollback, 4330 = `file_destroy`)
+- `vacuum.c:2419, 3458` — vacuum 의 두 OOS 회수 진입점 (helper caller 후보)
+- `heap_file.c:24131, 24178` — SA_MODE eager 회수 (`heap_update_home_delete_replaced_oos`)
+- `heap_file.c:4716` — `heap_remove_page_on_vacuum` (heap 의 chain 갱신 대조 사례, OOS 와 무관)
 
 ---
 
 ## Remarks
 
 - 선행 / 관련 이슈:
-  - CBRD-26668 — vacuum OOS 통합 (PR #6986). 슬롯 단위 회수 (`oos_delete`) 가 여기서 마무리됐다.
-  - CBRD-26715 — vacuum OOS 거짓 양성.
-  - CBRD-26608 — DROP TABLE 의 OOS cleanup (파일 단위 reclaim 은 정상 동작 중, 본 이슈와 별개).
-  - CBRD-26583 — OOS M2 epic (parent).
-- 부활 트리거: disk manager 가 permanent file 의 빈 sector 를 `file_destroy` 외 경로로 반환하는 인프라가 도입되는 시점. 현재 관련 JIRA 미존재.
+  - CBRD-26609 — `oos_delete` API 도입. 슬롯 단위 회수가 여기서 마무리됨.
+  - CBRD-26668 — vacuum OOS 통합 (forward-walk + REMOVE path). vacuum 이 `oos_delete` 를 호출하는 경로가 여기서 연결됨. 본 이슈는 그 위에 페이지 회수 단계를 추가.
+  - CBRD-26715 — vacuum OOS 거짓 양성 (본 이슈 진행 시 진단 로그 재사용 가능).
+  - CBRD-26608 — DROP TABLE 의 OOS cleanup (파일 단위 reclaim, 본 이슈와 별개).
+  - CBRD-26583 — OOS M2 epic (parent). 본 이슈 완료 후 OOS page lifecycle (insert -> delete -> page reclaim -> file reclaim) 이 완성됨.
+- 본 이슈 motivation 의 핵심 가정 — bestspace cap / persistence 한계가 실제 워크로드에서 빈 페이지 stranding 을 의미 있게 만든다 — 은 Q5 의 ANALYSIS 단계 실측으로만 확인 가능하다. 측정 결과 효과가 미미하면 본 이슈는 Won't Fix 로 close 한다.
+- 향후 disk manager 가 sector-level reclaim (`file_destroy` 외 경로에서 `disk_unreserve_ordered_sectors` 호출) 을 지원하면 본 helper 의 효과가 "확장 빈도 감소" 에서 "OOS 파일 disk 사용량 감소" 로 확장된다. 그 시점에 본 이슈의 후속 작업이 별도 이슈로 열린다.

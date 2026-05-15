@@ -18,6 +18,25 @@ OOS 경로에서 별도 압축을 추가하기 전에 **현재 어떤 타입이 
 - 현재 압축이 적용되는 타입과 적용되지 않는 타입을 분리하여 정리한다.
 - 향후 OOS 전용 압축 도입 여부 판단의 근거 자료로 활용한다.
 
+### 조사 결론
+
+본 조사 결과를 토대로 다음과 같이 결정한다.
+
+**결정** (2026-05-08 OOS 회의): CUBRID OOS 는 **PostgreSQL TOAST 의 `EXTENDED` 정책을 OOS 레이어 자체에서 구현**하는 방향으로 진행한다 (P사 스펙을 따르도록 결정). 즉 OOS 진입 직전(또는 OOS 인서트 경로 공통 단계)에 **압축 -> 외부 저장** 의 2 단계를 두어, OOS 적재 대상 모든 가변 타입에 균일하게 압축이 적용되도록 한다. (PG `EXTENDED` 라운드 1 = "압축 후 그래도 크면 외부화" 와 동일한 구조 — 출처: [CBRD-26592](http://jira.cubrid.org/browse/CBRD-26592) Compression Behavior 표)
+
+**현재 코드 상태 (본 조사 결과)**:
+
+- `DB_TYPE_VARCHAR` 만 `tp_String` 직렬화 경로에서 LZ4 압축이 일어나며, OOS 페이지에는 이미 압축된 바이트가 저장된다 (사실상 EXTENDED 와 등가).
+- 그 외 OOS 적재 가능 가변 타입 (`VARNCHAR`, `VARBIT`, `JSON`, `SET`, `MULTISET`, `SEQUENCE`) 은 직렬화 단계에서 압축되지 않는다 (사실상 EXTERNAL 동작).
+- `BLOB` / `CLOB` 본문은 외부 ES 에 별도 저장되므로 OOS 압축 정책의 대상이 아니다.
+
+**EXTENDED-at-OOS 구현 시 고려사항** (본 티켓 범위 외, 후속 티켓에서 다룸):
+
+- 공통 압축 단계를 OOS 진입점에 신설. 압축 알고리즘 (LZ4 / pglz / 기타) 및 임계값 (예: PG `pglz` 의 `min_comp_rate >= 25%` 와 유사) 선정 필요.
+- `DB_TYPE_VARCHAR` 의 `tp_String` 단계 기존 LZ4 압축과의 중복/이중 압축 회피 정책 필요. (case A: type-layer 압축을 OOS 진입 시 해제 후 재압축 / case B: type-layer 결과를 그대로 통과 / case C: VARCHAR 한정으로 OOS-layer 압축 skip)
+- 압축 메타 (알고리즘 ID, 원본 크기) 를 OOS 레코드 헤더 또는 인라인 포인터에 인코딩할 필드 추가 필요. PG `va_extinfo` 와 같은 슬롯이 현재 CUBRID OOS 에는 없음 (참조: CBRD-26592 Inline Reference 표).
+- 전역 토글 `pr_Enable_string_compression` 과의 관계 정리 (OOS 압축에도 동일 토글을 재사용할지, 별도 파라미터를 둘지).
+
 ---
 
 ## Analysis
@@ -169,12 +188,12 @@ OOS 진입 가능(가변 길이, 사이즈 > 512B) 하지만 **현재 LZ4 자동
 
 ## Findings
 
-### 결론
+### 현재 상태 요약 (조사 결과)
 
 - **LZ4 자동 압축은 `DB_TYPE_VARCHAR` 1종에만 적용** (임계값 255 바이트 이상).
-- OOS 적재 가능한 나머지 가변 타입은 현재 직렬화 단계에서 압축되지 않음.
-- `BLOB`/`CLOB` 본문은 외부 ES 저장이므로 OOS 압축 범주 외.
-- VARCHAR 단독으로는 OOS 전용 압축 추가 실익이 낮고, 압축 여지는 JSON/콜렉션 타입에 있음.
+- OOS 적재 가능한 나머지 가변 타입(`VARNCHAR`/`VARBIT`/`JSON`/`SET`/`MULTISET`/`SEQUENCE`)은 현재 직렬화 단계에서 압축되지 않음.
+- `BLOB`/`CLOB` 본문은 외부 ES 저장이므로 OOS 압축 정책 범주 외.
+- 위 현황은 [상단 "조사 결론"](#조사-결론) 의 EXTENDED-at-OOS 구현 시 기준점 자료로 활용한다.
 
 ### OOS 대상 타입별 확인 이력 (compression path)
 
@@ -227,24 +246,30 @@ OOS 진입 가능(가변 길이, 사이즈 > 512B) 하지만 **현재 LZ4 자동
       `mr_data_writeval_json`, `mr_data_writeval_set`).
 - [x] OOS 진입 가능하지만 압축이 미적용인 타입 목록을 정리한다
       (VARNCHAR/VARBIT/JSON/SET/MULTISET/SEQUENCE).
-- [ ] 후속 작업으로 OOS 전용 압축(혹은 위 미적용 타입의 직렬화 경로 압축
-      도입) 가치 평가를 별도 티켓에서 진행한다.
+- [x] OOS 압축 정책 방향을 의사결정한다 → 2026-05-08 OOS 회의에서
+      "P사(PG) `EXTENDED` 스펙을 OOS 레이어 자체에서 구현" 으로 확정
+      (상단 [조사 결론](#조사-결론) 참조).
+- [ ] EXTENDED-at-OOS 구현 (알고리즘 선정, 이중 압축 회피, 메타 인코딩,
+      토글 정책) 을 별도 후속 티켓에서 진행한다.
 
 ---
 
 ## Remarks
 
-- 결론: **OOS 자체에 별도 압축 레이어를 추가할 실효성은 VARCHAR 에 대해서는
-  낮다.** 이미 `tp_String` 경로에서 LZ4 가 적용되어 OOS 페이지에 압축된 바이트가
-  저장되기 때문이다.
-- 압축 여지가 큰 후보는 **JSON 과 콜렉션 타입(SET/MULTISET/SEQUENCE)** 이다.
-  특히 JSON 은 텍스트 기반 직렬화 결과가 그대로 저장되며 일반적으로 압축률이
-  높다. 향후 도입 시 진입점은 `mr_data_writeval_json` 또는 OOS 직전의
-  공통 압축 단계가 될 수 있다.
+본 섹션의 결정 요약은 상단 [조사 결론](#조사-결론) 으로 이동됨. 아래는 보조
+관찰 사항.
+
+- VARCHAR 가 `tp_String` 경로에서 이미 LZ4 압축되는 사실 자체는 EXTENDED-at-OOS
+  구현 시 **이중 압축 회피** 분기 설계의 입력이 된다 (조사 결론의 "고려사항"
+  참조).
+- 압축률 측면에서 가장 효과가 클 후보는 **JSON 과 콜렉션
+  타입(SET/MULTISET/SEQUENCE)** 이다. JSON 은 텍스트 기반 직렬화 결과가 그대로
+  저장되므로 일반적으로 압축률이 높다.
 - VARNCHAR/NCHAR 는 deprecated 명시 주석이 존재
   (`src/object/object_primitive.c:1714` 부근, "DB_TYPE_NCHAR and DB_TYPE_VARNCHAR
   will no longer be used"). 신규 압축 검토 대상에서 제외 가능.
 - 전역 토글 `pr_Enable_string_compression` 이 false 가 되면 VARCHAR 도 압축되지
-  않는다. 운영상 이 변수의 변경 가능성도 함께 고려해야 한다.
+  않는다. OOS 측 압축 토글을 별도로 둘지, 위 변수를 공유할지 후속 설계에서
+  결정한다.
 - 본 분석은 코드 정적 분석 기반이며, 실제 OOS 페이지 dump 로 압축 여부를
   재확인하는 검증 작업은 별도로 수행 가능하다.

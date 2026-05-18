@@ -1,19 +1,31 @@
-# [OOS] PG TOAST 압축 시점 서베이 -- 임계값 초과 시에만 압축 (서베이)
+# [OOS] PG TOAST 압축 시점 서베이 — 임계값 초과 시에만 압축
 
-> **TL;DR**: PostgreSQL 은 투플이 페이지 임계값(`TOAST_TUPLE_TARGET`, 기본 약 2 KB)을 초과할 때만 압축을 시도하며, 압축이 충분하지 않으면 외부 저장(externalize)으로 넘어간다. 작은 투플은 루프 자체에 진입하지 않아 압축 비용이 없다.
+> **한 줄 요약**: PostgreSQL 은 record 가 페이지 임계값 (기본 약 2 KB) 을 넘을 때만 압축을 시도한다. 작은 record 는 압축 코드 자체를 거치지 않는다.
 
-## Summary
+## 결론
 
-- PG 는 `heaptoast.c:184` (루프 조건) 의 `while (heap_compute_data_size(...) > maxDataLen)` 에서 임계값 초과 여부를 먼저 확인한다. 초과하지 않으면 압축 시도 없음.
-- 루프 진입 후 Round 1 압축 / Round 2 외부화 / Round 3 압축 / Round 4 외부화. 즉 압축은 외부화의 전 단계.
-- 스토리지 옵션(PLAIN/EXTENDED/EXTERNAL/MAIN)별로 압축/외부화 동작이 다르다.
-- OOS 에 압축 도입 시 쓰기 훅 위치, 읽기 경로 부재, 메타데이터 인코딩, 슬라이스 미지원 결합이 검토 대상이다.
+**PG 의 EXTENDED 정책만 도입** 한다.
 
-## Description
+- 가져올 것: 임계값을 넘으면 가장 큰 가변 컬럼부터 한 개씩 외부화 (PG Round 1/2 의 외부화 부분).
+- 가져오지 않을 것: pglz 압축 (Round 1 의 inline compress), MAIN 스토리지 옵션 (Round 3/4).
+- 압축은 별도 후속 이슈에서 다룬다.
 
-PostgreSQL TOAST 는 heap record 가 페이지에 들어가지 않을 때만 활성화된다. 임계값은 `TOAST_TUPLE_TARGET = TOAST_TUPLE_THRESHOLD` 기준 기본 약 2032 bytes (BLCKSZ=8192, `MaximumBytesPerTuple(4)` -- 페이지에 최소 4 개 투플이 들어가도록 보장하는 매크로). 투플이 이 크기 이하이면 `heaptoast.c:184` 루프 조건이 처음부터 거짓이라 압축 코드가 전혀 실행되지 않는다.
-근거 -- 임계값을 넘지 않으면 `while` 조건이 거짓이라 압축 코드는 실행되지 않는다:
-*출처: `heaptoast.c:177-198`*
+자세한 스펙 (임계값 `DB_PAGESIZE/4` 상향, 큰 컬럼부터 점진 demotion, AC, 다운스트림 영향) 은 [CBRD-26776](http://jira.cubrid.org/browse/CBRD-26776) 참고.
+
+---
+
+## 무엇을 조사했나
+
+질문: PostgreSQL 은 *언제* TOAST 압축을 시도하나? 모든 INSERT 마다 시도하나, 아니면 조건부인가?
+
+답: **조건부** 다. record 가 페이지 임계값을 넘지 않으면 압축 루프 자체에 들어가지 않는다.
+
+## PG 가 어떻게 동작하나
+
+### 1. 입구 조건 — 임계값 초과 검사
+
+`heaptoast.c:177-198` 의 `while` 루프 조건이 곧 입구 검사다. record 크기가 `maxDataLen` 이하면 루프가 한 번도 돌지 않고, 그 결과 압축 코드도 외부화 코드도 실행되지 않는다.
+
 ```c
 maxDataLen = RelationGetToastTupleTarget(rel, TOAST_TUPLE_TARGET) - hoff;
 
@@ -29,17 +41,22 @@ while (heap_compute_data_size(tupleDesc,
         toast_attr[biggest_attno].tai_colflags |= TOASTCOL_INCOMPRESSIBLE;
 }
 ```
-루프에 진입하면 4-라운드로 처리한다 (`heaptoast.c:179-271`):
 
-| 라운드 | 대상 | 동작 |
+임계값 (`TOAST_TUPLE_TARGET`) 은 BLCKSZ 8192 기준 약 2032 bytes 다. `MaximumBytesPerTuple(4)` — *페이지에 최소 4 개 투플이 들어가도록* 보장하는 매크로에서 나온 값이다.
+
+### 2. 루프 안에서는 4 라운드
+
+루프에 들어가면 PG 는 다음 순서로 record 를 줄인다. 각 라운드 끝마다 record 가 임계값 이하로 떨어졌는지 다시 본다.
+
+| 라운드 | 대상 컬럼 | 동작 |
 |---|---|---|
-| Round 1 | EXTENDED 컬럼 | 압축 시도. 단독으로도 크면 즉시 외부화. |
-| Round 2 | EXTENDED/EXTERNAL 잔류 컬럼 | 외부화. |
-| Round 3 | MAIN 컬럼 | 압축 시도 (완화된 임계값 적용). |
-| Round 4 | MAIN 컬럼 | 외부화. Round 4 까지 외부화해도 임계값을 못 맞추면 그대로 삽입. |
+| 1 | EXTENDED | 인라인 압축. 압축 후에도 너무 크면 즉시 외부화. |
+| 2 | EXTENDED / EXTERNAL 잔류 | 외부화. |
+| 3 | MAIN | 인라인 압축 (완화된 임계값). |
+| 4 | MAIN | 외부화. 여기까지 해도 임계값 미달이면 그대로 삽입. |
 
-근거 -- 위 표는 PG 자체 주석의 명명을 그대로 따른다. 원문 주석:
-*출처: `heaptoast.c:160-167`*
+PG 원문 주석 (`heaptoast.c:160-167`) 그대로:
+
 ```c
 /*
  *    1: Inline compress attributes with attstorage EXTENDED, and store very
@@ -51,7 +68,9 @@ while (heap_compute_data_size(tupleDesc,
  */
 ```
 
-스토리지 옵션 요약:
+### 3. 스토리지 옵션별 동작
+
+`attstorage` 는 컬럼 단위 속성으로, 압축/외부화 허용 여부를 정한다.
 
 | `attstorage` | 압축 | 외부화 |
 |---|---|---|
@@ -60,32 +79,51 @@ while (heap_compute_data_size(tupleDesc,
 | EXTERNAL | 생략 | Round 1 즉시 가능 |
 | MAIN | Round 3 에서 시도 | Round 4 에서 외부화 |
 
-pglz 자체 임계값 (`pg_lzcompress.c:223`): 입력 32 B 미만이면 압축 생략, 압축 결과가 원본 대비 25% 미만 절약이면 압축을 포기한다. `toast_internals.c:91` 에서 최종 수락 조건 `VARSIZE(compressed) < valsize - 2` 재확인.
-근거 -- pglz 의 기본 전략 구조체에 임계값이 직접 정의되어 있다:
-*출처: `pg_lzcompress.c:223-227`*
+### 4. pglz 자체의 압축 임계값
+
+루프 안에서 압축이 호출되더라도 pglz 가 한 번 더 거른다 (`pg_lzcompress.c:223-227`):
+
 ```c
 static const PGLZ_Strategy strategy_default_data = {
     32,        /* Data chunks less than 32 bytes are not compressed */
     INT_MAX,   /* No upper limit on what we'll try to compress */
     25,        /* Require 25% compression rate, or not worth it */
-    /* ... 추가 파라미터 생략 */
+    /* ... */
 };
 ```
-WAL/Recovery 측면: `oos_rv_redo_insert()` 는 WAL raw bytes 를 `spage_insert_for_recovery()` 로 그대로 재삽입한다 (`oos_file.cpp:1798-1828`). 압축 상태로 WAL 에 기록하면 redo/undo 모두 압축 상태로 복원되어 정상 동작과 일치한다. 현재 구조상 압축은 WAL 경로에 추가 변경을 강제하지 않는 것으로 보이나, undo 경로와 recovery 비용은 별도 검토 필요.
 
-## Notes -- CUBRID OOS 압축 도입 시 소규모 우려 사항
+- 입력이 32 B 미만이면 압축 스킵.
+- 압축 결과가 원본 대비 25% 이상 절약되지 않으면 압축 결과를 버린다.
 
-1. **쓰기 훅 삽입 위치**: OOS 로 전송하기 직전 `heap_file.c:12421` 부근 (`heap_attrinfo_dbvalue_to_recdes()` 호출 직후, `oos_insert()` 직전)이 자연스러운 삽입 지점으로 보인다. 이 위치에 압축 로직을 끼우는 것이 침습이 가장 작을 것으로 예상하나 검토 필요.
+최종 수락 조건은 `toast_internals.c:91` 의 `VARSIZE(compressed) < valsize - 2` 에서 한 번 더 확인한다.
 
-2. **읽기 경로 압축 해제 부재**: `oos_read()` (`oos_file.cpp:1348`) 및 그 상위 레이어에 현재 압축 해제 로직이 없다. 압축 도입 시 읽기 경로 구현이 선행 조건이다.
+### 5. WAL / Recovery 측면
 
-3. **압축 메타데이터 저장 위치**: `OR_VAR_FLAG_MASK = 0x3` (`object_representation.h:443`) 의 bit 2 이상을 확장하거나, `OOS_RECORD_HEADER` (현재 16 bytes) 를 확장하는 두 방안이 있다. OOS 는 아직 production 미배포 기능이라 포맷 변경 비용이 낮으나, 어느 방안이든 별도 검토가 필요하다.
+`oos_rv_redo_insert()` 는 WAL raw bytes 를 `spage_insert_for_recovery()` 로 그대로 재삽입한다 (`oos_file.cpp:1798-1828`). 압축 상태로 WAL 에 기록하면 redo/undo 모두 압축 상태로 복원되어 정상 동작과 일치한다. 현재 구조상 압축은 WAL 경로에 추가 변경을 강제하지 않는 것으로 보이나, undo 경로와 recovery 비용은 별도 검토 필요.
 
-4. **슬라이스 읽기 미지원과의 결합**: CUBRID OOS 는 현재 슬라이스 읽기를 지원하지 않아 항상 전체 chunk fetch 가 발생한다 (`oos_file.cpp:1348`). 압축을 도입하면 항상 전체 decompress 가 발생한다.
+---
 
-## Open Questions
+## CUBRID OOS 에 압축 도입 시 검토할 점 (참고용)
 
-1. 압축 알고리즘 (pglz vs lz4) 및 최소 임계값 수치 -- 워크로드 벤치마크 필요.
-2. 압축 메타데이터 저장 위치 -- bit 2 확장 vs `OOS_RECORD_HEADER` 확장 결정.
+본 이슈에서는 압축을 도입하지 않기로 결론지었으나, 후속 이슈를 대비해 검토 사항을 남긴다.
+
+1. **쓰기 훅 위치**: `heap_file.c:12421` 부근 (`heap_attrinfo_dbvalue_to_recdes()` 호출 직후, `oos_insert()` 직전) 이 가장 침습이 작아 보인다.
+
+2. **읽기 경로 압축 해제 부재**: `oos_read()` (`oos_file.cpp:1348`) 와 상위 레이어 모두 압축 해제 로직이 없다. 압축 도입 시 읽기 경로 구현이 선행 조건이다.
+
+3. **압축 메타데이터 저장 위치**: 두 가지 선택지가 있다.
+    - `OR_VAR_FLAG_MASK = 0x3` (`object_representation.h:443`) 의 bit 2 이상 확장.
+    - `OOS_RECORD_HEADER` (현재 16 bytes) 확장.
+
+   OOS 는 아직 production 미배포라 포맷 변경 비용은 낮다.
+
+4. **슬라이스 읽기 미지원**: CUBRID OOS 는 현재 슬라이스 읽기를 지원하지 않아 항상 전체 chunk fetch 가 발생한다 (`oos_file.cpp:1348`). 압축을 도입하면 매 read 마다 전체 decompress 가 강제된다.
+
+---
+
+## 남은 질문 (후속 이슈에서 결정)
+
+1. 압축 알고리즘 선택 — pglz vs lz4. 워크로드 벤치마크 필요.
+2. 압축 메타데이터 저장 위치 — bit 2 확장 vs `OOS_RECORD_HEADER` 확장.
 3. 읽기 경로 압축 해제 구현 범위.
-4. OOS vacuum 경로가 압축 도입의 영향을 받는가?
+4. OOS vacuum 경로가 압축의 영향을 받는가?

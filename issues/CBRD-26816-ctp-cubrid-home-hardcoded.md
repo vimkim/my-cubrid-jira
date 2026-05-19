@@ -18,7 +18,7 @@
     - `CTP/sql/src/com/navercorp/cubridqa/cqt/common/ShellInput.java:51` (sql/cqt 의 같은 패턴)
 - 같은 패턴으로 `CUBRID_DATABASES`, `PATH`, `LD_LIBRARY_PATH` 도 복원 (`~/.bashrc` 가 이 네 개를 같이 덮어쓰기 때문).
 - 부모 셸에 `$CUBRID` 가 비어 있을 때만 `.bash_profile` 의 값을 그대로 받는다. 즉 기존 사용자 환경 (사용자 셸에 `CUBRID` 미 export) 은 동작이 그대로 유지된다.
-- 검증: `bigPageSize.sh` 를 `just shell-debug` 로 돌렸을 때 `time=0` 즉시 NOK 가 아니라 실제 실행 시간 (분 단위) 이 기록되어야 한다.
+- 검증: `bigPageSize.sh` 를 `ctp.sh shell -c shell_ci.conf` 로 돌렸을 때 `time=0` 즉시 NOK 가 아니라 실제 실행 시간 (분 단위) 이 기록되어야 한다.
 - 범위 밖: jar 재빌드/배포 절차는 `TBD - 합의 미확인`.
 
 ---
@@ -87,7 +87,7 @@ java.io.FileNotFoundException                  <- 그런 파일 없음 -> 테스
 
 | 실행 방식 | 결과 | 소요 시간 |
 |---|---|---|
-| `just shell-debug ...bigPageSize` (CTP 경유) | `[NOK]`, `load.log` 가 빈 파일 | `time=0` (즉시 종료) |
+| `ctp.sh shell -c shell_ci.conf` (CTP 경유, bigPageSize 만 scenario 로 지정) | `[NOK]`, `load.log` 가 빈 파일 | `time=0` (즉시 종료) |
 | `bash bigPageSize.sh` (CTP 우회, 사용자 셸 환경) | 끝까지 실행, `load.log` 정상 생성 | 약 8 분 |
 
 CTP 쪽 `feedback.log` 에 다음 예외가 반복 출력되어 있었다:
@@ -178,7 +178,8 @@ export init_path=/home/vimkim/CTP/shell/init_path
 bash bigPageSize.sh                   # 약 8 분, 끝까지 실행
 
 # 3. CTP 경유: 실패 (CTP 가 .bash_profile 소싱 후 $CUBRID 복원 안 함)
-just shell-debug /home/vimkim/cubrid-testcases-private-ex/shell/_35_cherry/issue_21654_server_side_loaddb/bigPageSize
+#    shell_ci.conf 의 scenario 를 위 bigPageSize 경로로 지정한 뒤
+ctp.sh shell -c shell_ci.conf
 # 결과: time=0 으로 즉시 NOK
 cat /home/vimkim/CTP/result/shell/current_runtime_logs/feedback.log | grep FileNotFoundException
 # Exception in thread "main" java.io.FileNotFoundException:
@@ -300,7 +301,8 @@ if (scriptToRun == null) {
 export CUBRID=/home/vimkim/.cub/install/feat-oos-m2-manual/debug_clang
 
 # bigPageSize.sh 가 CTP 경유로 정상 실행되는지 확인
-just shell-debug .../bigPageSize
+# (shell_ci.conf 의 scenario 를 bigPageSize 경로로 지정한 뒤)
+ctp.sh shell -c shell_ci.conf
 # 기대: time 이 5-10 분 사이, OK 또는 진짜 NOK (FileNotFoundException 아닌 실제 실패)
 
 # feedback.log 에 FileNotFoundException 없는지 확인
@@ -314,7 +316,7 @@ grep FileNotFoundException /home/vimkim/CTP/result/shell/current_runtime_logs/fe
 
 - [ ] 사용자 셸에 `CUBRID` 가 비표준 경로로 export 된 상태에서 `ctp.sh shell` 이 그 경로를 따른다.
 - [ ] `CUBRID` 가 export 되지 않은 환경에서는 `.bash_profile` 의 값이 그대로 사용된다 (기존 동작 유지).
-- [ ] `bigPageSize.sh` 를 `just shell-debug` 로 실행하면 `time=0` 이 아닌 실제 실행 시간이 기록된다.
+- [ ] `bigPageSize.sh` 를 `ctp.sh shell -c shell_ci.conf` 로 실행하면 `time=0` 이 아닌 실제 실행 시간이 기록된다.
 - [ ] `feedback.log` 에 `FileNotFoundException: /home/.../CUBRID/conf/...` 가 더 이상 나오지 않는다.
 - [ ] OOS 회귀 sub-task 3 건 (CBRD-26813/26814/26815) 의 fix 를 CTP 로 검증해 OK 가 떨어진다.
 

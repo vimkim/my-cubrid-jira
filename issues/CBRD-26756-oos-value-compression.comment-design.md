@@ -37,7 +37,7 @@ grep -rn --include="*.c" --include="*.cpp" --include="*.h" --include="*.hpp" --i
 
 핵심 관찰:
 
-- **압축은 사실상 OR-buf 레이어 (`or_put_varchar_internal`) 에서 이미 일어난다.** `pr_do_db_value_string_compression` 은 `DB_VALUE` 에 결과를 캐시해 두기 위한 사전 호출이며, 디스크 바이트열 자체는 OR helper 가 그 자리에서 `cubcompress::compress<LZ4>` 를 돌린다 (`object_representation.c:840-870`).
+- **압축은 사실상 OR-buf 레이어 (`or_put_varchar_internal`) 에서 이미 일어난다.** `pr_do_db_value_string_compression` 은 `DB_VALUE` 에 결과를 캐시해 두기 위한 사전 호출이며, 디스크 바이트열 자체는 OR helper 가 그 자리에서 `cubcompress::compress` (LZ4 specialization) 를 돌린다 (`object_representation.c:840-870`).
 - 이 결과는 length prefix 가 `[byte=charlen ≤ 254] | [byte=255 sentinel + int compressed_len + int decompressed_len + bytes]` 두 모드로 나뉘며, **모든 reader (heap, btree, HA log, network, recovery)** 가 `or_get_varchar_compression_lengths` 한 곳을 거쳐 이 layout 을 해석한다.
 - 따라서 VARCHAR 압축은 **변경 시 디스크 포맷·WAL 포맷·HA wire 포맷 동시 변경** 이며, 옵션 B/C 가 비싼 진짜 이유는 LOC 가 아니라 이 호환성 면이다.
 
@@ -88,7 +88,7 @@ grep -rn --include="*.c" --include="*.cpp" --include="*.h" --include="*.hpp" --i
 ### 개요
 
 - `pr_do_db_value_string_compression` 의 `if (db_type != DB_TYPE_VARCHAR)` 가드 해제 + VARBIT / JSON / SET / MULTISET / SEQUENCE 의 `lengthval`·`writeval`·`readval` 콜백에 동일한 압축 분기 복제.
-- 각 타입에 평행한 `or_put_<type>_compressed` / `or_get_<type>_compression_lengths` OR helper 신설.
+- 각 타입에 평행한 `or_put_TYPE_compressed` / `or_get_TYPE_compression_lengths` OR helper 신설 (`TYPE` 자리에 varbit/json/set/multiset/sequence).
 - 압축 메타 (compressed_length / decompressed_length / sentinel byte) 가 디스크 포맷·인덱스 키 포맷에 동시 진입.
 
 ### Pros
@@ -99,16 +99,16 @@ grep -rn --include="*.c" --include="*.cpp" --include="*.h" --include="*.hpp" --i
 
 ### Cons / Side-effect
 
-- **🚨 B-Tree 인덱스 키 포맷 변경.** btree 는 동일한 `data_writeval`/`data_readval` 콜백을 호출하므로, VARBIT/JSON 등이 인덱스 키로 쓰이는 경우 인덱스 페이지 포맷이 바뀐다. 옵션:
+- **[WARN] B-Tree 인덱스 키 포맷 변경.** btree 는 동일한 `data_writeval`/`data_readval` 콜백을 호출하므로, VARBIT/JSON 등이 인덱스 키로 쓰이는 경우 인덱스 페이지 포맷이 바뀐다. 옵션:
   - (b1) 기존 인덱스 호환성을 깬다 → 마이그레이션 강제.
   - (b2) btree 진입 경로에서만 압축 skip 분기 → 호출처 분기 폭증 + per-type 의 lengthval/writeval pair 가 caller 별 동작 분기 (heap-vs-btree).
   - (b3) **btree 인덱스 빌드 시 핫패스 영향.** `btree_load.c:2513` (sort 단계 key 직렬화), `btree_load.c:4065, 4071` (중복 키 비교) 가 `data_readval` 을 직접 호출하므로, 압축 키를 다시 매번 decompress 해야 비교 가능. 인덱스 빌드/리오그 성능 저하가 마이그레이션 비용과 별개로 발생.
-- **🚨 HA replication / WAL 포맷 변경.** WAL 의 heap insert/delete redo 레코드가 raw recdes 바이트를 그대로 적재한다. 근거:
+- **[WARN] HA replication / WAL 포맷 변경.** WAL 의 heap insert/delete redo 레코드가 raw recdes 바이트를 그대로 적재한다. 근거:
   - `heap_file.c:22412`, `heap_file.c:22421` — `log_append_undoredo_recdes (thread_p, RVHF_INSERT, &log_addr, NULL, recdes_p);` (insert).
   - `heap_file.c:23608, 23613` — `log_append_undoredo_recdes (thread_p, RVHF_DELETE, &log_addr, &temp_recdes, NULL);` (delete).
   - `heap_file.c:20825` — `log_append_undoredo_recdes (thread_p, RVHF_MVCC_DELETE_MODIFY_HOME, ...)` (mvcc delete-modify).
   - 즉 `data_writeval` 결과가 그대로 recdes 페이로드가 되어 WAL 에 박힌다. 타입별 압축이 데이터 바이트 layout 을 바꾸면 동일한 RVHF_* recovery handler 가 새/구 양쪽을 디코드할 수 있어야 하며, HA replication 도 동일 페이로드를 슬레이브에 그대로 전달하므로 master/slave 동시 업그레이드가 필수. 롤링 업그레이드 불가.
-- **🚨 카탈로그 영향.** system catalog 컬럼이 VARCHAR 외에 JSON 으로 확장된 경우 (없는 경우라도 향후 추가 시) 카탈로그 포맷이 새 DB 와 호환 안 됨.
+- **[WARN] 카탈로그 영향.** system catalog 컬럼이 VARCHAR 외에 JSON 으로 확장된 경우 (없는 경우라도 향후 추가 시) 카탈로그 포맷이 새 DB 와 호환 안 됨.
 - `or_get_varchar_compression_lengths` 호출처 14곳을 타입별로 곱하면 신규 helper 호출처가 30~40 곳으로 증가.
 - `lengthval` ↔ `writeval` ↔ `readval` triple 의 invariant 가 깨지지 않도록 5 종 타입에 동일한 케어 필요.
 
@@ -140,9 +140,9 @@ grep -rn --include="*.c" --include="*.cpp" --include="*.h" --include="*.hpp" --i
 
 ### Cons / Side-effect
 
-- **🚨🚨 기존 데이터베이스 비호환.** VARCHAR ≥ 255B 가 들어 있는 모든 페이지 (heap + 카탈로그 + btree 인덱스 키) 가 현 `or_get_varchar_compression_lengths` 로 디코드된다. 이 함수 제거 시 기존 페이지 read 불가 → **dump/restore 마이그레이션 강제.**
-- **🚨🚨 WAL 비호환.** 기존 WAL 의 heap insert/update redo 레코드 (`log_append_undoredo_recdes (thread_p, RVHF_INSERT, ...)` — `heap_file.c:22412, 22421`) 가 압축 VARCHAR 를 담은 raw recdes 바이트열을 그대로 적재한다. recovery 시 동일 recdes 가 `data_readval` 로 풀리므로, VARCHAR 압축 분기를 제거하면 기존 WAL redo 가 디코드 불가 → 재기동 실패.
-- **🚨🚨 HA replication 비호환.** 마스터-슬레이브 동시 변경 필수, 누적 replication log 도 호환 reader 필요. (replication 도 동일한 recdes 페이로드를 전달하므로 WAL 호환성과 운명이 같다.)
+- **[CRITICAL] 기존 데이터베이스 비호환.** VARCHAR ≥ 255B 가 들어 있는 모든 페이지 (heap + 카탈로그 + btree 인덱스 키) 가 현 `or_get_varchar_compression_lengths` 로 디코드된다. 이 함수 제거 시 기존 페이지 read 불가 → **dump/restore 마이그레이션 강제.**
+- **[CRITICAL] WAL 비호환.** 기존 WAL 의 heap insert/update redo 레코드 (`log_append_undoredo_recdes (thread_p, RVHF_INSERT, ...)` — `heap_file.c:22412, 22421`) 가 압축 VARCHAR 를 담은 raw recdes 바이트열을 그대로 적재한다. recovery 시 동일 recdes 가 `data_readval` 로 풀리므로, VARCHAR 압축 분기를 제거하면 기존 WAL redo 가 디코드 불가 → 재기동 실패.
+- **[CRITICAL] HA replication 비호환.** 마스터-슬레이브 동시 변경 필수, 누적 replication log 도 호환 reader 필요. (replication 도 동일한 recdes 페이로드를 전달하므로 WAL 호환성과 운명이 같다.)
 - 결과적으로 **"permanent backward-compat reader" 유지가 필수** 이므로 코드 제거 효과의 절반 이상이 상쇄.
 - 단순 grep 으로 "VARCHAR 압축이 박힌 곳" 만 12 파일 약 165 hits 이며, 그 중 다수가 매크로/타입 라이프사이클이라 일괄 grep-replace 불가.
 
@@ -163,7 +163,7 @@ grep -rn --include="*.c" --include="*.cpp" --include="*.h" --include="*.hpp" --i
 근거:
 
 1. **본 작업의 목적은 다음 측정 가능한 비대칭을 메우는 것이다**: JSON / VARBIT / SET / MULTISET / SEQUENCE 컬럼이 OOS 진입 임계 (> 512B) 를 넘긴 행에서 OOS 페이지 압축 후 크기 / 원본 크기 비율 ≤ 0.7 (LZ4 기준) 을 달성. Option A 단일 변경으로 이 목적이 충족된다.
-2. **현 VARCHAR 압축은 production 안정 단계.** CBRD-20158 (`b049ba5ee`, 2018) 에서 처음 도입된 후 CBRD-21558 (`cd36742df`, inline 함수화), CBRD-22638 / CBRD-22993 (NCHAR varying / VARNCHAR 보정), CBRD-23703 / CBRD-26324 (LZ4 라이브러리 교체 및 `cubcompress::compress<LZ4>` API 정착) 까지 7년에 걸친 다수 패치로 안정화되었다. 디스크 / WAL / HA 포맷에 같은 기간 박혀 있으며, B / C 는 LOC 가 아니라 호환성 측면에서 비싸다.
+2. **현 VARCHAR 압축은 production 안정 단계.** CBRD-20158 (`b049ba5ee`, 2018) 에서 처음 도입된 후 CBRD-21558 (`cd36742df`, inline 함수화), CBRD-22638 / CBRD-22993 (NCHAR varying / VARNCHAR 보정), CBRD-23703 / CBRD-26324 (LZ4 라이브러리 교체 및 `cubcompress::compress` (LZ4 specialization) API 정착) 까지 7년에 걸친 다수 패치로 안정화되었다. 디스크 / WAL / HA 포맷에 같은 기간 박혀 있으며, B / C 는 LOC 가 아니라 호환성 측면에서 비싸다.
 3. **C 가 "너무 breaking 한가?" 의 답: 예, 너무 breaking 합니다.** 단순 LOC 만 보면 1,200~1,500 이지만 disk + WAL + HA 포맷이 동시에 바뀐다. 정량 비교:
    - **호환 부담 차원 수**: A = 1 (OOS payload prefix), B = 3 (인덱스 + WAL + HA wire), C = 4 (heap + WAL + HA + 카탈로그).
    - **마이그레이션 강제 여부**: A = 없음, B = 인덱스 키 포맷에 따라 있음, C = 필수 (dump/restore).

@@ -15,7 +15,7 @@
 - **분류 규칙**: 코어 덤프 스택 또는 *"External file `ces_*` not found"* 같은 OOS-specific 증상이 잡힌 항목은 `_25_unstable/*` 경로에 있어도 high. 코드 경로 증거가 답안 파일 차분 수준에 그치면 medium/low. `_25_unstable` 라벨 하나만으로는 high 에서 빼지 않는다.
 - **후속 티켓**: high 12건은 한 건씩 따로 만들지 않고 근원이 같은 단위로 묶어 3개 티켓으로 분기.
     - 클러스터 1 — LOB/ELO 외부 저장소 손상 (9건: #1, 2, 3, 4, 12, 14, 17, 19, 22)
-    - 클러스터 2 — 수 MB 크기 VARCHAR/JSON 의 OOS 읽기 누락 (1건: #29 `cbrd_25481`)
+    - 클러스터 2 — 대용량 VARCHAR/JSON 의 OOS 읽기 누락 (1건: #29 `cbrd_25481`)
     - 클러스터 3 — TDE 와 OOS overflow page 가 같이 쓰일 때의 충돌 (2건: #8, #9)
     - 티켓 번호는 `## 후속 작업` 체크리스트에 채운다.
 - **재실행 확인**: `_25_unstable/*` 와 dblink/`SUBQUERY_CACHE` 트레이스 차분 (#10, 13, 16, 18, 20, 21, 23, 24, 25, 26, 27, 28, 30, 31, 32) 은 master HEAD 에서 재현되는지 먼저 본다. 재현되면 본 M2 게이트에서 제외하고, 재현되지 않으면 별도 회귀로 재분류한다.
@@ -77,7 +77,7 @@ high 12건의 클러스터 내역: 클러스터 1 (9건) `#1, 2, 3, 4, 12, 14, 1
 
 **추적 시작점**: 디버그 빌드에서 `bigPageSize.sh` 를 재현하고, `peekmem_elo` 진입 시 buffer cursor 의 바이트를 master 와 diff. 한 자리만 어긋났다면 그 자리가 OOS 와 클래식 ELO 가 갈리는 지점이다.
 
-### 클러스터 2 — 수 MB 크기 VARCHAR / JSON 의 OOS 읽기 누락 (high 1건)
+### 클러스터 2 — 대용량 VARCHAR / JSON 의 OOS 읽기 누락 (high 1건)
 
 **#29 `cbrd_25481.sh`** — 28개 sub-case 중 12개 NOK.
 
@@ -91,9 +91,9 @@ high 12건의 클러스터 내역: 클러스터 1 (9건) `#1, 2, 3, 4, 12, 14, 1
 | `random_many_rows` row 1–5 | 1,398,116 x 5 | 앞에 NULL NULL 3행 추가, row 1 OK, row 2 NULL, row 3–5 누락 |
 | `multiple_large_json_columns` | 세 컬럼 각 1,398,116 | 한 컬럼 4, 나머지 NULL / no results |
 
-쓰기 측이 아니라 **읽기 측 OOS 회귀**다. 의심 경로:
+쓰기 측이 아니라 **읽기 측 OOS 회귀** 다. 의심 경로:
 
-- 수 MB 값의 OOS multi-chunk chain 을 끝까지 따라가지 않을 가능성.
+- 대용량 값의 OOS multi-chunk chain 을 끝까지 따라가지 않을 가능성.
 - CS 모드 fetch (`xs_send_method_call_info_to_client` / `qmgr_get_query_result`) 에서 OOS OID 가 변환되지 않은 채 클라이언트로 넘어가는 가능성 — `heap_record_replace_oos_oids()` 가 `locator_fetch_all` 외 경로에서 빠졌을 수 있다. CBRD-26516 의 "UPDATE 3x 중복 호출" 수정이 과도하게 깎인 변종일 가능성.
 - 6.9 MB 단일 행은 `RECDES` length 4-byte 한계 (2 GB) 와는 거리가 멀어 INT 오버플로 가능성은 낮지만, OOS chunk header 의 길이 필드는 한 번 확인할 가치가 있다 (OOS-CONTEXT 의 "RECDES length 4-byte limit" 메모 참조).
 
@@ -134,14 +134,14 @@ high 12건의 클러스터 내역: 클러스터 1 (9건) `#1, 2, 3, 4, 12, 14, 1
 ### 후속 작업
 
 - [ ] 클러스터 1 (LOB/ELO) 회귀 티켓 발행 (`TBD - 신규 CBRD-`). 본 분석의 클러스터 1 표를 그대로 첨부.
-- [ ] 클러스터 2 (수 MB 크기 OOS 읽기) 회귀 티켓 발행 (`TBD - 신규 CBRD-`). `cbrd_25481` CS 모드 `random_single_row` 의 7 MB JSON 한 줄을 최소 재현으로 제시.
+- [ ] 클러스터 2 (대용량 OOS 읽기) 회귀 티켓 발행 (`TBD - 신규 CBRD-`). `cbrd_25481` CS 모드 `random_single_row` 의 7 MB JSON 한 줄을 최소 재현으로 제시.
 - [ ] 클러스터 3 (TDE x OOS) 회귀 티켓 발행 (`TBD - 신규 CBRD-`). `tbl_enc_08` / `tbl_enc_14` 의 `diagdb` 출력 차분 첨부.
 - [ ] master HEAD 에서 OOS 무관 추정 16건 일괄 재실행. 재현되는 항목은 M2 게이트에서 제외, 그렇지 않으면 다시 분류.
 - [ ] #6, #11 의 답안 갱신 PR (필요시 별도 sub-task 로 분리).
 
 ## Acceptance Criteria
 
-- [ ] 세 회귀 클러스터 (LOB/ELO, 수 MB OOS read, TDE x OOS) 에 대해 별도 CBRD-XXXXX 가 각각 생성되고, 본 sub-task 의 Remarks 와 `failed-tc-report.md` 의 클러스터 표 양쪽에 티켓 번호가 채워진다.
+- [ ] 세 회귀 클러스터 (LOB/ELO, 대용량 OOS read, TDE x OOS) 에 대해 별도 CBRD-XXXXX 가 각각 생성되고, 본 sub-task 의 Remarks 와 `failed-tc-report.md` 의 클러스터 표 양쪽에 티켓 번호가 채워진다.
 - [ ] OOS 무관 추정 16건 (특히 `_25_unstable/*` 9건) 의 master baseline 재현 여부가 본 sub-task 코멘트에 표 형태로 정리된다.
 - [ ] `failed-tc-report.md` 가 본 sub-task 첨부 또는 git-tracked 경로 (`feat-oos-m2-manual` 브랜치) 로 도달 가능하다.
 
@@ -166,7 +166,7 @@ high 12건의 클러스터 내역: 클러스터 1 (9건) `#1, 2, 3, 4, 12, 14, 1
 | `src/loaddb/load_object.c:657` (`get_desc_current`) | `unloaddb` 가 컬럼 단위로 순회하는 곳. ELO read 의 비-라이브러리 최초 호출자. |
 | `src/object/lob_locator.cpp` | LOB locator API, insert 시 `es.c` 핸드오프. |
 | `src/storage/es.c` (`es_posix_*`) | 실제 `ces_*` 외부 파일 생성. |
-| `src/storage/oos_file.cpp` | OOS chunk write / read, 수 MB 값의 chain. |
+| `src/storage/oos_file.cpp` | OOS chunk write / read, 대용량 값의 chain. |
 | `src/storage/heap_file.c` (`heap_record_replace_oos_oids`) | 모든 read 경로에 호출돼야 한다. CS 모드 fetch 누락 가능성. |
 
 ## Remarks

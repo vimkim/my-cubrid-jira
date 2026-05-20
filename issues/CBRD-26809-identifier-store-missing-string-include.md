@@ -43,7 +43,15 @@ src/object/identifier_store.hpp:35:13: error:
 
 수정 전 상태에서 모던 툴체인에서 위 오류로 빌드 실패.
 
+## Drive-by fix: `<termio.h>` → `<termios.h>`
+
+같은 PR 안에서 `src/broker/broker_monitor.c` 의 `#include <termio.h>` 를 `#include <termios.h>` 로 함께 교체했다.
+
+- **이유**: `<termio.h>` 는 System V 시절의 레거시 헤더이며, POSIX 표준 헤더는 `<termios.h>` 다. glibc 2.34+ 및 musl 등 모던 libc 환경에서는 `<termio.h>` 가 제거되었거나 deprecated 로 처리되어, 모던 컴파일러에서 `fatal error: termio.h: No such file or directory` 가 발생한다.
+- **호환성**: 해당 파일은 이 헤더에서 `struct termios` / `tcgetattr` / `tcsetattr` 류 POSIX API 만 사용하므로 1:1 치환 가능. 동작·ABI 변경 없음.
+- **commit**: `88763d421` ("fix: rename termio to termios, a modern name").
+
 ## Remarks
 
-- PR: branch `fix-identifier-include-error`, commit `f53d09dc2`.
+- PR: branch `fix-identifier-include-error`, commit `f53d09dc2` (identifier_store), `88763d421` (termio→termios).
 - 동일 패턴 점검(IWYU 등)은 본 이슈 범위 밖.

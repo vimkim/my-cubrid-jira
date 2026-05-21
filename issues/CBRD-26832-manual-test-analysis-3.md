@@ -2,25 +2,31 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: CBRD-26660 / CBRD-26817 의 round-3 follow-up. `feature/oos-m2` 브랜치 빌드 `11.5.0.2338-404b396` 의 manual QA shell 결과 19건 NOK 를 OOS (Out-of-row Overflow Storage, 가변 컬럼을 별도 파일로 떼어내는 본 M2 의 핵심 기능) 회귀, 환경 / flaky, round-2 회귀 복귀의 세 갈래로 분류해 M2 머지 차단 항목만 작업 큐에 남긴다.
+**이슈 수행 목적**: build `11.5.0.2338-404b396` (`feature/oos-m2`) 의 manual QA shell **19 NOK 를 6 버킷으로 분류해, M2 머지 차단이 되는 OOS 회귀 3건만 본 sub-task 의 작업 항목으로 남긴다**. 나머지 16건은 환경 flaky / round-2 회귀 복귀로 가른다.
 
 **이슈 수행 이유**:
 
-- **현재 동작 / 배경**:
-    - HEAD 빌드 `11.5.0.2338-404b396` 의 manual QA 결과 (`shellTestId=56510`, `resultType=NOK`) 에서 shell 19건 NOK 가 잔존한다.
-    - round-2 (CBRD-26817, build `11.5.0.2334-e2a5d2b`) 의 16건 대비 NOK 절대수는 늘었지만, 코어 덤프는 0건이고 round-1 의 `peekmem_elo` SIGSEGV 도 사라졌다. LOB / ELO (External LOB Object) 클러스터 7건 (`bug_xdbms3947`, `bug_bts_16011` SA/CS, `bug_bts_7596`, `bug_bts_10290`, `cbrd_23349`, `cbrd_24103`) 이 자취를 감췄다.
-    - 이 변화는 CBRD-26815 (OOS JSON deserialize), CBRD-26813 (`REC_BIGONE` reassembly 후 OOS OID 확장), CBRD-26814 (OOS inline metadata fit 검사) 머지의 효과로 보인다.
-    - 동시에 round-2 의 "fixed 16건" 목록에 들어 있던 5건 (`bigPageSize.sh`, `tbl_enc_08.sh`, `multi_queries_2.sh`, `cbrd_23843_3.sh`, `check_option.sh`) 이 round-3 에서 다시 NOK 로 잡힌다.
-- **영향**: M2 머지 게이트가 막힌다. round-2 에서 통과로 분류해 후속 회귀 추적에서 빠진 5건이 round-3 에서 다시 NOK 가 되면, 다음 라운드에서도 "정말 고쳐졌나" 를 매번 다시 확인해야 한다. 본 sub-task 에서 이번 회귀 복귀가 진짜 코드 회귀인지, answer 파일 drift 인지, 환경 차이인지 가르지 않으면 M2 마감 결정이 지연되고 회귀가 OOS 무관 잡음에 묻혀 production 까지 새어 나갈 위험이 있다.
+- **진척 (round-2 -> round-3)**: NOK 19건, **코어 덤프 0건**. round-1 의 `peekmem_elo` SIGSEGV 와 round-2 의 LOB / ELO (External LOB Object — `lob_locator.cpp`) 클러스터 7건이 모두 사라졌다. CBRD-26815 / 26813 / 26814 머지 효과.
+- **새 위험**: round-2 의 "fixed 16건" 목록에 있던 **5건이 round-3 에서 다시 NOK** (`bigPageSize`, `tbl_enc_08`, `multi_queries_2`, `cbrd_23843_3`, `check_option`). 환경 잡음 / answer drift / 진짜 회귀 중 무엇인지 가르지 않으면 M2 마감 결정이 밀린다.
 
 **이슈 수행 방안**:
 
-- 19건 NOK 를 6 버킷으로 가른다. A) OOS 회귀 의심 3건, B) dblink (CUBRID 의 원격 DB 링크 문법, parser 가 별도 분기를 탄다) 포맷 / locale 6건, C) stat 카운터 flaky 4건, D) 결과셋 / 옵션 drift 4건, E) PL/CSQL trace 카운터 1건, F) medium 회귀 rollup 1건. 버킷별 매핑과 evidence 는 `## AI-Generated Context` 의 분류 절 (Bucket A 표 + 후속 산문) 에서 단일 canonical 으로 다룬다.
-- 버킷 A (OOS 회귀 의심) 3건은 본 sub-task 의 핵심 대상이다. TC#1 `tbl_enc_08`, TC#2 `tbl_enc_14`, TC#11 `cbrd_24916_check_index_ovfps`. 가설과 의심 사이트의 본 분석은 아래 `### Bucket A` 산문에 모았다.
-- round-2 회귀 복귀 5건 (`bigPageSize`, `tbl_enc_08`, `multi_queries_2`, `cbrd_23843_3`, `check_option`) 은 6 버킷 분류 위에 별도 플래그를 단다. 셋 중 하나다: round-2 fix 가 round-3 에서 다시 깨졌거나, 머지 충돌 시점의 build artifact 차이거나, answer 파일 의도 차이. 5건 모두 develop HEAD 에서 단발 재현해 baseline 을 다시 확인한다 (Recommended Next Steps 의 단일 지시).
-- 버킷 C (stat flake) 4건 (`cbrd_25278_option`, `cbrd_20145_1`, `cbrd_22803`, `bug_bts_5342`) 은 본 sub-task 범위 밖. CBRD-26817 에서도 같은 분류였고, round-3 도 같은 패턴 (run-to-run counter drift 또는 archive-log timing) 이라 develop baseline 재실행 또는 answer 파일 갱신으로 분리한다.
-- 버킷 B / D / E / F 는 round-2 와 비교한 변화량만 짚고 본 sub-task 에서는 회귀 여부 판정을 보류한다. 다만 B 의 TC#14 `cbrd_24501_cubrid` -12 (`count(*) = 900000` vs 답안 `0`) 는 단순 locale / formatting 이 아니라 "remote `cub_server` kill 도중 dblink 가 보고있던 행이 격리되지 않고 노출" 류의 semantic 회귀라 OOS 와 무관하더라도 별도 plain-bug 티켓 후보로 둔다.
-- 분석 원본: 본 분석가의 로컬 작업 트리에만 존재하는 `tc/SUMMARY.md`, `tc/PROMPT.md`, `tc/raw/tc_NN_*.txt`. PR / branch 에는 포함되지 않는다.
+- **분류 (19건 -> 6 버킷)**:
+
+  | 버킷 | 건수 | 본 sub-task 처리 |
+  |------|----:|------------------|
+  | **A. OOS 회귀 의심** | **3** | **본 sub-task 핵심 — 직접 추적** |
+  | B. dblink 포맷 / locale | 6 | 변화량만 짚음 (TC#14 `count(*)=900000` 만 별도 plain-bug 후보) |
+  | C. stat 카운터 flaky | 4 | 범위 밖 — develop baseline 재실행 / answer 갱신 |
+  | D. 결과셋 / 옵션 drift | 4 | 변화량만 짚음 |
+  | E. PL/CSQL trace 카운터 | 1 | 변화량만 짚음 |
+  | F. medium 회귀 rollup | 1 | 변화량만 짚음 |
+
+- **Bucket A 3건 (핵심 작업)**:
+    - TC#1 `tbl_enc_08`, TC#2 `tbl_enc_14` — TDE 테이블의 heap dump 에서 `MULTIPAGE_OBJECT_HEAP` (큰 가변 컬럼이 별도 multi-page 파일로 spill 되는 overflow heap chain) 블록이 답안 대비 누락 / 위치 변경. 의심 위치: `src/storage/heap_file.c:12466` 의 OOS 임계치 (`> DB_PAGESIZE/8`) + `heap_record_replace_oos_oids` (`:7982`) + dump 사이트 (`src/storage/file_manager.c:1445`).
+    - TC#11 `cbrd_24916_check_index_ovfps` — `check_index_ovfps.sh` 가 만드는 catalog 조인 SQL 이 `ERROR: g.x is a varchar type, not an object type` 으로 깨진다. 의심 위치: `src/object/schema_system_catalog_install.cpp` 의 컬럼 타입.
+- **round-2 회귀 복귀 5건**: 6 버킷 위 별도 플래그. 분포 — **A 1건 (`tbl_enc_08`), B 1건 (`cbrd_23843_3`), D 3건 (`bigPageSize`, `multi_queries_2`, `check_option`)**. 5건 모두 develop HEAD 단발 재현으로 baseline 분리 (Recommended Next Steps 단일 지시).
+- **분석 원본** (본 분석가 로컬 작업 트리, PR 미포함): `tc/SUMMARY.md`, `tc/PROMPT.md`, `tc/raw/tc_NN_*.txt`.
 
 ---
 

@@ -2,18 +2,48 @@
 
 ## Issue Triage
 
-**이슈 수행 목적** (필수): shell test `bigPageSize.sh` 가 storage layout (page size, OOS 이관 여부) 차이에도 deterministic 하게 OK 로 닫히도록 TC 한 줄의 ORDER BY 에 tiebreaker 를 더한다.
+**이슈 수행 목적** (필수): Shell test `bigPageSize.sh` 가 page size 나 OOS 동작에 상관없이 항상 같은 결과를 내도록, TC 의 ORDER BY 한 줄에 정렬 기준 컬럼을 하나 더 추가한다.
 
 **이슈 수행 이유** (필수):
 
-- **현재 동작 / 배경**: Test 의 비교 query 가 `select ... from t order by 1 desc limit 1` 형태다 (`bigPageSize.sh` line 21-24, 현재 line 24 는 `from t order by 1 desc limit 1` — tiebreaker 가 없다). `init.sql:48-73` 이 한 row INSERT 후 `INSERT INTO t SELECT ... FROM t` 를 여덟 번 self-double 하므로 256 row 모두 `col1 = -32768` (즉 `col2..col6, d1..d8, c1..c3, j` 까지 전 컬럼 동일), 단 `id` 만 AUTO_INCREMENT 컬럼이라 row 마다 monotonically 증가하는 값을 부여하므로 사실상 unique 하다. `ORDER BY col1 DESC` 는 256-way tie 라 LIMIT 1 결과는 SQL spec 상 implementation-defined — heap scan 순서·sort tie-handling·page packing 에 좌우된다. CUBRID 만의 quirk 가 아니고 PostgreSQL/MySQL/Oracle/SQL Server 모두 동일하다.
-- **영향**: QA — 같은 logical data 를 담은 `tdb1` (기본 16K page) 과 `tdb2` (`--db-page-size=4k`) 의 LIMIT 1 결과를 `compare_result_between_files csql1.log csql2.log` 로 비교하는데, OOS 작업이 `tdb2` 의 record placement 를 바꾸면서 두 DB 가 surface 하는 tied row 가 달라져 NOK. develop 에서 OK 였던 건 두 layout 이 우연히 같은 row 를 먼저 내놓던 coincidence 였다.
+### As-Is (현재 동작)
+
+한 줄 요약: *"동일한 데이터를 가진 두 DB 에서 같은 SELECT 를 돌렸는데, 서로 다른 row 가 나온다."*
+
+자세히:
+
+1. **테스트가 하는 일** — `bigPageSize.sh` 는 같은 데이터를 page size 만 다른 두 DB 에 적재한 뒤, 양쪽에서 같은 SELECT 를 돌려 결과 파일을 line-by-line 으로 비교한다.
+   - `tdb1`: 기본 16K page, `csql -S` 로 직접 INSERT.
+   - `tdb2`: 4K page (`--db-page-size=4k`), `tdb1` 을 `unloaddb` → `loaddb` 로 재적재.
+
+2. **테이블 데이터의 모양** — `init.sql:48-73` 은 row 한 개를 INSERT 한 뒤 `INSERT INTO t SELECT ... FROM t` 를 8 번 반복한다 (1 → 2 → 4 → … → 256). 결과적으로:
+   - 256 row 가 만들어지는데, **모든 일반 컬럼 값이 동일** 하다 (`col1..col6, d1..d8, c1..c3, j` 전부 같은 값. 예: `col1 = -32768`).
+   - 오직 AUTO_INCREMENT 컬럼인 `id` 만 row 마다 다른 값.
+
+3. **비교에 쓰는 query** (`bigPageSize.sh:21-24`) — `select ... from t order by 1 desc limit 1`. "첫 번째 컬럼(`col1`) 으로 내림차순 정렬한 뒤 맨 위 1 row 만 가져와" 라는 뜻이다.
+
+4. **여기서 문제가 시작된다** — 256 row 의 `col1` 이 전부 같은 값이라, ORDER BY 가 보는 정렬 키만으로는 어떤 row 가 "1 등" 인지 정해지지 않는다 (정렬 키가 tie). 이 경우 어떤 row 가 LIMIT 1 의 winner 가 될지는 **SQL 표준이 약속하지 않는 영역 (implementation-defined)** 이며, CUBRID 도 별도 보장을 두지 않는다. 즉 이 query 의 결과는 처음부터 storage 의 물리 배치 (어떤 row 가 heap 에서 먼저 스캔되는가) 에 의존하는 비결정적 query 다. CUBRID 만의 특성이 아니고 PostgreSQL/MySQL/Oracle/SQL Server 도 동일하다.
+
+5. **OOS 작업이 한 일** — OOS (Out-of-row Storage) 는 큰 컬럼을 외부 page 로 옮겨 저장한다. 이번 OOS 작업이 외부 이관 기준을 바꾸면서, 특히 4K page 인 `tdb2` 의 record 가 heap 안에서 놓이는 page · slot 위치가 달라졌다. heap scan 순서가 바뀌니 tie 상황의 winner 도 바뀌었다.
+
+6. **결과** — `tdb1` 과 `tdb2` 가 256 row 중 *서로 다른* row 를 LIMIT 1 winner 로 골랐고, `compare_result_between_files csql1.log csql2.log` 가 NOK 를 보고한다. 두 log 의 diff 는 `id` 컬럼만 다른 한 row.
+
+7. **develop 에서는 왜 통과했나** — 두 DB 가 우연히 같은 row 를 먼저 내놓던 coincidence. TC 가 본래 가지고 있던 잠재적 비결정성이 OOS 변경에 의해 드러난 것이지, engine regression 이 아니다.
+
+### To-Be (목표 동작)
+
+- 같은 데이터를 가진 두 DB 가 storage layout (page size, OOS 이관 정책) 과 무관하게 LIMIT 1 winner 로 **항상 같은 row** 를 반환 → `bigPageSize.sh` 가 항상 OK.
+- Engine 동작 변경 없음. TC 한 파일의 한 줄만 수정.
 
 **이슈 수행 방안**:
 
-- `bigPageSize.sh` line 24 를 `from t order by 1 desc limit 1` 에서 `from t order by 1 desc, id limit 1` 로 바꾸는 변경을 제안한다. 본 ticket 은 그 변경의 근거를 기록한다.
-- `id` 가 AUTO_INCREMENT 컬럼이라 사실상 unique 한 값이 되고, total order 가 성립한다. `unloaddb`/`loaddb` 가 `id` 값을 그대로 보존하므로 두 DB 가 결정적으로 같은 row 를 반환한다. 사용자 인용: "Fix (TC-only, no engine change): Add `id` as a tiebreaker".
-- Engine 변경 없음. Follow-up: `rg 'order by .* limit'` 결과로 같은 패턴을 다른 testcase 에서 별도 ticket 으로 audit (실제 명령은 Additional Information 에 둔다).
+- `bigPageSize.sh:24` 를 다음과 같이 변경한다.
+  - 현재: `from t order by 1 desc limit 1`
+  - 변경: `from t order by 1 desc, id limit 1`
+- 정렬 기준에 `id` 를 더하면, `col1` 이 같은 row 끼리는 `id` 로 순서가 정해진다. `id` 는 AUTO_INCREMENT 라 실질적으로 unique 하므로 256 row 에 total order 가 성립 → 결과가 결정적으로 한 row 로 정해진다.
+- `unloaddb` / `loaddb` 는 `id` 값을 그대로 직렬화·재적재하므로 (AUTO_INCREMENT 재발급 없음) 두 DB 의 `id` 값이 동일 → 두 DB 가 같은 winner row 를 반환.
+- Engine 변경 없음. 사용자 인용: *"Fix (TC-only, no engine change): Add `id` as a tiebreaker"*.
+- Follow-up: 다른 shell test 에도 같은 잠재 문제가 있을 수 있어 audit. 실제 grep 명령은 Additional Information 참고.
 
 ---
 

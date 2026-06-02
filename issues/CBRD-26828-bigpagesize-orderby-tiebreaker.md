@@ -2,54 +2,25 @@
 
 ## Issue Triage
 
-**이슈 수행 목적** (필수): Shell test `bigPageSize.sh` 가 page size 나 OOS 동작에 상관없이 항상 같은 결과를 내도록, TC 의 ORDER BY 한 줄에 정렬 기준 컬럼을 하나 더 추가한다.
+**이슈 수행 목적** (필수): Shell test `bigPageSize.sh` 의 비결정적 ORDER BY 한 줄을 고쳐, page size/OOS 저장방식/적재 경로와 무관하게 항상 같은 결과가 나오게 한다. TC 한 줄 수정이며 engine 변경은 없다.
 
 **이슈 수행 이유** (필수):
 
-### As-Is (현재 동작)
-
-한 줄 요약: *"동일한 데이터를 가진 두 DB 에서 같은 SELECT 를 돌렸는데, 서로 다른 row 가 나온다."*
-
-자세히:
-
-1. **테스트가 하는 일** — `bigPageSize.sh` 는 같은 데이터를 page size 만 다른 두 DB 에 적재한 뒤, 양쪽에서 같은 SELECT 를 돌려 결과 파일을 line-by-line 으로 비교한다.
-   - `tdb1`: 기본 16K page, `csql -S` 로 직접 INSERT.
-   - `tdb2`: 4K page (`--db-page-size=4k`), `tdb1` 을 `unloaddb` → `loaddb` 로 재적재.
-
-2. **테이블 데이터의 모양** — `init.sql:48-73` 은 row 한 개를 INSERT 한 뒤 `INSERT INTO t SELECT ... FROM t` 를 8 번 반복한다 (1 → 2 → 4 → … → 256). 결과적으로:
-   - 256 row 가 만들어지는데, **모든 일반 컬럼 값이 동일** 하다 (`col1..col6, d1..d8, c1..c3, j` 전부 같은 값. 예: `col1 = -32768`).
-   - 오직 AUTO_INCREMENT 컬럼인 `id` 만 row 마다 다른 값.
-
-3. **비교에 쓰는 query** (`bigPageSize.sh:21-24`) — `select ... from t order by 1 desc limit 1`. "첫 번째 컬럼(`col1`) 으로 내림차순 정렬한 뒤 맨 위 1 row 만 가져와" 라는 뜻이다.
-
-4. **여기서 문제가 시작된다** — 256 row 의 `col1` 이 전부 같은 값이라, ORDER BY 가 보는 정렬 키만으로는 어떤 row 가 "1 등" 인지 정해지지 않는다 (정렬 키가 tie). 이 경우 어떤 row 가 LIMIT 1 의 winner 가 될지는 **SQL 표준이 약속하지 않는 영역 (implementation-defined)** 이며, CUBRID 도 별도 보장을 두지 않는다. 즉 이 query 의 결과는 처음부터 storage 의 물리 배치 (어떤 row 가 heap 에서 먼저 스캔되는가) 에 의존하는 비결정적 query 다. CUBRID 만의 특성이 아니고 PostgreSQL/MySQL/Oracle/SQL Server 도 동일하다.
-
-5. **OOS 작업이 한 일** — OOS (Out-of-row Storage) 는 큰 컬럼을 외부 page 로 옮겨 저장한다. 이번 OOS 작업이 외부 이관 기준을 바꾸면서, 특히 4K page 인 `tdb2` 의 record 가 heap 안에서 놓이는 page · slot 위치가 달라졌다. heap scan 순서가 바뀌니 tie 상황의 winner 도 바뀌었다.
-
-6. **결과** — `tdb1` 과 `tdb2` 가 256 row 중 *서로 다른* row 를 LIMIT 1 winner 로 골랐고, `compare_result_between_files csql1.log csql2.log` 가 NOK 를 보고한다. 두 log 의 diff 는 `id` 컬럼만 다른 한 row.
-
-7. **develop 에서는 왜 통과했나** — 두 DB 가 우연히 같은 row 를 먼저 내놓던 coincidence. TC 가 본래 가지고 있던 잠재적 비결정성이 OOS 변경에 의해 드러난 것이지, engine regression 이 아니다.
-
-### To-Be (목표 동작)
-
-- 같은 데이터를 가진 두 DB 가 storage layout (page size, OOS 이관 정책) 과 무관하게 LIMIT 1 winner 로 **항상 같은 row** 를 반환 → `bigPageSize.sh` 가 항상 OK.
-- Engine 동작 변경 없음. TC 한 파일의 한 줄만 수정.
+- **현재 동작 / 배경**: TC 의 비교 query 가 `select ... from t order by 1 desc limit 1` 인데, 1 번 컬럼 `col1` 이 256 row 전부 같은 값이라 정렬 키가 256-way tie 다. tie 일 때 LIMIT 1 winner 는 heap 물리 scan 순서로 정해지는 implementation-defined 동작이라, 이 query 는 처음부터 storage 물리 배치에 의존하는 비결정적 query 다.
+- **영향**: QA 실패 — OOS 빌드에서 4K DB 의 heap 저장 표현이 바뀌며 (8 바이트 overflow 포인터 -> 약 656 바이트 inline, 상세는 AI-Generated Context 의 vpid 계측 참조) tie winner 가 row 1 에서 row 256 으로 역전돼 `compare_result_between_files` 가 NOK. engine bug 가 아니라, TC 가 본래 가진 비결정성이 OOS 변경으로 드러난 것이다.
 
 **이슈 수행 방안**:
 
-- `bigPageSize.sh:24` 를 다음과 같이 변경한다.
-  - 현재: `from t order by 1 desc limit 1`
-  - 변경: `from t order by 1 desc, id limit 1`
-- 정렬 기준에 `id` 를 더하면, `col1` 이 같은 row 끼리는 `id` 로 순서가 정해진다. `id` 는 AUTO_INCREMENT 라 실질적으로 unique 하므로 256 row 에 total order 가 성립 → 결과가 결정적으로 한 row 로 정해진다.
-- `unloaddb` / `loaddb` 는 `id` 값을 그대로 직렬화·재적재하므로 (AUTO_INCREMENT 재발급 없음) 두 DB 의 `id` 값이 동일 → 두 DB 가 같은 winner row 를 반환.
-- Engine 변경 없음. 사용자 인용: *"Fix (TC-only, no engine change): Add `id` as a tiebreaker"*.
-- Follow-up: 다른 shell test 에도 같은 잠재 문제가 있을 수 있어 audit. 실제 grep 명령은 Additional Information 참고.
+- `bigPageSize.sh:24` 의 `from t order by 1 desc limit 1` 을 `from t order by 1 desc, id limit 1` 로 바꾼다.
+- `id` 는 AUTO_INCREMENT 라 실질 unique -> 256 row 에 total order 성립 -> winner 가 결정적으로 한 row 로 고정된다. `unloaddb`/`loaddb` 는 `id` 값을 그대로 재적재하므로 (AUTO_INCREMENT 재발급 없음) 두 DB 의 winner 가 일치한다.
+- Engine/spec/매뉴얼 변경 없음. 사용자 인용: *"Fix (TC-only, no engine change): Add `id` as a tiebreaker"*.
+- Follow-up: 같은 패턴 (`order by ... limit` + tie) 이 다른 shell test 에 잠재할 수 있어 audit. grep 명령은 Additional Information 참고.
 
 ---
 
 ## AI-Generated Context
 
-> 아래 내용은 AI 가 코드와 testcase 를 분석해 작성한 상세 자료다. 빠른 triage 에는 위 **Issue Triage** 만으로 충분하다. 본문은 구현·리뷰 단계의 reference 다.
+> 아래 내용은 AI 가 코드와 testcase 를 분석해 작성한 상세 자료다. 빠른 triage 에는 위 **Issue Triage** 만으로 충분하다. 본문은 구현/리뷰 단계의 reference 다.
 
 ### Summary
 
@@ -57,8 +28,9 @@
 |---|---|
 | 형태 | OOS 빌드에서 `bigPageSize.sh` 가 `compare_result_between_files csql1.log csql2.log` 단계에서 NOK |
 | 진짜 원인 | Engine bug 가 아니다. TC 의 ORDER BY 가 tie 를 풀지 않아 LIMIT 1 가 비결정적 |
-| Trigger | OOS 작업이 `tdb2` (4K page) 의 record 물리 배치를 바꿔, 이전에 우연히 일치하던 tied row 가 갈렸다 |
-| 영향 범위 | TC 한 파일. Engine·spec·매뉴얼 변경 없음. 유사 패턴이 다른 shell test 에 잠재할 수 있다 |
+| Trigger | OOS 가 큰 행의 heap home record 를 8 바이트 포인터 (`REC_BIGONE`) 에서 약 656 바이트 inline (`REC_HOME`) 으로 바꿔, 4K 헤더 page 에 마지막 행이 놓이며 tie winner 가 역전됐다 (코드 계측으로 `vpid` 단위 확정) |
+| 모드 의존성 | CS 모드 (`loaddb -C`) 에서만 회귀. SA 모드 (`loaddb -S`) 는 develop/OOS 동일 — OOS inline 저장은 server-side insert 에서만 작동 |
+| 영향 범위 | TC 한 파일. Engine/spec/매뉴얼 변경 없음. 유사 패턴이 다른 shell test 에 잠재할 수 있다 |
 | 호환성 | TC 만 고치므로 engine 회귀 risk 0. develop merge 후에도 그대로 동작 |
 
 ### 용어 정의
@@ -71,7 +43,7 @@
 - **`cubrid loaddb`**: 위 두 파일을 다른 DB 로 다시 적재하는 utility.
 - **`csql -S`**: csql 의 standalone mode — server process 없이 csql 안에서 DB 를 직접 열어 작업한다.
 - **`compare_result_between_files`**: CTP shell helper. 두 결과 파일을 line-by-line 비교해 OK/NOK 를 판정한다.
-- **`format_csql_output`**: CTP shell helper. csql output 의 timing·session id 등 휘발성 line 을 잘라 비교가 가능한 형태로 정규화한다.
+- **`format_csql_output`**: CTP shell helper. csql output 의 timing/session id 등 휘발성 line 을 잘라 비교가 가능한 형태로 정규화한다.
 - **`bigPageSize.result`**: CTP 가 매 case 의 pass/fail 을 적는 expected-output 파일. `bigPageSize-1 : OK`, `bigPageSize-2 : OK` 두 line 을 담는다.
 
 ### 핵심 사실 한 장 정리
@@ -124,7 +96,56 @@ INSERT INTO t SELECT col1, ..., j FROM t;  -- self-double, x8
 
 실행 모드 차이 (`bigPageSize.sh:26` 의 `csql -udba $db1 -S -l -c` vs `bigPageSize.sh:29` 의 `csql -udba $db2 -l -c`) 자체는 tie 문제와 직교한다.
 
-OOS 이관 정책이 바뀌면 (예: `vk/cbrd-26824-shell-ci-fixes` 가 base 로 둔 `oos-bug-14917` 의 변경) heap 안에서 record 가 놓이는 page · slot 이 달라진다. heap scan 이 page 순으로 도는 한 sort 의 첫 input row 도 그에 따라 갈리고, ORDER BY key 가 전부 tie 인 상황에서는 그 input 순서가 그대로 결과 순서가 된다.
+### 근본 원인 — 코드 계측으로 vpid 단위 확정
+
+이전에는 "OOS 가 물리 배치를 바꿨다" 수준까지만 알았는데, 이번에 계측 빌드로 어느 행이 어느 page/slot 에 놓이는지 직접 측정해 `vpid` (volume id + page id, 디스크 page 의 식별자) 단위로 원인을 확정했다.
+
+**계측 방법** — `src/storage/heap_file.c` 의 `heap_insert_physical()` (행의 home record 를 heap page 에 배치하는 함수) 에 insert 순서별 `vpid|slot` 로깅을 한 줄 넣고 develop / OOS 두 빌드를 재빌드한 뒤, 같은 데이터를 `loaddb -C` 로 적재하며 각 행의 착지 위치를 기록했다.
+
+```c
+/* spage_insert_at 직후 */
+fprintf (hins_fp, "#%d oid=%d|%d|%d len=%d\n", ++ctr,
+         res_oid.volid, res_oid.pageid, res_oid.slotid, recdes->length);
+```
+
+**실측 결과** (256 건, 적재 순서 = `id` 1 -> 256, 예시 db 기준):
+
+| insert 순서 | DEVELOP | OOS |
+|---|---|---|
+| #1 = row 1 | `page 4673, slot 1`, len 8 | `page 4674, slot 1`, len 656 |
+| #2 ... #255 | `4673` slot 2 ... 255 (len 8) | `4674 ... 4724` (len 656) |
+| #256 = row 256 (마지막) | `4673, slot 256` (len 8) | `4673, slot 1` (len 656) |
+| 가장 낮은 page (scan 시작점) `slot 1` | row 1 | row 256 |
+| 첫 scan row | 1 (16K 와 동일) -> OK | 256 -> NOK |
+
+핵심은 home record (행이 heap page 에 차지하는 본체 레코드) 크기다.
+
+- **develop** 은 큰 행을 통째로 외부 overflow 에 저장하고 home 에는 8 바이트 포인터 (`REC_BIGONE` — 행 전체가 overflow 에 있음을 나타내는 레코드 타입) 만 남긴다. 8 바이트라 256 건이 4K 헤더 page (`4673`) 한 장에 적재 순서대로 다 들어가 `slot 1 = row 1` 이다.
+- **OOS** 는 큰 컬럼만 OOS 파일로 빼고 행을 inline (`REC_HOME` — 행 본체가 heap 에 그대로 있는 일반 레코드 타입, 약 656 바이트) 으로 heap 에 유지한다. 656 바이트라 4K page 에 몇 건 못 들어가 row 1~255 가 새 page (`4674~4724`) 로 밀리고, 헤더 page 에 남은 656 바이트 한 자리를 맨 마지막 insert (row 256) 가 차지해 `slot 1 = row 256` 이 된다.
+
+heap scan 은 가장 낮은 pageid 인 헤더 page 부터 돈다. 따라서 home record 가 8 바이트에서 656 바이트로 커진 것만으로 scan 의 첫 행이 row 1 에서 row 256 으로 뒤집히고, 256-way tie 라 그 첫 행이 그대로 LIMIT 1 winner 가 된다.
+
+> **한 줄 근본 원인**: OOS 가 큰 행의 heap 저장 표현을 8 바이트 포인터에서 656 바이트 inline 으로 바꿈 -> 4K 헤더 page 에 마지막 행만 들어감 -> 가장 낮은 page (scan 시작) 에 마지막 행이 놓임 -> tie 쿼리 winner 역전.
+
+### 모드별 매트릭스 (develop vs OOS x 적재 경로)
+
+같은 데이터에서 4K DB 의 첫 scan row (16K 는 항상 `1,2,3...`):
+
+| 4K 적재 경로 | develop (OOS 이전) | OOS |
+|---|---|---|
+| `csql -S` 직접 INSERT | `1 2 3 ...` | `1 2 3 ...` |
+| `loaddb -S` (SA 모드) | `256 255 254 ...` | `256 255 254 ...` (동일) |
+| `loaddb -C` (CS 모드, TC 가 쓰는 방식) | `1 2 3 ...` (OK) | `256 1 2 3 ...` (NOK) |
+
+회귀 (통과 -> 실패) 는 **CS 모드에서만** 발생한다. OOS 의 inline 저장 경로는 server-side insert 에서만 작동하므로 SA 모드는 develop/OOS 가 동일하게 동작한다. 즉 16K vs 4K 차이가 아니라 4K + OOS + CS 적재 세 조건이 겹칠 때만 깨진다.
+
+### 배제한 가설 (모두 실측으로 무관 확인)
+
+| 가설 | 검증 방법 | 결과 |
+|---|---|---|
+| loaddb 멀티스레드 (`loaddb_worker_count`) | 256 row < `periodic_commit` (10240) -> 단일 batch -> worker 1 개. 재적재 2 회 동일 | 결정적, 무관 |
+| `unloaddb -t` (멀티스레드 dump) | TC 기본 `-t 1` 은 legacy `-t 0` 과 dump 순서 동일 (`1,2,...,256`). `-t >= 2` 라야 뒤섞임 | TC 와 무관 |
+| 조회 시 parallel heap scan | `/*+ PARALLEL(0) NO_PARALLEL_HEAP_SCAN */` vs 기본 비교 | 결과 동일, 무관 |
 
 ### develop 에서 OK 였던 이유
 
@@ -200,7 +221,7 @@ select id, col1 from t order by col1 desc limit 5;
   rg -n 'order by .* limit' ~/cubrid-testcases-private-ex/shell/ \
     | rg -v 'order by .*, *id'
   ```
-- 본 ticket 의 root cause 는 TC 비결정성이지, OOS·page-size·sort 동작의 spec 위반이 아니다. 즉 engine 쪽 fix 는 검토하지 않는다.
+- 본 ticket 의 root cause 는 TC 비결정성이지, OOS/page-size/sort 동작의 spec 위반이 아니다. 즉 engine 쪽 fix 는 검토하지 않는다.
 - Branch context: `vk/cbrd-26824-shell-ci-fixes` 는 CBRD-26824 (`bug_bts_14917` 회귀) 와 별개로 shell-CI 의 다른 NOK 들을 일괄 정리하는 work branch.
 
 ---

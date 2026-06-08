@@ -4,8 +4,6 @@
 
 **이슈 수행 목적**: OOS 로 빠지는 큰 컬럼 값 중 지금은 압축 없이 저장되는 타입(VARBIT/JSON/콜렉션 등)을 압축해서 저장한다. OOS 파일이 작아지고 읽기 디스크 I/O 가 줄어든다.
 
-> 용어: OOS (Out-of-row Overflow Storage) 는 heap 레코드(한 행의 데이터) 안에 두기엔 너무 큰 가변 컬럼 값을, 별도의 OOS 파일로 빼서 저장하는 방식이다. 행에는 "값이 저기 있다" 는 16바이트짜리 포인터만 남는다.
-
 **이슈 수행 이유**:
 
 - **현재 동작 / 배경**: CUBRID 에는 이미 문자열 자동 압축(LZ4) 이 있다. 그런데 이 압축은 `DB_TYPE_VARCHAR` 한 종류에만 걸린다 (`pr_do_db_value_string_compression` 이 VARCHAR 가 아니면 그냥 반환). 그래서 `DB_TYPE_VARBIT` / `DB_TYPE_JSON` / `DB_TYPE_SET` / `DB_TYPE_MULTISET` / `DB_TYPE_SEQUENCE` 값은 압축 없이 그대로 OOS 파일에 들어간다 (CBRD-26756 조사로 확인).

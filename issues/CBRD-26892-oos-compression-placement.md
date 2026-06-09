@@ -13,13 +13,11 @@
 | 데이터 타입 직렬화 계층 | VARCHAR 만 LZ4 압축. `pr_do_db_value_string_compression` 이 `db_type != DB_TYPE_VARCHAR` 에서 즉시 반환하므로, VARNCHAR·VARBIT·JSON 등은 비압축으로 직렬화된다. |
 | OOS 경계 | 공식 압축 없음. OOS 로 빠진 큰 가변 값(VARBIT·JSON 등)은 그대로 비압축 저장된다. |
 
-임시 PR `cbrd-26756-oos-compression` 이 OOS 경계에 LZ4 압축을 붙여 봤지만, 이는 공식 머지본이 아니라 방향 검토용 실험 구현이다.
-
-**영향** (설계 의도 / 기술 부채): OOS 는 큰 값을 분리해 디스크 I/O 를 줄이는 것이 목적인데, VARBIT·JSON 같은 값을 비압축으로 두면 그 절감 효과가 제한된다. 그렇다고 압축을 임시 PR 처럼 OOS 경계 LZ4 일괄 방식으로 굳히면, 타입별로 압축을 달리할 여지(저압축성 VARBIT 는 건너뛰기, JSON 자체압축 활용 등)를 잃고 `compressor.hpp` 의 LZ4 단일 고정(`static_assert`, `compressor.hpp:123`)에 갇힌다.
+**영향**: 현재 압축되는 가변 타입(Variable Type)은 VARCHAR 뿐이다. 압축 위치를 정하고 나면 JSON·VARBIT·SEQUENCE (그리고 추후 CHAR) 같은 다른 가변 타입도 압축 대상에 넣을 수 있다.
 
 **이슈 수행 방안**: `TBD - ANALYSIS 단계에서 결정` (중립 조사 이슈).
 
-- A안 / B안의 트레이드오프를 본문 **비교표·도식**으로 문서화하고, 최종 위치 선택은 ANALYSIS 단계로 미룬다.
+- A안 / B안의 트레이드오프를 본문 **비교표·도식** 으로 문서화하고, 최종 위치 선택은 ANALYSIS 단계로 미룬다.
 - 임시 PR `cbrd-26756` 의 OOS 경계 구현은 공식 baseline 이 아니라 프로토타입 참고 자료로만 다룬다.
 - 압축 알고리즘 다양화(LZ4 외 zstd 등)는 CBRD-26890(LOB 압축 알고리즘 검토)과 연계해 별도로 다룬다.
 
@@ -36,7 +34,7 @@
 | **장점 ①** | 타입별 알고리즘 자유 선택 (VARBIT skip, JSON 자체압축 활용 등) | 영향 범위가 OOS 파일로 좁아 회귀 위험 작음 |
 | **장점 ②** | 이중압축이 **구조적으로 불가** (압축 자리가 한 곳) | 작은 가변값엔 비용 0 (OOS 임계치 넘은 값만 압축) |
 | **장점 ③** | 길이 prefix 가 압축 여부를 기술 → **별도 헤더 불필요** | feat/oos 작업 내부에서 **자기완결**, 포맷 변경이 OOS 파일에 국한 |
-| **장점 ④** | develop 이슈로 **독립 진행** 가능 | 임시 PR 로 **이미 동작 검증**됨 (encode/decode/gain-gate 완성) |
+| **장점 ④** | develop 이슈로 **독립 진행** 가능 | 임시 PR 로 **이미 동작 검증** 됨 (encode/decode/gain-gate 완성) |
 | **단점 ①** | 영향 범위 넓음 (heap+index+OOS 모두 회귀 검증) | 알고리즘이 LZ4 로 **고정** (`compressor.hpp` static_assert) |
 | **단점 ②** | 인덱스 키 압축 의미 검증 필요 (키비교·prefix·커버링 인덱스) | 저압축성 VARBIT 도 풀 O(n) 압축 강제 → **낭비 CPU** 가 read/write 에 직접 실림 |
 | **단점 ③** | 타입마다 수정량 편차 큼 (string 류는 게이트만, JSON/SET 은 포맷 변경) | 별도 압축 헤더(`OOS_COMP_HEADER` 8B) 필요 |
@@ -51,10 +49,10 @@
 ### A안 — 데이터 타입 직렬화 계층 압축
 
 - **무엇을 하는가**: DB_VALUE 를 디스크/`recdes`(heap 레코드 디스크립터) 이미지로 직렬화할 때(`mr_data_writeval_*`) 압축한다. 지금 VARCHAR 가 쓰는 압축 자리를 다른 타입으로 넓히는 방향.
-- **압축이 박히는 곳**: 직렬화 포맷 자체. VARCHAR 는 `value->data.ch.medium.compressed_size` 라는 **포맷 내장 슬롯**으로 압축 여부를 기술한다. VARNCHAR·VARBIT 는 같은 `ch.medium` 구조를 공유하므로 게이트만 풀면 되지만, JSON·SET 은 이 슬롯이 없어 새 포맷 설계가 필요하다.
+- **압축이 박히는 곳**: 직렬화 포맷 자체. VARCHAR 는 `value->data.ch.medium.compressed_size` 라는 **포맷 내장 슬롯** 으로 압축 여부를 기술한다. VARNCHAR·VARBIT 는 같은 `ch.medium` 구조를 공유하므로 게이트만 풀면 되지만, JSON·SET 은 이 슬롯이 없어 새 포맷 설계가 필요하다.
 - **적용 단위**: 타입. 한 번 타입에 압축을 켜면 그 타입은 heap·index·OOS 어디로 가든 동일하게 압축된다.
 - **알고리즘 자유도**: 타입별 `writeval` 함수가 갈라져 있으니, 타입마다 다른 알고리즘/정책을 박을 수 있다(원리상). 단, 공통 `compressor.hpp` 가 LZ4 고정이라 다양화는 그 래퍼 확장이 선행되어야 한다.
-- **본질적 결정 포인트**: "인덱스 키도 압축할 것인가". `mr_index_writeval_string` 이 `mr_data_writeval_string` 과 **같은 본체를 공유**하므로, A안을 택하면 인덱스 키 압축 여부를 강제로 결정·구현해야 한다.
+- **본질적 결정 포인트**: "인덱스 키도 압축할 것인가". `mr_index_writeval_string` 이 `mr_data_writeval_string` 과 **같은 본체를 공유** 하므로, A안을 택하면 인덱스 키 압축 여부를 강제로 결정·구현해야 한다.
 
 ### B안 — OOS 경계 압축
 
@@ -132,7 +130,7 @@ OOS_COMP_HEADER.algo (oos_file.hpp:45)  ← 포맷상 이미 여지 확보됨   
 ```
 
 **B안 수정 요약**
-- 핵심 함수(`oos_payload_encode` / `oos_payload_decode` / `oos_should_compress`)는 **임시 PR 에 이미 작성**되어 있음 → 수정이 아니라 **공식화·정책 확정**이 일.
+- 핵심 함수(`oos_payload_encode` / `oos_payload_decode` / `oos_should_compress`)는 **임시 PR 에 이미 작성** 되어 있음 → 수정이 아니라 **공식화·정책 확정** 이 일.
 - **정책 결정 항목**: ① `oos_should_compress` 의 타입 화이트리스트 확정, ② 저압축성 타입 풀 압축 skip 여부, ③ VARCHAR 이중압축 회피를 코드로 강제할지.
 - **알고리즘 다양화**: `compressor.hpp` 확장 + 이미 있는 `OOS_COMP_HEADER.algo` 필드 활용(CBRD-26890 연계).
 

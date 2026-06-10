@@ -20,7 +20,7 @@
 ## 1. A안 vs B안 장단점 비교
 
 - **A안 = 데이터 타입 직렬화 계층 압축** — `mr_data_writeval_*` 의 공식 압축 자리를 VARCHAR 너머로 확장
-- **B안 = OOS 경계 압축** — `oos_payload_encode` 에서 OOS 로 빠지는 값만 압축 (임시 PR `cbrd-26756` 프로토타입)
+- **B안 = OOS 경계 압축** — 큰 가변 컬럼이 OOS 로 빠질 때, OOS 파일에 쓰기 직전 그 값만 압축
 
 기본 성격(장단점 아님):
 
@@ -34,7 +34,7 @@
 | 장점 ① | 타입별 알고리즘 자유 선택 (VARBIT skip, JSON 자체압축 활용 등) | 영향 범위가 OOS 파일로 좁아 회귀 위험 작음 |
 | 장점 ② | 이중압축이 **구조적으로 불가** (압축 자리가 한 곳) | 작은 가변값엔 비용 0 (OOS 임계치 넘은 값만 압축) |
 | 장점 ③ | 길이 prefix 가 압축 여부를 기술 → **별도 헤더 불필요** | feat/oos 작업 내부에서 **자기완결**, 포맷 변경이 OOS 파일에 국한 |
-| 장점 ④ | develop 이슈로 **독립 진행** 가능 | 임시 PR 로 **이미 동작 검증** 됨 (encode/decode/gain-gate 완성) |
+| 장점 ④ | develop 이슈로 **독립 진행** 가능 | encode/decode/이득판정이 OOS 경계 한 곳에 모여 **구현·검증 단순** |
 
 ### 단점 비교
 
@@ -69,35 +69,34 @@
 
 ## 3. A안 / B안 각각 — 수정해야 할 콜패스
 
-**범례**: `[유지]` = 이미 있는 코드, `[게이트 완화]` = 분기 조건만 손봄, `[신규]` = 새로 작성, `[분기]` = 공유 본체를 갈라야 함.
+**범례**: `[유지]` = 이미 있는 공식 코드, `[게이트 완화]` = 분기 조건만 손봄, `[신규]` = 새로 작성, `[분기]` = 공유 본체를 갈라야 함, `[구현]` = 그 지점에 압축 로직을 새로 넣음.
 
 ### A안 수정 콜패스 — 타입 계층 (공식 코드 확장)
 
 ```
 ■ 쓰기 경로
-mr_data_writeval_string()                          object_primitive.c:10832  [유지]
+mr_data_writeval_string()                                       [유지]
      │
-     └─▶ mr_writeval_string_internal()             object_primitive.c:10929  [분기?]
-              │                                      ⚠ 인덱스도 이 공통 본체 호출
-              │   mr_index_writeval_string() ───────┘ object_primitive.c:10813
-              │     → A안 택하면 인덱스 키도 압축됨. 인덱스 제외하려면
+     └─▶ mr_writeval_string_internal()                          [분기?]
+              │                          ⚠ 인덱스도 이 공통 본체를 호출
+              │   mr_index_writeval_string() ───────────────────┘
+              │     → A안 택하면 인덱스 키도 압축됨. 인덱스만 빼려면
               │       align 인자 기준으로 본체를 [분기] 해야 함
               │
-              └─▶ pr_do_db_value_string_compression()   object_primitive.c:14613
-                       │
+              └─▶ pr_do_db_value_string_compression()
                        │  ★ if (db_type != DB_TYPE_VARCHAR) return;   ← [게이트 완화]
                        │     VARNCHAR/VARBIT 는 ch.medium 공유 → 게이트만 풀면 됨
                        │     JSON/SET 은 ch.medium 슬롯 없음 → 각 타입 writeval 에 [신규]
-                       │  ★ OR_IS_STRING_LENGTH_COMPRESSABLE (255 미만 skip)
+                       │  ★ 길이 임계치(255B) 미만 → skip
                        │
-                       └─▶ cubcompress::compress<LZ4>()   compressor.hpp:135  [유지/확장]
-                                ★ static_assert(T==LZ4)    ← 알고리즘 다양화 시 [확장]
+                       └─▶ cubcompress::compress<LZ4>()           [유지/확장]
+                                ★ LZ4 단일 고정 → 알고리즘 다양화 시 [확장]
 
 ■ 읽기 역경로 (반드시 대칭 수정)
-mr_data_readval_string() / pr_do_db_value_string_decompression()              [대칭 수정]
+mr_data_readval_string() / pr_do_db_value_string_decompression()   [대칭 수정]
 
-■ 타입별 추가 작업 (JSON/SET 등 ch.medium 미공유 타입을 포함할 경우)
-mr_data_writeval_json() / mr_data_writeval_set() 등 각 타입 writeval/readval    [신규 + 포맷 변경]
+■ 타입별 추가 작업 (JSON/SET 등 ch.medium 미공유 타입 포함 시)
+각 타입의 writeval / readval (mr_data_writeval_json, mr_data_writeval_set 등)   [신규 + 포맷 변경]
 ```
 
 **A안 수정 요약**
@@ -106,36 +105,38 @@ mr_data_writeval_json() / mr_data_writeval_set() 등 각 타입 writeval/readval
 - **인덱스 분리**: 인덱스 키를 압축에서 빼려면 `mr_writeval_string_internal` 공유 본체를 `align` 기준으로 분기.
 - **알고리즘 다양화**: `compressor.hpp` 의 LZ4 `static_assert` 확장(CBRD-26890 연계).
 
-### B안 수정 콜패스 — OOS 경계 (임시 PR 공식화)
+### B안 수정 콜패스 — OOS 경계
 
 ```
 ■ 쓰기 경로
-heap_file.c:12497   oos_payload_encode(thread_p, attr_type, ...)              [유지/공식화]
+heap 레코드가 OOS 임계치 초과 → 큰 가변 컬럼을 OOS 로 분리하는 지점
      │
-     ├─▶ OOS_COMPRESSION_ENABLED && oos_should_compress(attr_type)
-     │        oos_file.hpp:241,257   ← 타입 게이트(VARCHAR 제외=이중압축 회피)  [정책 확정]
-     │
-     ├─▶ bound = cubcompress::bound<LZ4>(len)        oos_file.hpp:308          [유지]
-     │        ★ bound <= 0 (len > 0x7E000000)  → raw 저장
-     │
-     └─▶ cubcompress::compress<LZ4>()                oos_file.hpp:323          [유지]
-              │   ⚠ 풀 O(n) 패스 — VARBIT 등 저압축성 타입엔 낭비 CPU
-              │     → 타입별 skip/샘플링 둘지 [정책 결정]
-              └─▶ ★ comp_len + OOS_COMP_MIN_GAIN(8) > len → raw fallback        [유지]
+     └─▶ oos_payload_encode(type, image, ...)                    [구현 지점]
+              │
+              ├─▶ oos_should_compress(type)                      [구현]
+              │     ← 타입 게이트(VARCHAR 제외 = 이중압축 회피)
+              │
+              ├─▶ bound = cubcompress::bound<LZ4>(len)           [구현]
+              │     ★ 길이 한계 초과 → raw 저장
+              │
+              └─▶ cubcompress::compress<LZ4>()                   [구현]
+                       │  ⚠ 풀 O(n) 패스 — VARBIT 등 저압축성 타입엔 낭비 CPU
+                       │     → 타입별 skip/샘플링 둘지 [정책 결정]
+                       └─▶ ★ 이득 부족(압축 후 크기 + 헤더 ≥ 원본) → raw fallback
 
 ■ 읽기 역경로
-heap_file.c:10621   oos_payload_decode()             oos_file.hpp:132          [유지]
-                       ← OOS_COMP_HEADER(8B).algo 보고 해제
+OOS 에서 분리 저장된 값을 읽어 들이는 지점
+     └─▶ oos_payload_decode()                                    [구현]
+              ← blob 헤더의 algo 필드 보고 해제
 
 ■ 알고리즘 다양화 시
-compressor.hpp:123,135,164  static_assert(T==LZ4)                              [확장]
-OOS_COMP_HEADER.algo (oos_file.hpp:45)  ← 포맷상 이미 여지 확보됨               [활용]
+cubcompress 공통 래퍼의 LZ4 단일 고정 [확장]  +  OOS blob 헤더에 algo 식별 필드 [신규]
 ```
 
 **B안 수정 요약**
-- 핵심 함수(`oos_payload_encode` / `oos_payload_decode` / `oos_should_compress`)는 **임시 PR 에 이미 작성** 되어 있음 → 수정이 아니라 **공식화·정책 확정** 이 일.
-- **정책 결정 항목**: ① `oos_should_compress` 의 타입 화이트리스트 확정, ② 저압축성 타입 풀 압축 skip 여부, ③ VARCHAR 이중압축 회피를 코드로 강제할지.
-- **알고리즘 다양화**: `compressor.hpp` 확장 + 이미 있는 `OOS_COMP_HEADER.algo` 필드 활용(CBRD-26890 연계).
+- OOS 경계 세 지점에 압축 로직을 넣는다: 쓰기쪽 `oos_payload_encode`, 타입 게이트 `oos_should_compress`, 읽기쪽 `oos_payload_decode`.
+- **정책 결정 항목**: ① 압축 대상 타입 화이트리스트 확정, ② 저압축성 타입 풀 압축 skip 여부, ③ VARCHAR 이중압축 회피를 코드로 강제할지.
+- **알고리즘 다양화**: 공통 압축 래퍼 확장 + OOS blob 헤더에 algo 식별 필드(CBRD-26890 연계).
 
 ---
 
@@ -146,18 +147,18 @@ OOS_COMP_HEADER.algo (oos_file.hpp:45)  ← 포맷상 이미 여지 확보됨   
 ### Summary
 
 - **문제 / 목적**: OOS 로 빠지는 값을 압축할지, 한다면 타입 직렬화 계층(A안)과 OOS 경계(B안) 중 어디서 할지 비교/조사.
-- **원인 / 배경**: 공식 압축은 타입 계층의 VARCHAR 단일뿐이고 OOS 값은 비압축이다. 임시 PR `cbrd-26756` 이 OOS 경계 압축을 시도하면서 압축 위치를 정식으로 정할 필요가 생겼다.
+- **원인 / 배경**: 공식 압축은 타입 계층의 VARCHAR 단일뿐이고 OOS 값은 비압축이다. OOS 가 큰 가변 값을 분리 저장하면서, 그 값을 압축할지·어느 계층에서 할지 정식으로 정할 필요가 생겼다.
 - **제안 / 변경**: 본 이슈는 코드 변경 없음. 비교 문서화와 결정 항목 정리만.
 - **영향 범위**: heap 직렬화, index 직렬화(`mr_index_writeval_*`), OOS read/write 경로, `compressor.hpp` 공통 래퍼. 조사 단계라 본 이슈 자체로 인한 디스크 포맷 변경은 없다.
 
 ### 데이터 타입별 압축 현황
 
-`타입 계층` 열만 공식이다. `OOS 경계` 열의 `O` 는 임시 PR `cbrd-26756` 기준이며, 공식 머지본에서는 OOS 값이 모두 비압축이다.
+`A안: 타입 계층` 열은 현재 공식 동작이다. `B안: OOS 경계` 열의 `O` 는 그 방식을 택했을 때 압축 대상이 되는 타입을 나타낸다(현재 OOS 값은 모두 비압축).
 
-| 가변 타입 | A안: 타입 계층 (공식) | B안: OOS 경계 (임시 PR 프로토타입) |
+| 가변 타입 | A안: 타입 계층 (현재 공식) | B안: OOS 경계 (택했을 때 대상) |
 |-----------|------------------|-------------------------------|
 | VARCHAR | O (LZ4) | X (이중압축 회피로 제외) |
-| VARNCHAR (enum `DB_TYPE_VARNCHAR_DEPRECATED`) | X (db_type 분기로 미적용) | O (LZ4) |
+| VARNCHAR (레거시) | X (db_type 분기로 미적용) | O (LZ4) |
 | VARBIT | X | O (LZ4) |
 | JSON | X | O (LZ4) |
 | SET/MULTISET/SEQUENCE | X | O (LZ4) |
@@ -180,7 +181,7 @@ OOS 임계치(레코드 > `DB_PAGESIZE/8`, 컬럼 > 512B)에 못 미쳐 heap 안
 
 ### 알고리즘 다양화 가능성 (A안·B안 공통)
 
-`compressor.hpp` 의 `bound/compress/decompress` 는 모두 `static_assert(std::is_same_v<T, LZ4>)`(`compressor.hpp:123,135,164`)로 LZ4 만 허용한다. 어느 위치를 택하든 zstd 같은 알고리즘 추가는 이 공통 래퍼 확장이 선행되어야 하며, 이 부분은 CBRD-26890(internal LOB 압축 알고리즘 검토)과 겹친다. 단 B안은 `OOS_COMP_HEADER.algo`(`oos_file.hpp:45`) 필드로 디스크 포맷상 알고리즘 식별 여지를 이미 확보해 둔 상태다.
+`compressor.hpp` 의 `bound/compress/decompress` 는 모두 `static_assert(std::is_same_v<T, LZ4>)`(`compressor.hpp:123,135,164`)로 LZ4 만 허용한다. 어느 위치를 택하든 zstd 같은 알고리즘 추가는 이 공통 래퍼 확장이 선행되어야 하며, 이 부분은 CBRD-26890(internal LOB 압축 알고리즘 검토)과 겹친다. 단 B안은 OOS blob 헤더에 알고리즘 식별 필드를 두면 디스크 포맷상 다양화 여지를 확보할 수 있다.
 
 ## Open Questions
 
@@ -193,13 +194,4 @@ OOS 임계치(레코드 > `DB_PAGESIZE/8`, 컬럼 > 512B)에 못 미쳐 heap 안
 ## 참고 사항
 
 - 본 이슈는 설계 확정이 아닌 조사/검토 단계이며, 상세 정책과 구현은 후속 이슈에서 구체화한다.
-- 임시 PR `cbrd-26756` 은 공식 머지본이 아니다. 그 OOS 경계 구현 세부(헤더 형식·타입 분기·gain gate)는 방향 검토용 프로토타입 참고일 뿐, 본 이슈가 디스크 포맷을 확정하지는 않는다.
-
-## 참고 코드
-
-- `src/object/object_primitive.c` (공식) — mr_data_writeval_string(:10832), mr_index_writeval_string(:10813), mr_writeval_string_internal(:10929), pr_do_db_value_string_compression(:14613)
-- `src/base/object_representation.h:1411,1414` (공식) — OR_MINIMUM_STRING_LENGTH_FOR_COMPRESSION(255), 압축 조건 매크로
-- `src/storage/oos_file.hpp` (임시 PR cbrd-26756 프로토타입) — OOS_COMP_HEADER(:53,70), algo 필드(:45), OOS_COMP_MIN_GAIN(:82), oos_payload_decode(:132), OOS_COMPRESSION_ENABLED(:241), oos_should_compress(:257), oos_payload_encode(:296), bound(:308), compress(:323), gain gate(:324)
-- `src/storage/heap_file.c` (임시 PR) — :12497 oos_payload_encode 호출(attr_type 전달), :10621 oos_payload_decode 호출
-- `src/base/compressor.hpp` (공식) — LZ4 단일 래퍼(public 템플릿 bound/compress/decompress static_assert :123,135,164; LZ4_compress_fast_extState :97)
-- `win/3rdparty/lz4/include/lz4.h:170,171` — LZ4_MAX_INPUT_SIZE(0x7E000000), LZ4_COMPRESSBOUND 매크로
+- 압축 위치(A안/B안)는 ANALYSIS 단계에서 확정하며, 본 이슈가 디스크 포맷을 확정하지는 않는다.

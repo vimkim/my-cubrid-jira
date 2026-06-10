@@ -1,133 +1,202 @@
-# [OOS] OOS 페이로드 압축 저장
+# [OOS] [조사/설계] OOS 값 압축 위치 검토 — 데이터 타입 직렬화 계층(A안) vs OOS 경계(B안)
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS 로 빠지는 큰 컬럼 값 중 지금은 압축 없이 저장되는 타입(VARBIT/JSON/콜렉션 등)을 압축해서 저장한다. OOS 파일이 작아지고 읽기 디스크 I/O 가 줄어든다.
+**이슈 수행 목적**: OOS(Out-of-row Overflow Storage — heap 의 큰 가변 컬럼을 별도 파일로 분리 저장하는 방식)로 빠지는 값을 압축할지, 한다면 어느 계층에서 할지 결정의 근거를 마련한다. 후보 두 가지 — **A안(데이터 타입 직렬화 계층)** / **B안(OOS 경계)** — 의 장단점·특징·고쳐야 할 코드 흐름을 정리하고, 최종 선택은 ANALYSIS 단계로 넘긴다.
 
 **이슈 수행 이유**:
 
-- **현재 동작 / 배경**: CUBRID 에는 이미 문자열 자동 압축(LZ4) 이 있다. 그런데 이 압축은 `DB_TYPE_VARCHAR` 한 종류에만 걸린다 (`pr_do_db_value_string_compression` 이 VARCHAR 가 아니면 그냥 반환). 그래서 `DB_TYPE_VARBIT` / `DB_TYPE_JSON` / `DB_TYPE_SET` / `DB_TYPE_MULTISET` / `DB_TYPE_SEQUENCE` 값은 압축 없이 그대로 OOS 파일에 들어간다 (CBRD-26756 조사로 확인).
-- **영향**: OOS 로 빠지는 값은 정의상 큰 값(`OR_OOS_INLINE_SIZE` = 16바이트 포인터로 바꿀 만큼 큰 값)인데, 그게 압축도 안 된 채 디스크에 쌓인다. 특히 JSON 은 텍스트 기반이라 압축률이 높은데도 통째로 저장돼, OOS 파일 용량과 읽기 I/O 가 불필요하게 커진다.
+지금(공식 머지본) 엔진의 값 압축 현황은 아래와 같다.
 
-**이슈 수행 방안**:
+| 압축 위치 | 공식 상태 |
+|-----------|-----------|
+| 데이터 타입 직렬화 계층 | VARCHAR 만 LZ4 압축. `pr_do_db_value_string_compression` 이 `db_type != DB_TYPE_VARCHAR` 에서 즉시 반환하므로, VARNCHAR·VARBIT·JSON 등은 비압축으로 직렬화된다. |
+| OOS 경계 | 공식 압축 없음. OOS 로 빠진 큰 가변 값(VARBIT·JSON 등)은 그대로 비압축 저장된다. |
 
-- 값을 OOS 파일에 넣기 직전에 압축하고, 읽어올 때 풀어준다. 쓰기는 `heap_attrinfo_insert_to_oos`, 읽기는 `heap_attrvalue_read_oos_inline` 에서 처리한다.
-- 타입 자체의 직렬화 코드(`data_writeval`) 안에 압축을 넣는 방식은 쓰지 않는다. 그렇게 하면 OOS 가 아닌 일반 행과 인덱스까지 디스크 포맷이 바뀌어 영향이 너무 커진다.
-- 압축 대상: `DB_TYPE_VARBIT` / `DB_TYPE_JSON` / `DB_TYPE_SET` / `DB_TYPE_MULTISET` / `DB_TYPE_SEQUENCE` / `DB_TYPE_VARNCHAR`. VARNCHAR 도 포함한다 - 위 LZ4 가 VARCHAR 만 걸러내므로 VARNCHAR 는 압축 안 된 채 OOS 로 가기 때문이다. `DB_TYPE_VARCHAR`(이미 압축됨) 와 `DB_TYPE_BLOB` / `DB_TYPE_CLOB`(본문은 외부 저장소에 있고 행에는 위치 정보만 들어감) 는 제외한다.
-- 압축한 값에는 8바이트짜리 표시를 앞에 붙인다 (압축했는지 여부 + 원래 크기). 이 표시를 읽고 푸는 코드는 한 군데(`oos_file.hpp` 공유 모듈) 에만 두고, OOS 값을 읽는 모든 경로가 그 한 곳을 쓰게 한다. OOS 값을 읽는 곳은 한 군데가 아니다 - 일반 조회, 복제(HA) 적용, 향후 CDC 가 있다.
-- 복제(standby 서버로 데이터 복사) 는 압축을 푼 값이 아니라 압축된 상태 그대로 전송하고, standby 가 같은 코드로 풀어 쓴다. 전송량을 늘리지 않고, standby 도 일반 읽기와 같은 경로로 복원하게 하기 위해서다.
-- LZ4 압축은 기존 `cubcompress::compress` / `decompress` (`src/base/compressor.hpp`) 를 재사용한다.
-- 압축 on/off 설정을 정식 시스템 파라미터(`oos_enable_compression`) 로 뺄지 여부: `TBD - 합의 미확인`. 현재 구현은 코드 내부 상수이며, 시스템 파라미터로 빼는 방향을 검토 중이다.
+**영향**: 현재 압축되는 가변 타입(Variable Type)은 VARCHAR 뿐이다. 압축 위치를 정하고 나면 JSON·VARBIT·SEQUENCE (그리고 추후 CHAR) 같은 다른 가변 타입도 압축 대상에 넣을 수 있다.
+
+---
+
+## 1. A안 vs B안 장단점 비교
+
+- **A안 = 데이터 타입 직렬화 계층 압축** — `mr_data_writeval_*` 의 공식 압축 자리를 VARCHAR 너머로 확장
+- **B안 = OOS 경계 압축** — 큰 가변 컬럼이 OOS 로 빠질 때, OOS 파일에 쓰기 직전 그 값만 압축
+
+기본 성격(장단점 아님):
+
+- **압축이 적용되는 범위** — A안: 데이터가 저장되는 모든 곳(일반 저장·인덱스·OOS)에 한꺼번에 / B안: OOS 로 따로 빠진 값에만.
+- **개발 진행 방식** — A안: OOS 작업과 무관하게 따로 떼어 바로 개발 가능 / B안: OOS(feat/oos) 작업 안에서 함께 진행.
+
+쉽게 말하면, **A안은 "값의 종류(타입)마다 저장할 때 압축"** 하는 방식이라 그 종류는 어디에 저장되든 압축된다. **B안은 "큰 값이 별도 파일(OOS)로 빠질 때만 그 자리에서 압축"** 하는 방식이다.
+
+### 장점 비교
+
+| | A안: 타입마다 저장 시 압축 | B안: OOS 로 빠질 때만 압축 |
+|---|----------------------|---------------|
+| 장점 ① | 값 종류마다 압축 방법을 다르게 고를 수 있다 (예: 잘 안 줄어드는 사진·영상류는 건너뛰고, JSON 은 전용 압축 사용) | 손대는 범위가 OOS 한 곳뿐이라 다른 기능을 망가뜨릴 위험이 작다 |
+| 장점 ② | 압축하는 곳이 한 군데라, 같은 값을 두 번 압축하는 실수가 아예 안 생긴다 | 크기가 작아 원래 자리에 남는 값은 건드리지 않아, 작은 데이터엔 추가 부담이 없다 |
+| 장점 ③ | 압축 여부를 기존 표시에 같이 적어, 따로 표시용 공간을 안 만들어도 된다 | OOS 작업 안에서 다 끝나고, 저장 형식 변화도 OOS 파일에만 생긴다 |
+| 장점 ④ | OOS 작업을 기다릴 필요 없이 바로 개발에 들어갈 수 있다 | 압축·해제·이득 판단이 한곳에 모여 있어 만들고 점검하기 쉽다 |
+
+### 단점 비교
+
+| | A안: 타입마다 저장 시 압축 | B안: OOS 로 빠질 때만 압축 |
+|---|----------------------|---------------|
+| 단점 ① | 값이 저장되는 모든 길(일반 저장·인덱스·OOS)을 다 손대고 다시 검사해야 해 일이 많다 | 압축 방식이 LZ4 한 가지로 묶여 있어, 나중에 다른 방식으로 바꾸기 어렵다 |
+| 단점 ② | 빠른 검색용 색인(인덱스)에 들어가는 값까지 압축되면, 정렬·검색이 멀쩡한지 따로 확인해야 한다 | 잘 안 줄어드는 값도 일단 끝까지 압축해 본 뒤 버려서, 그 헛수고가 저장·읽기 속도에 그대로 얹힌다 |
+| 단점 ③ | 값 종류마다 작업량이 들쭉날쭉하다 (문자열류는 조금, JSON 류는 저장 형식을 새로 만들어야 함) | 압축했는지 적어 둘 8바이트짜리 표시를 값마다 붙여야 한다 |
+| 단점 ④ | 인덱스만 압축에서 빼려면, 지금 같이 쓰는 함수를 둘로 갈라야 해 손이 많이 간다 | 이미 압축된 VARCHAR 를 또 압축하지 않으려고 '제외 목록'으로만 막아 둬서, 빠뜨리면 두 번 압축될 수 있다 |
+
+---
+
+## 2. A안 / B안 각각의 특징
+
+### A안 — 데이터 타입 직렬화 계층 압축
+
+- **무엇을 하는가**: DB_VALUE 를 디스크/`recdes`(heap 레코드 디스크립터) 이미지로 직렬화할 때(`mr_data_writeval_*`) 압축한다. 지금 VARCHAR 가 쓰는 압축 자리를 다른 타입으로 넓히는 방향.
+- **압축이 수행되는 곳**: 직렬화 포맷 자체. VARCHAR 는 `value->data.ch.medium.compressed_size` 라는 **포맷 내장 슬롯** 으로 압축 여부를 기술한다. VARNCHAR·VARBIT 는 같은 `ch.medium` 구조를 공유하므로 압축 대상 조건만 넓히면 되지만, JSON·SET 은 이 슬롯이 없어 새 포맷 설계가 필요하다.
+- **적용 단위**: 타입. 한 번 타입에 압축을 켜면 그 타입은 heap·index·OOS 어디로 가든 동일하게 압축된다.
+- **알고리즘 자유도**: 타입별 `writeval` 함수가 갈라져 있으니, 타입마다 다른 알고리즘/정책을 박을 수 있다(원리상). 단, 공통 `compressor.hpp` 가 LZ4 고정이라 다양화는 그 래퍼 확장이 선행되어야 한다.
+- **본질적 결정 포인트**: "인덱스 키도 압축할 것인가". `mr_index_writeval_string` 이 `mr_data_writeval_string` 과 **같은 본체를 공유** 하므로, A안을 택하면 인덱스 키 압축 여부를 강제로 결정·구현해야 한다.
+
+### B안 — OOS 경계 압축
+
+- **무엇을 하는가**: 큰 가변 컬럼이 OOS 로 빠질 때(`oos_payload_encode`)만 압축한다. 직렬화는 그대로 두고, OOS 파일에 쓰기 직전에 layer-2 blob 으로 한 번 더 감싼다.
+- **압축이 수행되는 곳**: OOS blob 포맷. `[ OOS_COMP_HEADER(8B) | image-or-lz4-bytes ]` 구조로, 헤더의 `algo` 필드가 압축 방식을 기술한다(향후 알고리즘 다양화 여지는 포맷상 이미 확보).
+- **적용 단위**: OOS 로 빠진 개별 값. OOS 임계치(레코드 > `DB_PAGESIZE/8`, 컬럼 > 512B)에 못 미쳐 heap 에 남는 작은 가변값은 손대지 않는다.
+- **압축 이득 판정**: 압축 후 `comp_len + OOS_COMP_MIN_GAIN(8) > image_len` 이면 raw fallback. LZ4 는 풀 패스를 돌려야 실제 크기를 알 수 있어, 저압축성 타입은 이 풀 압축이 사실상 낭비 CPU 가 된다.
+- **본질적 결정 포인트**: "저압축성 타입(VARBIT 등)에 풀 압축 패스를 그대로 태울 것인가". 그리고 알고리즘 LZ4 고정을 언제 풀 것인가.
+
+---
+
+## 3. A안 / B안 각각 — 고쳐야 할 코드 흐름
+
+**범례**: `[유지]` = 이미 있는 코드 그대로, `[조건 수정]` = 어떤 타입을 압축할지 막아 둔 if 조건만 손봄, `[신규]` = 새로 작성, `[분기]` = 같이 쓰는 함수를 둘로 가름, `[구현]` = 그 자리에 압축 로직을 새로 넣음.
+
+### A안 — 고쳐야 할 코드 흐름 (이미 있는 코드를 손봐서 넓힘)
+
+```
+■ 쓰기 경로
+mr_data_writeval_string()                                       [유지]
+     │
+     └─▶ mr_writeval_string_internal()                          [분기?]
+              │                          ⚠ 인덱스도 이 공통 본체를 호출
+              │   mr_index_writeval_string() ───────────────────┘
+              │     → A안 택하면 인덱스 키도 압축됨. 인덱스만 빼려면
+              │       align 인자 기준으로 본체를 [분기] 해야 함
+              │
+              └─▶ pr_do_db_value_string_compression()
+                       │  ★ if (db_type != DB_TYPE_VARCHAR) return;   ← [조건 수정]
+                       │     지금은 VARCHAR 만 통과. 이 조건을 넓혀 다른 타입도 압축 대상에 포함
+                       │     VARNCHAR/VARBIT 는 ch.medium 구조 공유 → 조건만 넓히면 됨
+                       │     JSON/SET 은 ch.medium 슬롯 없음 → 각 타입 writeval 에 [신규]
+                       │  ★ 길이 임계치(255B) 미만 → skip
+                       │
+                       └─▶ cubcompress::compress<LZ4>()           [유지/확장]
+                                ★ LZ4 단일 고정 → 알고리즘 다양화 시 [확장]
+
+■ 읽기 역경로 (반드시 대칭 수정)
+mr_data_readval_string() / pr_do_db_value_string_decompression()   [대칭 수정]
+
+■ 타입별 추가 작업 (JSON/SET 등 ch.medium 미공유 타입 포함 시)
+각 타입의 writeval / readval (mr_data_writeval_json, mr_data_writeval_set 등)   [신규 + 포맷 변경]
+```
+
+**A안 수정 요약**
+- **string 계열(VARNCHAR·VARBIT)**: `pr_do_db_value_string_compression` 의 db_type 조건만 넓힘 + read 대칭 → 비교적 작음.
+- **JSON·SET 등**: 압축 여부 기술 슬롯이 없어 각 타입 직렬화 포맷에 신규 설계 필요 → 큼.
+- **인덱스 분리**: 인덱스 키를 압축에서 빼려면 `mr_writeval_string_internal` 공유 본체를 `align` 기준으로 분기.
+- **알고리즘 다양화**: `compressor.hpp` 의 LZ4 `static_assert` 확장(CBRD-26890 연계).
+
+### B안 — 고쳐야 할 코드 흐름 (OOS 경계에 새로 넣음)
+
+```
+■ 쓰기 경로
+heap 레코드가 OOS 임계치 초과 → 큰 가변 컬럼을 OOS 로 분리하는 지점
+     │
+     └─▶ oos_payload_encode(type, image, ...)                    [구현 지점]
+              │
+              ├─▶ oos_should_compress(type)                      [구현]
+              │     ← 압축할 타입 선별(VARCHAR 제외 = 이중압축 회피)
+              │
+              ├─▶ bound = cubcompress::bound<LZ4>(len)           [구현]
+              │     ★ 길이 한계 초과 → raw 저장
+              │
+              └─▶ cubcompress::compress<LZ4>()                   [구현]
+                       │  ⚠ 풀 O(n) 패스 — VARBIT 등 저압축성 타입엔 낭비 CPU
+                       │     → 타입별 skip/샘플링 둘지 [정책 결정]
+                       └─▶ ★ 이득 부족(압축 후 크기 + 헤더 ≥ 원본) → raw fallback
+
+■ 읽기 역경로
+OOS 에서 분리 저장된 값을 읽어 들이는 지점
+     └─▶ oos_payload_decode()                                    [구현]
+              ← blob 헤더의 algo 필드 보고 해제
+
+■ 알고리즘 다양화 시
+cubcompress 공통 래퍼의 LZ4 단일 고정 [확장]  +  OOS blob 헤더에 algo 식별 필드 [신규]
+```
+
+**B안 수정 요약**
+- OOS 경계 세 지점에 압축 로직을 넣는다: 쓰기쪽 `oos_payload_encode`, 압축할 타입 선별 `oos_should_compress`, 읽기쪽 `oos_payload_decode`.
+- **정책 결정 항목**: ① 압축 대상 타입 화이트리스트 확정, ② 저압축성 타입 풀 압축 skip 여부, ③ VARCHAR 이중압축 회피를 코드로 강제할지.
+- **알고리즘 다양화**: 공통 압축 래퍼 확장 + OOS blob 헤더에 algo 식별 필드(CBRD-26890 연계).
 
 ---
 
 ## AI-Generated Context
 
-> 아래는 AI 가 코드를 분석해 채운 상세 자료다. 빠른 triage 에는 위 Issue Triage 만 봐도 되고, 본문은 구현/리뷰 때 참고하면 된다.
-
-### 개요
-
-압축한 값은 앞에 8바이트 헤더를 붙여 저장한다. 헤더에는 압축 방식과 원래 크기가 들어간다. 따라서 OOS 값을 읽는 쪽은 항상 헤더를 먼저 해석한 뒤 압축을 풀어야 한다. 이 이슈의 핵심 위험은 OOS 값을 읽는 경로가 하나가 아니라는 점이다. 일반 조회, 복제 적용기, 향후 CDC 가 모두 OOS 값을 읽으며, 이 중 한 경로라도 헤더를 해석하지 않으면 깨진 값을 사용하게 된다. 그래서 헤더 해석/복원 코드를 공유 모듈 한 곳에 두고 모든 경로가 그것을 호출하도록 한다.
+**참고**: 아래는 AI 가 코드/맥락을 분석해 작성한 상세 자료입니다. 빠른 triage 에는 위 1~3 절로 충분하며, 아래는 구현/리뷰 단계 참고용입니다. 근거 비교 보고서: `oos-compression-placement-analysis.md`(작업 트리 루트).
 
 ### Summary
 
-- **문제 / 목적**: VARCHAR 를 뺀 OOS 대상 타입(VARBIT/JSON/콜렉션)이 비압축으로 저장돼 OOS 파일이 커진다. OOS 경계에서 압축한다.
-- **원인 / 배경**: 자동 LZ4 압축이 VARCHAR(`tp_String`) 직렬화 경로에만 있다 (CBRD-26756).
-- **제안 / 변경**: 쓰기(`heap_attrinfo_insert_to_oos`)/읽기(`heap_attrvalue_read_oos_inline`) 에 압축/복원을 넣고, 포맷과 코덱을 `oos_file` 공유 모듈로 둔다.
-- **영향 범위**: `src/storage/heap_file.c`, `src/storage/oos_file.{hpp,cpp}`, `src/transaction/log_applier.c`(복제 reader). 디스크/전송 포맷 변경이라 OOS 미완 단계(feat/oos, M2)에서 처리한다. 기존 일반 행 포맷은 안 바뀐다.
+- **문제 / 목적**: OOS 로 빠지는 값을 압축할지, 한다면 타입 직렬화 계층(A안)과 OOS 경계(B안) 중 어디서 할지 비교/조사.
+- **원인 / 배경**: 공식 압축은 타입 계층의 VARCHAR 단일뿐이고 OOS 값은 비압축이다. OOS 가 큰 가변 값을 분리 저장하면서, 그 값을 압축할지·어느 계층에서 할지 정식으로 정할 필요가 생겼다.
+- **제안 / 변경**: 본 이슈는 코드 변경 없음. 비교 문서화와 결정 항목 정리만.
+- **영향 범위**: heap 직렬화, index 직렬화(`mr_index_writeval_*`), OOS read/write 경로, `compressor.hpp` 공통 래퍼. 조사 단계라 본 이슈 자체로 인한 디스크 포맷 변경은 없다.
 
----
+### 데이터 타입별 압축 현황
 
-## Description
+`A안: 타입 계층` 열은 현재 공식 동작이다. `B안: OOS 경계` 열의 `O` 는 그 방식을 택했을 때 압축 대상이 되는 타입을 나타낸다(현재 OOS 값은 모두 비압축).
 
-OOS 로 빠진 값도 결국 일반 행과 똑같은 직렬화 함수(`data_writeval` - 값을 디스크 바이트로 바꾸는 콜백)를 거쳐 OOS 페이지에 기록된다. OOS 전용 직렬화 경로는 따로 없다. 즉 타입의 `data_writeval` 안에서 압축이 일어나야만 OOS 도 압축된 바이트를 받는데, 그 경로를 가진 타입은 `DB_TYPE_VARCHAR` 하나뿐이다.
+| 가변 타입 | A안: 타입 계층 (현재 공식) | B안: OOS 경계 (택했을 때 대상) |
+|-----------|------------------|-------------------------------|
+| VARCHAR | O (LZ4) | X (이중압축 회피로 제외) |
+| VARNCHAR | X (db_type 분기로 미적용) | O (LZ4) |
+| VARBIT | X | O (LZ4) |
+| JSON | X | O (LZ4) |
+| SET/MULTISET/SEQUENCE | X | O (LZ4) |
+| BLOB/CLOB | X (external ES, locator 만 inline) | X |
+| CHAR/NCHAR/BIT(고정) | X | X (OOS 대상 아님) |
 
-CBRD-26756 조사 결과는 이렇다:
+OOS 임계치(레코드 > `DB_PAGESIZE/8`, 컬럼 > 512B)에 못 미쳐 heap 안에 그대로 남는 작은 가변 값은 어느 방식에서도 압축되지 않는다. 타입 계층은 VARCHAR 만, OOS 경계는 OOS 로 빠진 값만 다루기 때문이다.
 
-- 압축 진입점 `pr_do_db_value_string_compression` 은 타입이 VARCHAR 가 아니면 바로 빠져나온다.
-- 이 함수를 부르는 곳은 `mr_lengthval_string_internal` 과 `mr_writeval_string_internal` 둘뿐이고, 둘 다 문자열(`tp_String`) 경로다.
-- JSON/콜렉션/VARBIT 의 직렬화 함수(`mr_data_writeval_json`, `mr_data_writeval_set`, `mr_writeval_varbit_internal`)에는 압축 호출이 아예 없다.
+참고: VARNCHAR 는 deprecated 된 타입으로, pt_type 레벨에서는 사실상 VARCHAR 의 alias 로 다뤄진다.
 
-그래서 이 이슈는 타입별 코드를 건드리는 대신, OOS 로 넣고 빼는 길목에 압축/복원을 한 겹 끼운다. 압축은 값의 의미를 바꾸지 않는다. 같은 값을 넣고 빼면 똑같은 `DB_VALUE`(CUBRID 내부 값 표현) 와 똑같은 `DISK_SIZE` 가 나와야 한다.
+### 압축 후 크기 예측 비용
 
-설계 분기 두 가지를 이렇게 정했다. (1) 압축은 타입별 직렬화가 아니라 OOS 경계에서 한다 - 일반 행/인덱스 포맷을 건드리지 않기 위해서다. (2) 복제는 압축을 푼 값이 아니라 압축된 바이트를 그대로 standby 로 보내고 standby 가 푼다 - 전송량을 늘리지 않고, standby 도 일반 읽기와 같은 코드로 풀게 하기 위해서다.
+삽입 성능과 직결되는 지점이라 따로 둔다.
 
-## Specification Changes
+- `LZ4_compressBound(isize)` = `isize + isize/255 + 16`, 한계 초과 시 0 (`lz4.h:171`). O(1) 매크로다.
+- 단, 이는 **최악 팽창 상한**(입력보다 약간 큰 값)이라 실제 압축 크기가 아니다. 실제 크기는 `LZ4_compress_fast_extState` 풀 패스(O(n))를 돌려야만 알 수 있다.
+- 따라서 "크기를 싸게 추정해 보고 이득 없으면 건너뛰기"는 LZ4 로는 불가능하다. 압축 대상이면 일단 풀 압축을 돌린 뒤에야 이득 여부를 판단한다. VARBIT 처럼 잘 안 줄어드는 타입은 이 풀 압축 패스가 사실상 낭비 CPU 가 된다.
 
-- OOS 파일에 저장되는 값 앞에 8바이트 헤더가 붙는다. 구성은 압축 방식 1바이트(없음 / LZ4) + 예약 3바이트 + 원래 크기 4바이트다. 예약 3바이트는 나중에 다른 압축 방식을 넣을 자리다.
-- 행 안에 남는 16바이트 포인터(`OR_OOS_INLINE_SIZE`, OOS OID 8바이트 + 길이 8바이트) 와 가변 컬럼 오프셋 표(VOT) 의 플래그 비트는 바뀌지 않는다.
-- 압축해도 안 줄어드는 값은 그냥 비압축으로 저장하되, 헤더 8바이트만큼은 커진다. OOS 대상은 원래 큰 값이라 이 8바이트는 무시할 수준이다.
-- OOS 값의 저장/전송 포맷이 바뀌므로 기존 OOS 데이터와는 호환되지 않는다. feat/oos 는 아직 출시 전 개발 브랜치라 마이그레이션 대상이 없다.
-- 사용자가 보는 SQL 동작이나 문법은 그대로다. 압축은 내부 저장 최적화일 뿐이다.
-- sysprm 을 추가한다면 매뉴얼에 `oos_enable_compression` 항목이 필요하다: `TBD - 합의 미확인`.
+### 인덱스 영향 (A안 한정)
 
-## Implementation
+`mr_index_writeval_string`(`object_primitive.c:10813`)은 별도 함수지만 `mr_writeval_string_internal`(`:10929`) 을 정렬값(`CHAR_ALIGNMENT` vs `INT_ALIGNMENT`)만 바꿔 호출하는 **공통 본체** 다. A안(타입 계층 압축)을 택하면 인덱스 키에도 영향이 가며, 인덱스만 빼려면 이 wrapper 를 본체에서 갈라야 해 수정량이 커진다. 인덱스 키 압축은 키 비교·prefix 인덱스·커버링 인덱스 의미에 영향을 줄 수 있어 별도 확인이 필요하다.
 
-쓰기 - `heap_attrinfo_insert_to_oos` (`src/storage/heap_file.c`):
+### 알고리즘 다양화 가능성 (A안·B안 공통)
 
-```
-값을 직렬화 -> image (크기 L_u)
-  |
-  +-> 압축 대상 타입이고, 압축 설정 ON 이고, L_u >= OOS_MIN_COMPRESS_LEN(255) 이면:
-  |     LZ4 로 압축 -> 결과 크기 L_c
-  |     이득 마진 충족 시 채택: L_c + OOS_COMP_MIN_GAIN(8) <= L_u
-  |       (8바이트 헤더는 압축/비압축 양쪽에 똑같이 붙어 비교에서 빠진다.
-  |        이 마진은 매 읽기마다 드는 압축 해제 CPU 를 정당화하는 최소 절감량)
-  |
-  +-> [8B 헤더 | 압축본 또는 원본] 을 oos_insert 로 저장
-  +-> 행에 남기는 길이 = 8B + 실제 저장 바이트 (oos_insert 에 넘긴 크기와 같아야 함)
-```
+`compressor.hpp` 의 `bound/compress/decompress` 는 모두 `static_assert(std::is_same_v<T, LZ4>)`(`compressor.hpp:123,135,164`)로 LZ4 만 허용한다. 어느 위치를 택하든 zstd 같은 알고리즘 추가는 이 공통 래퍼 확장이 선행되어야 하며, 이 부분은 CBRD-26890(internal LOB 압축 알고리즘 검토)과 겹친다. 단 B안은 OOS blob 헤더에 알고리즘 식별 필드를 두면 디스크 포맷상 다양화 여지를 확보할 수 있다.
 
-읽기 - `heap_attrvalue_read_oos_inline` (`src/storage/heap_file.c`):
+## Open Questions
 
-```
-oos_read 로 [8B 헤더 | 저장 바이트] 를 버퍼에 읽음
-  |
-  +-> 헤더가 "압축 없음": 헤더 8B 를 걷어내고(버퍼 앞으로 memmove) 원래 크기로 맞춤
-  +-> 헤더가 "LZ4": 원래 크기만큼 새 버퍼 할당해서 압축 해제, 읽기 버퍼는 해제
-```
+- 인덱스 키를 압축 대상에 포함할지, 포함 시 키 비교·prefix·커버링 인덱스에 미치는 영향 범위. (A안)
+- VARBIT 등 저압축성 타입에 풀 압축 패스를 그대로 태울지, 타입별 스킵이나 샘플링 추정을 둘지(삽입 성능 측정 필요). (A·B 공통)
+- zstd 등 알고리즘 다양화를 어느 계층에서, `compressor.hpp` 의 LZ4 고정을 어떻게 풀며 도입할지(CBRD-26890 연계).
+- JSON 처럼 라이브러리 자체 압축을 가진 타입을 별도 처리할지.
+- 타입 계층(A안)과 OOS 경계(B안)를 동시에 쓸 경우, 이중압축 방지를 주석 약속이 아니라 코드로 강제하는 방법.
 
-조심해야 할 곳:
+## 참고 사항
 
-- **`oos_read` 의 길이 약속**: `oos_read` 는 "넘겨받은 버퍼 크기 == 저장된 바이트 수" 여야 한다고 단언(assert)한다. 그래서 행에 남기는 길이는 압축된 실제 크기와 같아야 하고, 원래 크기는 행이 아니라 8바이트 헤더 안에 적어야 한다.
-- **읽기 버퍼 소유권**: `heap_attrvalue_read_oos_inline` 에서 `raw->data` 는 "데이터 위치" 이면서 동시에 "나중에 해제할 메모리 시작점" 이다 (호출자는 `raw->data != oos_scratch` 일 때 `recdes_free_data_area` 로 해제). 그래서 비압축일 때 포인터만 헤더 8바이트 뒤로 옮기면 안 된다(해제 시작점이 어긋난다). 데이터를 앞으로 당기는 `memmove` 를 써야 한다. 압축일 때는 새 메모리에 풀고, 읽기 버퍼를 해제한 뒤 `raw->data` 를 새 메모리 시작점으로 둔다. 같은 버퍼 안에서 푸는 것(in-place) 은 금지 - LZ4 는 입력과 출력이 겹치면 안 된다.
-- **임시 버퍼 수명**: 쓰기 쪽 압축용 임시 버퍼는 성공이든 실패(`error_oos`) 든 모든 경로에서 `free_and_init` 으로 해제하고, `recdes.data` 와 같은 메모리로 묶지 않는다.
-- **읽는 곳이 여러 군데 (CBRD-26756 조사 후 발견된 핵심 위험)**: 복제 적용기(applier) `la_resolve_oos_value_for_sql_log` (`src/transaction/log_applier.c`) 가 복제 스트림에서 받은 OOS 바이트(`entry->data`) 를 직접 `data_readval` 한다. 일반 조회 경로를 안 거친다. 이 경로가 8바이트 헤더를 안 읽고 안 풀면, 압축본은 깨진 값으로, 비압축본조차 헤더 8바이트가 값 앞에 섞여 깨진 값으로 standby 에 반영된다. 기존 길이 검사(`entry->length != oos_length`) 는 둘 다 같은 길이라 이걸 못 잡는다. 그래서 헤더 포맷과 푸는 코드를 `oos_file` 공유 모듈로 빼고, 이 경로도 같은 코드를 쓰게 고친다. 향후 CDC/flashback 의 OOS 복원 경로도 같은 코드를 거쳐야 하며, 아직 없는 지점에는 `// TODO(CBRD-26881):` 를 남긴다.
-- **압축 실패 처리**: `cubcompress::compress` 가 0 이하를 반환하면 내부에서 `er_set` 으로 에러가 이미 찍혔을 수 있다. 비압축으로 넘어가기 전에 `er_clear` 로 그 잔여 에러를 지운다 (성공했지만 이득이 없어 비압축으로 가는 경우와는 구분).
-- **복구(recovery) 무영향**: redo/undo 로그에는 압축이 끝난 바이트(헤더 포함) 가 그대로 기록되므로, 복구 때 같은 바이트가 재생돼 결과가 달라지지 않는다. 압축은 로깅보다 앞단에서 이미 끝나 있다.
-
-## Acceptance Criteria
-
-- [ ] VARBIT/JSON/SET/MULTISET/SEQUENCE/VARNCHAR OOS 컬럼이 압축 저장되고, 넣고 빼면 값과 `DISK_SIZE` 가 압축 전과 같다.
-- [ ] VARCHAR/BLOB/CLOB 는 동작이 안 바뀐다.
-- [ ] 압축해도 안 줄어드는 값은 비압축으로 저장되고(헤더 8바이트만 추가), 정상 복원된다.
-- [ ] 한 OOS 페이지를 넘는 큰 값(다중 chunk)도 압축 후 chain 으로 정상 저장/복원된다.
-- [ ] 복제 적용기(`la_resolve_oos_value_for_sql_log`) 가 헤더를 읽고 풀어, 압축/비압축 OOS 값을 standby 에 똑같이 복원한다.
-- [ ] crash 후 복구해도 OOS 값이 정상 복원된다 (redo/undo 가 같은 바이트 재생).
-- [ ] 헤더 읽기/쓰기가 공유 함수로 빠지고, 아직 없는 reader(CDC/flashback) 경로에 `TODO(CBRD-26881)` 가 남는다.
-
-## Definition of done
-
-- [ ] 위 Acceptance Criteria 충족
-- [ ] QA 통과 (OOS 적재 검증은 debug 빌드의 `oos.log` 로 확인)
-- [ ] 문서/매뉴얼 반영 (sysprm 추가 시)
-
-## 참고 코드
-
-| 구성 요소 | 파일 | 용도 |
-|---|---|---|
-| `heap_attrinfo_insert_to_oos` | `src/storage/heap_file.c` | OOS 저장 진입점 (압축 추가 지점) |
-| `heap_attrinfo_dbvalue_to_recdes` | `src/storage/heap_file.c` | 값을 디스크 바이트로 직렬화 |
-| `heap_attrvalue_read_oos_inline` | `src/storage/heap_file.c` | OOS 읽기 (복원 추가 지점) |
-| `oos_should_compress` / OOS_COMP_HEADER put/get | `src/storage/heap_file.c` | 압축 대상 타입 판정, 8B 헤더 직렬화 |
-| `oos_insert` / `oos_read` / `oos_record_header` | `src/storage/oos_file.cpp`, `oos_file.hpp` | OOS 파일 입출력, 청크 헤더, 공유 코덱 |
-| `la_resolve_oos_value_for_sql_log` | `src/transaction/log_applier.c` | 복제 적용기의 OOS reader |
-| `cubcompress::compress` / `decompress` | `src/base/compressor.hpp` | LZ4 코덱 |
-| `pr_do_db_value_string_compression` | `src/object/object_primitive.c` | VARCHAR 전용 기존 LZ4 진입점 |
-| `OR_OOS_INLINE_SIZE`, `OR_IS_OOS` | `src/base/object_representation.h` | 행에 남는 OOS 포인터 크기, VOT 플래그 |
-
-## Remarks
-
-- 부모: CBRD-26583. 선행 조사: CBRD-26756 (타입별 자동 압축 여부 정리).
-- 구현 WIP 가 브랜치 `cbrd-26756-oos-compression` 에 있다 (`heap_file.c` 쓰기/읽기, `oos_file.hpp` 공유 코덱, `log_applier.c` 적용기 연동).
-- 미결정: 압축 설정의 sysprm 화 여부 (`oos_enable_compression`).
+- 본 이슈는 설계 확정이 아닌 조사/검토 단계이며, 상세 정책과 구현은 후속 이슈에서 구체화한다.
+- 압축 위치(A안/B안)는 ANALYSIS 단계에서 확정하며, 본 이슈가 디스크 포맷을 확정하지는 않는다.

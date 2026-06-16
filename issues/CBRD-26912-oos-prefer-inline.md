@@ -35,7 +35,7 @@
 
 CUBRID OOS 는 heap 레코드가 커지면 큰 가변 컬럼을 OOS 파일로 분리해, 작은 컬럼만 읽을 때 불필요한 디스크 I/O 를 줄인다. 어떤 컬럼을 분리할지는 `heap_attrinfo_determine_disk_layout` 가 정한다.
 
-현재 정책은 단순하다. 레코드 총 길이(`header + payload + mvcc_extra`)가 `DB_PAGESIZE/4` 를 넘으면, OOS 후보(가변이면서 값 크기 > `OR_OOS_INLINE_SIZE` = 16바이트)를 모아 **크기 내림차순**으로 정렬한 뒤, 레코드가 `DB_PAGESIZE/4` 이하가 될 때까지 큰 것부터 하나씩 OOS 로 보낸다.
+현재 정책은 단순하다. 레코드 총 길이(`header + payload + mvcc_extra`)가 `DB_PAGESIZE/4` 를 넘으면, OOS 후보(가변이면서 값 크기 > `OR_OOS_INLINE_SIZE` = 16바이트)를 모아 **크기 내림차순** 으로 정렬한 뒤, 레코드가 `DB_PAGESIZE/4` 이하가 될 때까지 큰 것부터 하나씩 OOS 로 보낸다.
 
 문제는 이 선택이 오직 크기에만 의존한다는 점이다. 예를 들어 자주 조회하는 4KB 프로파일 컬럼과 거의 안 읽는 3KB 로그 컬럼이 한 레코드에 있으면, 더 큰 프로파일 컬럼이 먼저 OOS 로 빠져 매 조회마다 `oos_read` 비용을 문다. 사용자는 "이 컬럼은 될 수 있으면 인라인에 둬라" 는 의사를 SQL 로 전혀 표현할 수 없다.
 

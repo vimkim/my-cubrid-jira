@@ -40,12 +40,32 @@ SELECTED=$(printf '%s\n' "${FILES[@]}" | fzf \
 
 [ -z "$SELECTED" ] && echo "Cancelled." && exit 0
 
-# Print the exact worker command (shell-quoted with %q so paths with spaces or
-# special chars re-run verbatim) so it can be copied and run directly later.
-echo "Running (copy to reproduce):"
-printf '  '; printf '%q ' "$SCRIPT_DIR/upload.sh" "$SELECTED"; printf '\n\n'
+# The exact worker command, shell-quoted with %q so paths with spaces or
+# special chars re-run verbatim.
+CMD=$(printf '%q ' "$SCRIPT_DIR/upload.sh" "$SELECTED")
 
-# Hand off to the worker: upload.sh detects the key, previews, confirms, and
-# uploads the selected file. exec replaces this process so upload.sh inherits
-# the tty and its exit status propagates.
-exec "$SCRIPT_DIR/upload.sh" "$SELECTED"
+# Hand off to the worker. We deliberately do NOT exec: exec would replace this
+# process and nothing below would run. Running it as a child lets us regain
+# control afterward to record/print the command with its real exit code. The
+# child still inherits the tty, so upload.sh's interactive prompts work.
+T0=$(date +%s%N 2>/dev/null || echo 0)
+rc=0
+"$SCRIPT_DIR/upload.sh" "$SELECTED" || rc=$?
+
+# Record the worker command in atuin so it's searchable / up-arrow-able later.
+# It is never typed at the prompt (upload-fzf.sh invokes it internally), so
+# atuin's normal shell hook never sees it. start/end is exactly what that hook
+# does: start reserves the entry, end stamps the real exit code + duration.
+if command -v atuin &>/dev/null; then
+  T1=$(date +%s%N 2>/dev/null || echo 0)
+  AID=$(atuin history start -- "$CMD" 2>/dev/null) \
+    && atuin history end --exit "$rc" --duration "$(( T1 - T0 ))" "$AID" >/dev/null 2>&1 \
+    || true
+fi
+
+# Print it last so it's the final thing on screen — easy to drag-select + copy.
+echo ""
+echo "Worker command (copy to reproduce):"
+printf '  %s\n' "$CMD"
+
+exit "$rc"

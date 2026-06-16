@@ -40,6 +40,11 @@ SELECTED=$(printf '%s\n' "${FILES[@]}" | fzf \
 
 [ -z "$SELECTED" ] && echo "Cancelled." && exit 0
 
+# Print the exact worker command (shell-quoted with %q so paths with spaces or
+# special chars re-run verbatim) so it can be copied and run directly later.
+echo "Running (copy to reproduce):"
+printf '  '; printf '%q ' "$SCRIPT_DIR/upload.sh" "$SELECTED"; printf '\n\n'
+
 # Hand off to the worker: upload.sh detects the key, previews, confirms, and
 # uploads the selected file. exec replaces this process so upload.sh inherits
 # the tty and its exit status propagates.

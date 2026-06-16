@@ -62,7 +62,9 @@ fi
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 read -rp "Upload to $ISSUE_KEY? [y/N] " CONFIRM
-[[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
+# Exit 130 (the SIGINT convention) on a declined upload so the run is recorded
+# distinctly from a real success (0) — e.g. in atuin via upload-fzf.sh.
+[[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 130; }
 
 echo "Sanitizing Korean spacing..."
 korean-spacing -i "$SELECTED" -o "$SELECTED"

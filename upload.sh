@@ -1,38 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ISSUES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/issues"
+# upload.sh <issue-file.md> — upload one issue markdown file to CUBRID JIRA.
+#
+# Given a file, it detects the issue key from the filename, shows the existing
+# JIRA issue + a local preview, asks for confirmation, sanitizes Korean spacing,
+# then uploads via jira-md-upload. Interactive file selection lives in
+# upload-fzf.sh, which picks a file with fzf and execs into this script.
 
-# Collect markdown files
-mapfile -t FILES < <(
-  find "$ISSUES_DIR" -maxdepth 1 -name "*.md" -printf '%T@\t%p\n' \
-    | sort -rn \
-    | cut -f2-
-)
+if [ $# -lt 1 ]; then
+  echo "Usage: $(basename "$0") <issue-file.md>" >&2
+  exit 2
+fi
 
-if [ ${#FILES[@]} -eq 0 ]; then
-  echo "No issue files found in $ISSUES_DIR"
+SELECTED="$1"
+
+if [ ! -f "$SELECTED" ]; then
+  echo "File not found: $SELECTED" >&2
   exit 1
 fi
-
-# Use bat for preview if available, otherwise cat
-if command -v bat &>/dev/null; then
-  PREVIEW_CMD='bat --color=always --style=numbers {}'
-else
-  PREVIEW_CMD='cat {}'
-fi
-
-# Interactive file selection with fzf
-SELECTED=$(printf '%s\n' "${FILES[@]}" | fzf \
-  --preview "$PREVIEW_CMD" \
-  --preview-window=right:60%:wrap \
-  --header="Select a Jira issue to upload  [Enter: upload, Esc: cancel]" \
-  --prompt="Issue> " \
-  --height=90% \
-  --border=rounded \
-  --info=inline)
-
-[ -z "$SELECTED" ] && echo "Cancelled." && exit 0
 
 BASENAME=$(basename "$SELECTED" .md)
 

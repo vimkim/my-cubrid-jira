@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# upload-fzf.sh — interactively pick a JIRA issue markdown file with fzf, then
-# hand it to upload.sh, which detects the key, shows a preview, confirms, fixes
-# Korean spacing, and uploads. This is the interactive front-end; upload.sh is
-# the worker and can also be run directly with a file argument.
+# cubrid-jira-upload-fzf.sh — interactively pick a JIRA issue markdown file with
+# fzf, then hand it to cubrid-jira-upload.sh, which detects the key, shows a
+# preview, confirms, fixes Korean spacing, and uploads. This is the interactive
+# front-end; cubrid-jira-upload.sh is the worker and can also be run directly
+# with a file argument.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_DIR="$SCRIPT_DIR/issues"
@@ -42,18 +43,18 @@ SELECTED=$(printf '%s\n' "${FILES[@]}" | fzf \
 
 # The exact worker command, shell-quoted with %q so paths with spaces or
 # special chars re-run verbatim.
-CMD=$(printf '%q ' "$SCRIPT_DIR/upload.sh" "$SELECTED")
+CMD=$(printf '%q ' "$SCRIPT_DIR/cubrid-jira-upload.sh" "$SELECTED")
 
 # Hand off to the worker. We deliberately do NOT exec: exec would replace this
 # process and nothing below would run. Running it as a child lets us regain
 # control afterward to record/print the command with its real exit code. The
-# child still inherits the tty, so upload.sh's interactive prompts work.
+# child still inherits the tty, so the worker's interactive prompts work.
 T0=$(date +%s%N 2>/dev/null || echo 0)
 rc=0
-"$SCRIPT_DIR/upload.sh" "$SELECTED" || rc=$?
+"$SCRIPT_DIR/cubrid-jira-upload.sh" "$SELECTED" || rc=$?
 
 # Record the worker command in atuin so it's searchable / up-arrow-able later.
-# It is never typed at the prompt (upload-fzf.sh invokes it internally), so
+# It is never typed at the prompt (this front-end invokes it internally), so
 # atuin's normal shell hook never sees it. start/end is exactly what that hook
 # does: start reserves the entry, end stamps the real exit code + duration.
 if command -v atuin &>/dev/null; then

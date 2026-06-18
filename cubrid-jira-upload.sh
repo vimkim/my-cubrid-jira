@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# upload.sh <issue-file.md> — upload one issue markdown file to CUBRID JIRA.
+# cubrid-jira-upload.sh <issue-file.md> — upload one issue markdown file to
+# CUBRID JIRA (jira.cubrid.org).
 #
 # Given a file, it detects the issue key from the filename, shows the existing
 # JIRA issue + a local preview, asks for confirmation, sanitizes Korean spacing,
 # then uploads via jira-md-upload. Interactive file selection lives in
-# upload-fzf.sh, which picks a file with fzf and execs into this script.
+# cubrid-jira-upload-fzf.sh, which picks a file with fzf and hands it to this
+# script.
 
 if [ $# -lt 1 ]; then
   echo "Usage: $(basename "$0") <issue-file.md>" >&2
@@ -63,7 +65,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 read -rp "Upload to $ISSUE_KEY? [y/N] " CONFIRM
 # Exit 130 (the SIGINT convention) on a declined upload so the run is recorded
-# distinctly from a real success (0) — e.g. in atuin via upload-fzf.sh.
+# distinctly from a real success (0) — e.g. in atuin via cubrid-jira-upload-fzf.sh.
 [[ "$CONFIRM" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 130; }
 
 echo "Sanitizing Korean spacing..."

@@ -2,10 +2,11 @@
 set -euo pipefail
 
 # cubrid-jira-upload-fzf.sh — interactively pick a JIRA issue markdown file with
-# fzf, then hand it to cubrid-jira-upload.sh, which detects the key, shows a
-# preview, confirms, fixes Korean spacing, and uploads. This is the interactive
-# front-end; cubrid-jira-upload.sh is the worker and can also be run directly
-# with a file argument.
+# fzf, then hand it to cubrid-jira-upload-interactive.sh, which detects the key,
+# shows a preview, confirms, fixes Korean spacing, and uploads. This is the
+# interactive front-end; cubrid-jira-upload-interactive.sh is the worker and can
+# also be run directly with a file argument. For non-interactive uploads (Claude
+# Code, CI) use cubrid-jira-upload-noninteractive.sh instead.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISSUES_DIR="$SCRIPT_DIR/issues"
@@ -43,7 +44,7 @@ SELECTED=$(printf '%s\n' "${FILES[@]}" | fzf \
 
 # The exact worker command, shell-quoted with %q so paths with spaces or
 # special chars re-run verbatim.
-CMD=$(printf '%q ' "$SCRIPT_DIR/cubrid-jira-upload.sh" "$SELECTED")
+CMD=$(printf '%q ' "$SCRIPT_DIR/cubrid-jira-upload-interactive.sh" "$SELECTED")
 
 # Hand off to the worker. We deliberately do NOT exec: exec would replace this
 # process and nothing below would run. Running it as a child lets us regain
@@ -51,7 +52,7 @@ CMD=$(printf '%q ' "$SCRIPT_DIR/cubrid-jira-upload.sh" "$SELECTED")
 # child still inherits the tty, so the worker's interactive prompts work.
 T0=$(date +%s%N 2>/dev/null || echo 0)
 rc=0
-"$SCRIPT_DIR/cubrid-jira-upload.sh" "$SELECTED" || rc=$?
+"$SCRIPT_DIR/cubrid-jira-upload-interactive.sh" "$SELECTED" || rc=$?
 
 # Record the worker command in atuin so it's searchable / up-arrow-able later.
 # It is never typed at the prompt (this front-end invokes it internally), so

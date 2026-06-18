@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# cubrid-jira-upload.sh <issue-file.md> — upload one issue markdown file to
-# CUBRID JIRA (jira.cubrid.org).
+# cubrid-jira-upload-interactive.sh <issue-file.md> — upload one issue markdown
+# file to CUBRID JIRA (jira.cubrid.org), with a human confirmation prompt.
 #
 # Given a file, it detects the issue key from the filename, shows the existing
-# JIRA issue + a local preview, asks for confirmation, sanitizes Korean spacing,
-# then uploads via jira-md-upload. Interactive file selection lives in
-# cubrid-jira-upload-fzf.sh, which picks a file with fzf and hands it to this
-# script.
+# JIRA issue + a local preview, asks for [y/N] confirmation, sanitizes Korean
+# spacing, then uploads via jira-md-upload. The [y/N] prompt (and the key
+# fallback prompt) require an interactive TTY, so non-interactive callers
+# (Claude Code, CI) must use cubrid-jira-upload-noninteractive.sh instead.
+# Interactive file selection lives in cubrid-jira-upload-fzf.sh, which picks a
+# file with fzf and hands it to this script.
 
 if [ $# -lt 1 ]; then
   echo "Usage: $(basename "$0") <issue-file.md>" >&2

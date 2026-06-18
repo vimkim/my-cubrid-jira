@@ -11,16 +11,22 @@ Use the `upload` just recipe to interactively upload a Markdown file to Jira:
 
 ```sh
 just upload      # fzf picker → preview → confirm → upload
-just --list      # see all recipes (upload-file, fetch, list, doctor, serve, …)
+just --list      # see all recipes (upload-file, upload-dry, upload-yes, fetch, …)
 ```
 
 `just upload` runs `cubrid-jira-upload-fzf.sh`, which:
 
 1. Lists all `issues/*.md` files in an `fzf` picker with a preview pane.
-2. Hands the choice to `cubrid-jira-upload.sh`, which detects the issue key from
-   the filename (e.g. `CBRD-25356-some-descriptive-name.md`) or prompts for one.
+2. Hands the choice to `cubrid-jira-upload-interactive.sh`, which detects the
+   issue key from the filename (e.g. `CBRD-25356-some-descriptive-name.md`) or
+   prompts for one.
 3. Shows the current Jira issue + a local preview and asks before uploading.
 4. Normalizes Korean spacing, then uploads (Markdown → Jira wiki markup).
+
+For non-interactive use (e.g. Claude Code, CI), there's a no-prompt worker,
+`cubrid-jira-upload-noninteractive.sh <file>`: it **dry-runs** by default
+(previews the overwrite, uploads nothing) and only uploads when given `--yes`.
+Recipes: `just upload-dry <file>` (preview) and `just upload-yes <file>` (upload).
 
 Credentials (`JIRA_URL`/`JIRA_USER`/`JIRA_PASSWORD`) come from `.envrc` via
 direnv. Run `just doctor` to verify tools and credentials.

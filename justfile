@@ -17,9 +17,20 @@ default:
 upload:
     bash cubrid-jira-upload-fzf.sh
 
-# Upload one file directly, e.g. `just upload-file issues/CBRD-26517-oos-todo.md`.
+# Upload one file directly with a [y/N] confirmation prompt (needs a TTY),
+# e.g. `just upload-file issues/CBRD-26517-oos-todo.md`.
 upload-file file:
-    bash cubrid-jira-upload.sh {{file}}
+    bash cubrid-jira-upload-interactive.sh {{file}}
+
+# Dry-run a non-interactive upload (shows the diff target, uploads nothing).
+# Safe for Claude Code / CI. e.g. `just upload-dry issues/CBRD-26517-oos-todo.md`.
+upload-dry file:
+    bash cubrid-jira-upload-noninteractive.sh {{file}}
+
+# Non-interactive upload — NO prompt, overwrites the live issue immediately.
+# e.g. `just upload-yes issues/CBRD-26517-oos-todo.md`.
+upload-yes file:
+    bash cubrid-jira-upload-noninteractive.sh {{file}} --yes
 
 # Live-preview the notes in a browser (markserv on http://0.0.0.0:8000 — reachable from other machines on the LAN).
 serve:

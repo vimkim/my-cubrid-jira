@@ -12,30 +12,47 @@ on the server.
   `CBRD-25356.md`). The slug after the key is for humans and is ignored by the
   uploader. Files named `CBRD-XXXXX-*.md` are drafts without a key yet — they
   cannot be uploaded until renamed with a real number.
-- `cubrid-jira-upload.sh` — the **worker**: uploads one file (see below).
-- `cubrid-jira-upload-fzf.sh` — the **interactive front-end**: fzf picker → worker.
+- `cubrid-jira-upload-interactive.sh` — the **interactive worker**: uploads one
+  file behind a `[y/N]` prompt (needs a TTY; for humans). (see below)
+- `cubrid-jira-upload-noninteractive.sh` — the **non-interactive worker**: same
+  job, no prompt. Dry-runs by default; uploads only with `--yes`. This is the
+  one Claude Code / CI can run.
+- `cubrid-jira-upload-fzf.sh` — the **interactive front-end**: fzf picker →
+  interactive worker.
 - `justfile` — task runner; run `just` to list recipes.
 
 ## Uploading (this is automated — do not hand-craft API calls)
 
-The upload pipeline is `just upload` → `cubrid-jira-upload-fzf.sh` (fzf picker)
-→ `cubrid-jira-upload.sh <file>` (worker). The worker:
+There are two workers — one for humans (interactive), one for Claude Code / CI
+(non-interactive) — that do the **same five steps**:
 
-1. Derives the issue key from the filename (or prompts if absent).
+1. Derives the issue key from the filename.
 2. Fetches the **current** JIRA issue (summary + status) so you can see what
    you're about to overwrite.
-3. Shows a local preview and asks `Upload to <KEY>? [y/N]`.
+3. Shows a local preview, then confirms (see below).
 4. Runs `korean-spacing` in place to fix spacing around inline markdown next to
    Korean text.
 5. Calls `jira-md-upload <KEY> <file>`, which converts Markdown → JIRA wiki
    markup and **overwrites the issue description**.
 
+The only difference is step 3 (and the missing-key case):
+
+- **Interactive** (`just upload` → `cubrid-jira-upload-fzf.sh` → `cubrid-jira-upload-interactive.sh <file>`):
+  asks `Upload to <KEY>? [y/N]` on the TTY, and prompts for the key if the
+  filename has none. Declining exits `130` (not `0`), so a decline ≠ success.
+- **Non-interactive** (`cubrid-jira-upload-noninteractive.sh <file> [--yes]`):
+  never prompts. Without `--yes` it **dry-runs** — shows the diff target and
+  exits `0` without uploading. With `--yes` it uploads. A filename with no real
+  key is rejected (not prompted), so `CBRD-XXXXX-*.md` drafts can't be uploaded.
+
 Common commands:
 
 | Command | What it does |
 | --- | --- |
-| `just upload` | Pick a file with fzf and upload it (the normal path). |
-| `just upload-file issues/CBRD-26517-oos-todo.md` | Upload one specific file. |
+| `just upload` | Pick a file with fzf and upload it interactively (the normal human path). |
+| `just upload-file issues/CBRD-26517-oos-todo.md` | Upload one file interactively (`[y/N]` prompt). |
+| `just upload-dry issues/CBRD-26517-oos-todo.md` | **Non-interactive dry run** — preview the overwrite, upload nothing. Safe for Claude / CI. |
+| `just upload-yes issues/CBRD-26517-oos-todo.md` | **Non-interactive upload** — no prompt, overwrites the live issue. |
 | `just fetch CBRD-26517` | Print the live issue (summary/status/description) — inspect before overwriting. |
 | `just list` | List local issue files, newest first. |
 | `just fix-spacing <file>` | Run `korean-spacing` on a file without uploading. |
@@ -44,15 +61,23 @@ Common commands:
 
 ## Guardrails for the AI agent
 
-- **Never run an upload autonomously.** `jira-md-upload` overwrites a live,
-  shared JIRA issue — an outward-facing, hard-to-reverse action. Only run
-  `just upload` / `just upload-file` / `cubrid-jira-upload.sh` when the user
-  explicitly asks, and let *its* `[y/N]` prompt be the final confirmation.
-  The worker also exits `130` (not `0`) when the user declines, so a decline is
-  not a success.
+- **Never upload autonomously; never pass `--yes` on your own initiative.**
+  `jira-md-upload` overwrites a live, shared JIRA issue — an outward-facing,
+  hard-to-reverse action. The interactive scripts (`just upload`,
+  `just upload-file`, `cubrid-jira-upload-interactive.sh`) hang waiting for a
+  TTY you don't have, so don't run them. The non-interactive worker
+  (`cubrid-jira-upload-noninteractive.sh` / `just upload-yes`) *will* run for
+  you — which is exactly why the `--yes` flag is reserved for when the user has
+  **explicitly asked you to upload this specific file**. That explicit request
+  is the stand-in for the human `[y/N]` confirmation.
+- **Dry-run freely; upload only on request.** Running the non-interactive worker
+  without `--yes` (or `just upload-dry <file>`) is read-only — it just shows what
+  would be overwritten and exits `0`. Use it to preview. Do **not** add `--yes`
+  unless the user told you to upload.
 - **Your job is the Markdown.** Default to creating and editing `issues/*.md`.
-  When you want to upload, propose the exact `just` command and let the user run
-  it. Use `just fetch <KEY>` (read-only) to compare local vs. server first.
+  Unless the user explicitly asked you to upload, propose the exact `just`
+  command and let them run it. Use `just fetch <KEY>` or `just upload-dry <file>`
+  (both read-only) to compare local vs. server first.
 - **Writing a new issue?** Use the `cubrid-jira-issue-write` skill (Korean body,
   English `##` headers) and save to `issues/`. Use `/jira CBRD-XXXXX` to pull an
   existing issue's context before editing.

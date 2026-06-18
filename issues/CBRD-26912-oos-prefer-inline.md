@@ -1,64 +1,64 @@
-# [OOS] 컬럼별 OOS 회피 우선순위 SQL 지정 (STORAGE PREFER_INLINE)
+# [OOS] 컬럼별 OOS 회피 우선순위를 SQL 로 지정 (STORAGE PREFER_INLINE)
 
 ## Issue Triage
 
-**이슈 수행 목적**: 사용자가 CREATE TABLE / ALTER TABLE 에서 특정 컬럼에 `STORAGE PREFER_INLINE` 을 지정해, 그 컬럼이 OOS(Out-of-row Storage - heap 레코드의 큰 가변 컬럼을 별도 OOS 파일로 분리하는 저장 방식) 로 빠지는 우선순위를 낮추고 될 수 있으면 heap 레코드 안에 인라인으로 유지하도록 한다.
+**이슈 수행 목적**: 사용자가 `CREATE TABLE` / `ALTER TABLE` 에서 특정 컬럼에 `STORAGE PREFER_INLINE` 을 지정할 수 있게 한다. 이 옵션을 붙인 컬럼은 OOS(Out-of-row Storage — heap 레코드의 큰 가변 컬럼을 별도 OOS 파일로 분리하는 저장 방식)로 빠지는 우선순위가 낮아져서, 가능하면 heap 레코드 안에 인라인으로 남는다.
 
 **이슈 수행 이유**:
 
-- **현재 동작 / 배경**: heap 레코드를 디스크 레이아웃으로 굳히는 `heap_attrinfo_determine_disk_layout` (`heap_file.c:12097`) 은, 레코드 총 길이가 `DB_PAGESIZE/4` (16KB 페이지 기준 4KB) 를 넘으면 OOS 후보 가변 컬럼을 크기 내림차순으로만 정렬(`heap_file.c:12136`, `std::greater`)해 큰 것부터 하나씩 OOS 로 demote 한다. 즉 컬럼 선택 기준이 오직 "크기" 뿐이고, 어떤 컬럼을 인라인에 붙잡아 두라고 사용자가 표현할 수단이 전혀 없다.
-- **영향**: 설계 의도 한계 - 자주 읽는 컬럼이라도 단지 상대적으로 크다는 이유만으로 가장 먼저 OOS 로 빠지고, 그 컬럼을 읽을 때마다 `oos_read` 추가 I/O 가 발생한다. PostgreSQL TOAST 의 `SET STORAGE MAIN` 같은 "이 컬럼은 인라인 우선" 제어가 없어, 사용자가 핫(hot) 컬럼을 OOS 로부터 보호할 방법이 없다.
+- **현재 동작 / 배경**: heap 레코드를 디스크 레이아웃으로 확정하는 함수는 `heap_attrinfo_determine_disk_layout` (`heap_file.c:12097`) 이다. 이 함수는 레코드 총 길이가 `DB_PAGESIZE/4`(16KB 페이지 기준 4KB)를 넘으면, OOS 후보 가변 컬럼을 크기 내림차순으로만 정렬한 뒤(`heap_file.c:12136`, `std::greater`) 큰 것부터 하나씩 OOS 로 demote 한다. 컬럼을 고르는 기준이 오직 "크기" 하나뿐이라, 특정 컬럼을 인라인에 남겨 두고 싶다는 의사를 사용자가 표현할 방법이 전혀 없다.
+- **영향**: 설계상의 한계다. 자주 읽는 컬럼이라도 상대적으로 크기만 하면 가장 먼저 OOS 로 빠지고, 그 컬럼을 읽을 때마다 `oos_read` 만큼의 추가 I/O 가 발생한다. PostgreSQL TOAST 의 `SET STORAGE MAIN` 처럼 "이 컬럼은 인라인을 우선한다"고 지정하는 수단이 없어서, 사용자가 자주 읽는(hot) 컬럼을 OOS 로부터 보호할 방법이 없다.
 
 **이슈 수행 방안**:
 
-- 컬럼 옵션 `STORAGE PREFER_INLINE | DEFAULT` 를 추가한다. 절을 생략하면 `DEFAULT` 와 동일(현행 크기순 동작). CREATE TABLE 컬럼 정의와 ALTER TABLE MODIFY/CHANGE 에 동일하게 적용된다 (둘 다 `attr_def_one` 규칙 공유).
-- 강도는 전부 soft 다. `PREFER_INLINE` 컬럼을 demote 후보 정렬의 맨 뒤로 보내, 다른 컬럼을 모두 OOS 로 보내도 레코드가 `DB_PAGESIZE/4` 를 못 맞출 때만 마지막 수단으로 demote 한다. 레코드가 항상 페이지에 들어가는 기존 불변식을 깨지 않는다.
-- 저장은 `INVISIBLE` 컬럼 선례와 동일한 플래그 비트 경로를 그대로 쓴다: `SM_ATTRIBUTE.flags` 신규 비트 `SM_ATTFLAG_OOS_PREFER_INLINE` (0x1000) -> 기존대로 통째 직렬화(transform 계층 변경 불필요) -> `OR_ATTRIBUTE` 신규 비트필드 `oos_prefer_inline:1` -> `heap_file.c` demote 정렬에서 소비. 카탈로그 테이블 스키마 변경은 없다.
-- 범위 밖 (별도 후속 이슈): hard 강제(절대 OOS 금지 / 작아도 무조건 OOS). hard 는 OOS 후보에서 컬럼을 완전히 빼므로 레코드가 페이지를 넘으면 기존 overflow page 경로로 떨어진다 - overflow x OOS 동시 동작 검증이 필요해 분리한다. 사용자 인용: "DEFAULT == OOS 인 것으로 하자. PREFER_INLINE / DEFAULT (OOS)", "될 수 있으면 안 보내겠다는 의지를 표명할 수 있어야 해".
+- 컬럼 옵션 `STORAGE PREFER_INLINE | DEFAULT` 를 새로 추가한다. 옵션을 생략하면 `DEFAULT` 와 같고(지금처럼 크기순으로 동작), `CREATE TABLE` 컬럼 정의와 `ALTER TABLE MODIFY/CHANGE` 에 똑같이 적용된다(둘 다 `attr_def_one` 규칙을 공유한다).
+- 동작 강도는 전부 soft 다. `PREFER_INLINE` 컬럼은 demote 후보 정렬에서 맨 뒤로 밀린다. 그래서 다른 컬럼을 모두 OOS 로 보내고도 레코드가 `DB_PAGESIZE/4` 안에 들어오지 못할 때에만, 마지막 수단으로 이 컬럼을 demote 한다. "레코드는 항상 페이지에 들어간다"는 기존 불변식은 그대로 유지된다.
+- 저장 방식은 `INVISIBLE` 컬럼이 이미 쓰고 있는 플래그 비트 경로를 그대로 따른다. `SM_ATTRIBUTE.flags` 에 신규 비트 `SM_ATTFLAG_OOS_PREFER_INLINE`(0x1000)을 두고 → 기존 방식대로 통째로 직렬화한 뒤(transform 계층은 손댈 필요가 없다) → `OR_ATTRIBUTE` 의 신규 비트필드 `oos_prefer_inline:1` 로 복원하고 → `heap_file.c` 의 demote 정렬에서 사용한다. 카탈로그 테이블 스키마는 바뀌지 않는다.
+- 이번 범위에서 제외(별도 후속 이슈로 분리): hard 강제(컬럼을 절대 OOS 로 보내지 않거나, 작아도 무조건 OOS 로 보내는 방식). hard 는 컬럼을 OOS 후보에서 아예 빼버리기 때문에, 레코드가 페이지를 넘으면 기존 overflow page 경로로 넘어간다. 이 경우 overflow 와 OOS 가 동시에 동작하는 상황을 따로 검증해야 하므로 이번 이슈에서 분리한다. (사용자 의견 인용: "DEFAULT == OOS 인 것으로 하자. PREFER_INLINE / DEFAULT (OOS)", "될 수 있으면 안 보내겠다는 의지를 표명할 수 있어야 해".)
 
 ---
 
 ## AI-Generated Context
 
-> 아래 내용은 AI 가 코드/맥락을 분석해 작성한 상세 자료입니다. 빠른 triage 에는 위 **Issue Triage** 블록만으로 충분하며, 본문은 구현/리뷰 단계에서 참고하시면 됩니다.
+> 아래 내용은 AI 가 코드와 맥락을 분석하여 정리한 상세 자료입니다. 빠르게 triage 만 하실 때는 위 **Issue Triage** 블록만 보셔도 충분하고, 아래 본문은 구현이나 리뷰 단계에서 참고하시면 됩니다.
 
 ### Summary
 
-- **문제 / 목적**: OOS demotion 이 크기순으로만 컬럼을 고르므로, 사용자가 특정 컬럼을 인라인에 유지하라고 지정할 수단이 없다. 컬럼 단위 SQL 힌트를 추가한다.
-- **원인 / 배경**: `heap_attrinfo_determine_disk_layout` 의 후보 정렬이 `{크기, attr index}` 단일 키(`heap_file.c:12136`)라, 워크로드 의도가 반영될 여지가 없다.
-- **제안 / 변경**: `STORAGE PREFER_INLINE` 컬럼 옵션 추가. 정렬에 우선순위 1차 키를 더해 PREFER_INLINE 컬럼을 후보 맨 뒤로 보낸다(soft). 플래그 1비트로 저장.
-- **영향 범위**: 파서(`csql_grammar.y`, `keyword.c`, `parse_tree*.c`), 스키마(`storage_common.h`, `execute_schema.c`, `class_object.c`), 디스크 표현(`object_representation_sr.*`), heap demotion(`heap_file.c`). 카탈로그 disk 포맷/시스템 테이블 컬럼 변경 없음. 기존 테이블/데이터와 하위 호환(플래그 미설정 = 현행 동작).
+- **문제 / 목적**: OOS demotion 이 컬럼을 크기순으로만 고르기 때문에, 사용자가 "이 컬럼은 인라인에 유지하라"고 지정할 수단이 없다. 컬럼 단위의 SQL 힌트를 추가한다.
+- **원인 / 배경**: `heap_attrinfo_determine_disk_layout` 의 후보 정렬 키가 `{크기, attr index}` 하나뿐이라(`heap_file.c:12136`), 워크로드의 의도가 끼어들 여지가 없다.
+- **제안 / 변경**: `STORAGE PREFER_INLINE` 컬럼 옵션을 추가한다. 정렬에 우선순위 1차 키를 하나 더해서 PREFER_INLINE 컬럼을 후보의 맨 뒤로 보낸다(soft). 플래그 1비트로 저장한다.
+- **영향 범위**: 파서(`csql_grammar.y`, `keyword.c`, `parse_tree*.c`), 스키마(`storage_common.h`, `execute_schema.c`, `class_object.c`), 디스크 표현(`object_representation_sr.*`), heap demotion(`heap_file.c`). 카탈로그 disk 포맷과 시스템 테이블 컬럼은 바뀌지 않는다. 기존 테이블·데이터와 하위 호환된다(플래그를 설정하지 않으면 지금과 동일하게 동작).
 
 ---
 
 ## Description
 
-CUBRID OOS 는 heap 레코드가 커지면 큰 가변 컬럼을 OOS 파일로 분리해, 작은 컬럼만 읽을 때 불필요한 디스크 I/O 를 줄인다. 어떤 컬럼을 분리할지는 `heap_attrinfo_determine_disk_layout` 가 정한다.
+CUBRID OOS 는 heap 레코드가 커지면 큰 가변 컬럼을 OOS 파일로 떼어내서, 작은 컬럼만 읽을 때 생기는 불필요한 디스크 I/O 를 줄여 준다. 어떤 컬럼을 떼어낼지는 `heap_attrinfo_determine_disk_layout` 가 결정한다.
 
-현재 정책은 단순하다. 레코드 총 길이(`header + payload + mvcc_extra`)가 `DB_PAGESIZE/4` 를 넘으면, OOS 후보(가변이면서 값 크기 > `OR_OOS_INLINE_SIZE` = 16바이트)를 모아 **크기 내림차순** 으로 정렬한 뒤, 레코드가 `DB_PAGESIZE/4` 이하가 될 때까지 큰 것부터 하나씩 OOS 로 보낸다.
+현재 정책은 단순하다. 레코드 총 길이(`header + payload + mvcc_extra`)가 `DB_PAGESIZE/4` 를 넘으면, OOS 후보(가변 컬럼이면서 값 크기가 `OR_OOS_INLINE_SIZE`(16바이트)보다 큰 컬럼)를 모은 다음 **크기 내림차순** 으로 정렬한다. 그리고 레코드가 `DB_PAGESIZE/4` 이하로 줄어들 때까지 큰 컬럼부터 하나씩 OOS 로 보낸다.
 
-문제는 이 선택이 오직 크기에만 의존한다는 점이다. 예를 들어 자주 조회하는 4KB 프로파일 컬럼과 거의 안 읽는 3KB 로그 컬럼이 한 레코드에 있으면, 더 큰 프로파일 컬럼이 먼저 OOS 로 빠져 매 조회마다 `oos_read` 비용을 문다. 사용자는 "이 컬럼은 될 수 있으면 인라인에 둬라" 는 의사를 SQL 로 전혀 표현할 수 없다.
+문제는 이 선택이 오직 크기에만 의존한다는 점이다. 예를 들어 자주 조회하는 4KB 프로파일 컬럼과 거의 읽지 않는 3KB 로그 컬럼이 한 레코드에 같이 있으면, 더 큰 프로파일 컬럼이 먼저 OOS 로 빠져서 조회할 때마다 `oos_read` 비용을 치른다. 사용자는 "이 컬럼은 가능하면 인라인에 둬 달라"는 의사를 SQL 로 표현할 방법이 전혀 없다.
 
-이 이슈는 PostgreSQL TOAST 의 `ALTER TABLE ... SET STORAGE MAIN`(가능한 한 인라인 유지) 에 대응하는 컬럼 옵션을 CUBRID SQL 에 추가한다. 단, CUBRID OOS 에는 PostgreSQL STORAGE 가 함께 표현하는 압축 의미가 없으므로(압축은 타입 계층의 별도 기능), PostgreSQL 의 4값(PLAIN/EXTERNAL/EXTENDED/MAIN) 을 그대로 옮기지 않고 OOS demotion 우선순위에만 한정한 2값으로 정의한다.
+이 이슈는 PostgreSQL TOAST 의 `ALTER TABLE ... SET STORAGE MAIN`(가능한 한 인라인 유지)에 대응하는 컬럼 옵션을 CUBRID SQL 에 추가한다. 다만 CUBRID OOS 에는 PostgreSQL 의 STORAGE 가 함께 담고 있는 압축 의미가 없기 때문에(압축은 타입 계층의 별도 기능이다), PostgreSQL 의 네 가지 값(PLAIN/EXTERNAL/EXTENDED/MAIN)을 그대로 가져오지 않는다. 대신 OOS demotion 우선순위에만 한정한 두 가지 값으로 정의한다.
 
 ### 동작 정의 (전부 soft)
 
-demotion 은 레코드가 `DB_PAGESIZE/4` 를 넘을 때만 일어난다. `PREFER_INLINE` 은 "demote 할지 말지" 가 아니라 "demote 한다면 어떤 컬럼부터" 의 순서만 바꾼다.
+demotion 은 레코드가 `DB_PAGESIZE/4` 를 넘을 때만 일어난다. `PREFER_INLINE` 은 "demote 를 할지 말지"를 바꾸는 게 아니라, "demote 를 한다면 어떤 컬럼부터 할지"의 순서만 바꾼다.
 
-- `STORAGE DEFAULT` (또는 절 생략): 현행 그대로. 크기 내림차순.
-- `STORAGE PREFER_INLINE`: 해당 컬럼을 후보 정렬의 맨 뒤로 보낸다. 다른 모든 후보를 OOS 로 보내도 레코드가 `DB_PAGESIZE/4` 를 못 맞추면, 그때 마지막 수단으로만 이 컬럼을 demote 한다.
+- `STORAGE DEFAULT`(또는 옵션 생략): 지금과 똑같이 크기 내림차순으로 처리한다.
+- `STORAGE PREFER_INLINE`: 해당 컬럼을 후보 정렬의 맨 뒤로 보낸다. 다른 후보를 모두 OOS 로 보내고도 레코드가 `DB_PAGESIZE/4` 안에 들어오지 못하면, 그제야 마지막 수단으로 이 컬럼을 demote 한다.
 
-soft 이므로 "레코드는 항상 페이지에 들어간다" 는 기존 OOS 불변식이 유지된다. PREFER_INLINE 컬럼도 끝까지 후보로 남기 때문이다.
+soft 방식이므로 "레코드는 항상 페이지에 들어간다"는 기존 OOS 불변식이 그대로 유지된다. PREFER_INLINE 컬럼도 끝까지 후보로 남아 있기 때문이다.
 
 ### soft-only 의 한계 (의도된 범위)
 
-PREFER_INLINE 은 순서만 바꾸므로, **demote 할 다른 컬럼이 없으면 효과가 없다.** 큰 가변 컬럼이 하나뿐인 레코드에서 그 컬럼을 PREFER_INLINE 으로 지정해도, 레코드가 `DB_PAGESIZE/4` 를 넘으면 결국 그 컬럼이 OOS 로 간다(대신 뺄 컬럼이 없으므로). 단일 핫 컬럼을 절대 인라인에 고정하려면 hard 강제가 필요하지만, hard 는 overflow page 와의 상호작용 검증이 필요해 이 이슈 범위 밖이다.
+PREFER_INLINE 은 순서만 바꾸기 때문에, **demote 할 다른 컬럼이 없으면 아무 효과가 없다.** 큰 가변 컬럼이 하나뿐인 레코드에서 그 컬럼을 PREFER_INLINE 으로 지정하더라도, 레코드가 `DB_PAGESIZE/4` 를 넘으면 결국 그 컬럼이 OOS 로 간다(대신 내보낼 컬럼이 없기 때문이다). 단일 hot 컬럼을 무슨 일이 있어도 인라인에 고정하려면 hard 강제가 필요한데, hard 는 overflow page 와의 상호작용을 따로 검증해야 하므로 이번 이슈 범위에서는 제외한다.
 
-또한 이것은 워크로드 힌트이지 공짜 이득이 아니다. 핫 컬럼을 보호하면 그만큼 다른 컬럼 조회에 `oos_read` I/O 가 옮겨간다. 보호 대상이 다른 컬럼보다 자주 읽힐 때만 순이득이다.
+또 이 옵션은 워크로드 힌트일 뿐, 공짜로 얻는 이득이 아니다. hot 컬럼을 보호하면 그만큼 다른 컬럼을 조회할 때 `oos_read` I/O 가 그쪽으로 옮겨간다. 보호하려는 컬럼이 다른 컬럼보다 자주 읽힐 때에만 전체적으로 이득이다.
 
 ## Specification Changes
 
-QA/매뉴얼 갱신 필요. 새 SQL 구문과 키워드가 추가된다.
+QA 와 매뉴얼을 갱신해야 한다. 새 SQL 구문과 키워드가 추가되기 때문이다.
 
 ### 새 컬럼 옵션 구문
 
@@ -75,25 +75,25 @@ ALTER TABLE t MODIFY payload VARCHAR(4096) STORAGE DEFAULT;
 ALTER TABLE t MODIFY logs    BIT VARYING   STORAGE PREFER_INLINE;
 ```
 
-- 절을 생략하면 `STORAGE DEFAULT` 와 동일하다.
-- `STORAGE` 와 `PREFER_INLINE` 은 신규 비예약(non-reserved) 키워드로 추가한다. 기존에 `storage` 를 식별자(테이블/컬럼명)로 쓰던 스키마가 깨지지 않도록 `identifier` 규칙에 echo 항목을 넣는다. `DEFAULT` 는 이미 예약어라 토큰을 재사용한다.
-- 고정 길이 컬럼(예: `CHAR`, `INT`)에 지정해도 OOS 대상이 아니라 효과가 없다. 에러 없이 허용하고 플래그만 저장한다(PostgreSQL 의 무시 의미와 동일). demotion 후보는 가변 컬럼뿐이라 저장된 플래그가 소비되지 않으며, 이후 ALTER 로 가변 타입이 되면 자연히 적용된다.
+- 옵션을 생략하면 `STORAGE DEFAULT` 와 동일하다.
+- `STORAGE` 와 `PREFER_INLINE` 은 새 비예약(non-reserved) 키워드로 추가한다. `storage` 를 이미 식별자(테이블·컬럼명)로 쓰고 있던 스키마가 깨지지 않도록, `identifier` 규칙에 echo 항목을 넣는다. `DEFAULT` 는 이미 예약어이므로 그 토큰을 재사용한다.
+- 고정 길이 컬럼(예: `CHAR`, `INT`)에 지정하더라도 OOS 대상이 아니라서 효과가 없다. 이때는 에러 없이 허용하고 플래그만 저장한다(PostgreSQL 도 이 경우 무시한다). demotion 후보는 가변 컬럼뿐이므로 저장된 플래그는 사용되지 않다가, 나중에 ALTER 로 가변 타입으로 바뀌면 자연스럽게 적용된다.
 
 ### ALTER 의 적용 시점 (중요 - 사용자 가시 동작)
 
-`ALTER ... STORAGE PREFER_INLINE` 은 **이후의 INSERT/UPDATE 부터** 적용된다. 이미 OOS 로 나간 기존 값은 ALTER 만으로 인라인으로 되돌아오지 않는다. 이는 PostgreSQL `SET STORAGE` 와 동일한 의미이며, 기존 데이터를 즉시 재배치하려면 해당 행을 다시 쓰거나 테이블을 재구성해야 한다. (소급 재배치는 후속 이슈.)
+`ALTER ... STORAGE PREFER_INLINE` 은 **그 이후의 INSERT/UPDATE 부터** 적용된다. 이미 OOS 로 나가 있는 기존 값은 ALTER 만으로는 인라인으로 되돌아오지 않는다. 이는 PostgreSQL 의 `SET STORAGE` 와 같은 동작이다. 기존 데이터를 곧바로 재배치하려면 해당 행을 다시 쓰거나 테이블을 재구성해야 한다(소급 재배치는 후속 이슈로 다룬다).
 
-`ALTER ... MODIFY` 에서 `STORAGE` 절을 **생략하면 기존 힌트가 보존된다** (DEFAULT 로 리셋되지 않음). PT 계층은 3상태 enum(UNSET/DEFAULT/PREFER_INLINE)을 써서, UNSET(절 생략)일 때 기존 플래그를 유지한다 - `INVISIBLE` 의 UNSET 보존 처리(`semantic_check.c:4894`, `:8722`)와 동일. 명시적으로 되돌리려면 `STORAGE DEFAULT` 를 적는다.
+`ALTER ... MODIFY` 에서 `STORAGE` 절을 **생략하면 기존 힌트가 그대로 보존된다**(DEFAULT 로 초기화되지 않는다). PT 계층은 3상태 enum(UNSET/DEFAULT/PREFER_INLINE)을 사용해서, UNSET(절 생략)일 때는 기존 플래그를 유지한다. 이는 `INVISIBLE` 의 UNSET 보존 처리(`semantic_check.c:4894`, `:8722`)와 같은 방식이다. 힌트를 명시적으로 되돌리려면 `STORAGE DEFAULT` 를 적으면 된다.
 
 ### 스키마 덤프 라운드트립
 
-`SHOW CREATE TABLE` 과 unloaddb 스키마 덤프가 이 힌트를 다시 출력해야 loaddb 재적재 시 보존된다. 따라서 `pt_print_attr_def` 반영은 선택이 아니라 필수다.
+`SHOW CREATE TABLE` 과 unloaddb 스키마 덤프가 이 힌트를 다시 출력해 줘야, loaddb 로 재적재할 때 힌트가 보존된다. 따라서 `pt_print_attr_def` 에 반영하는 일은 선택이 아니라 필수다.
 
-저장 계층은 단일 비트(`oos_prefer_inline`)라, `STORAGE DEFAULT` 와 "절 생략" 은 모두 비트 0 으로 같은 상태가 된다(의도된 동작 - 둘은 의미상 동일). 따라서 프린터는 비트 1 일 때만 `STORAGE PREFER_INLINE` 을 출력하고, DEFAULT/생략은 아무것도 출력하지 않는다. 즉 사용자가 적은 `STORAGE DEFAULT` 리터럴은 그대로 라운드트립되지 않으며, 라운드트립 보존 대상은 PREFER_INLINE 뿐이다.
+저장 계층은 단일 비트(`oos_prefer_inline`)만 쓰기 때문에, `STORAGE DEFAULT` 와 "절 생략" 은 모두 비트 0 으로 같은 상태가 된다(의도된 동작이다 — 두 경우는 의미가 같다). 그래서 프린터는 비트가 1 일 때만 `STORAGE PREFER_INLINE` 을 출력하고, DEFAULT 나 생략은 아무것도 출력하지 않는다. 즉 사용자가 직접 적은 `STORAGE DEFAULT` 라는 문구는 그대로 다시 나오지 않으며, 라운드트립으로 보존되는 대상은 PREFER_INLINE 뿐이다.
 
 ## Implementation
 
-`INVISIBLE` 컬럼 옵션이 동일한 "PT 노드 -> SM_ATTRIBUTE.flags 비트 -> OR_ATTRIBUTE 비트필드" 경로를 이미 밟고 있으므로, 그 선례를 그대로 따른다.
+`INVISIBLE` 컬럼 옵션이 "PT 노드 → SM_ATTRIBUTE.flags 비트 → OR_ATTRIBUTE 비트필드" 라는 똑같은 경로를 이미 거치고 있으므로, 그 선례를 그대로 따른다.
 
 ### 데이터 흐름
 
@@ -111,23 +111,23 @@ ALTER TABLE t MODIFY logs    BIT VARYING   STORAGE PREFER_INLINE;
       (!) 후보 정렬 1차 키에 prefer_inline 추가 -> PREFER_INLINE 컬럼을 맨 뒤로
 ```
 
-`(!)` 표시가 실제 정책이 바뀌는 유일한 지점이다. 나머지는 플래그를 끝까지 운반하는 배선이다.
+`(!)` 로 표시한 곳이 실제 정책이 바뀌는 유일한 지점이다. 나머지는 플래그를 끝까지 실어 나르는 배선일 뿐이다.
 
 ### 변경 파일 목록
 
 | 파일 | 변경 내용 |
 |------|-----------|
-| `src/parser/csql_grammar.y` | `%token <cptr> STORAGE` `%token <cptr> PREFER_INLINE` 추가. `COLUMN_CONSTRAINT_STORAGE (0x400)` define(현재 최대 `COLUMN_CONSTRAINT_INVISIBLE 0x200`). `column_constraint_and_comment_def`(:10110) 에 `column_storage_def` 추가. 새 규칙은 키워드+값 형태라 규칙 모양은 `column_comment_def`(:10640, `COMMENT comment_value`) 를 따르고, 플래그 배선은 `column_invisible_def`(:10596) 선례를 따른다. `identifier` 규칙(:20663 부근) 에 `STORAGE`/`PREFER_INLINE` echo 항목 추가(누락 시 `storage` 식별자 사용 스키마가 깨짐). `attr_def_one`(:9961) 의 중복-옵션 마스크 처리. |
-| `src/parser/keyword.c` | `{STORAGE, "STORAGE", 1}`, `{PREFER_INLINE, "PREFER_INLINE", 1}` (세 번째 인자 1 = 비예약). 예약어 판정(`pt_is_reserved_word`)용 테이블이다. |
-| `src/parser/csql_lexer.l` | **필수**: 키워드 토큰화 규칙 추가. 렉서의 일반 식별자 규칙은 무조건 `IdName` 을 반환하므로, 키워드는 키워드별 flex 규칙(`[sS][tT][oO][rR][aA][gG][eE] { ...; return STORAGE; }`)이 있어야 토큰이 발생한다. `INVISIBLE` 규칙(`[iI][nN][vV]...`)을 본떠 `STORAGE`/`PREFER_INLINE` 규칙 추가, `<cptr>` 토큰이라 `csql_yylval.cptr = pt_makename(yytext)` 설정. 이 규칙을 빠뜨리면 문법/keyword.c 가 맞아도 `STORAGE` 가 식별자로 렉싱돼 파싱이 실패한다. |
-| `src/parser/parse_tree.h` | `PT_ATTR_STORAGE_SETTING` enum (UNSET/DEFAULT/PREFER_INLINE) 추가. `pt_attr_def_info`(:1927) 에 `attr_storage:2` 비트필드 추가 (`attr_invisible:2` (:1938) 와 동일 패턴, UNSET 기본). |
-| `src/parser/parse_tree_cl.c` | `pt_print_attr_def`(함수 시작 :6715, INVISIBLE 출력 블록 :6851 옆) 에 PREFER_INLINE 출력 블록 추가 (라운드트립 필수). |
-| `src/parser/semantic_check.c` | 검증 + MODIFY/CHANGE 시 UNSET 보존 처리 (`attr_invisible` 의 :4894 / :8722 UNSET 처리 패턴 따름). |
+| `src/parser/csql_grammar.y` | `%token <cptr> STORAGE` `%token <cptr> PREFER_INLINE` 추가. `COLUMN_CONSTRAINT_STORAGE (0x400)` define(현재 최대 `COLUMN_CONSTRAINT_INVISIBLE 0x200`). `column_constraint_and_comment_def`(:10110) 에 `column_storage_def` 추가. 새 규칙은 키워드+값 형태이므로, 규칙 모양은 `column_comment_def`(:10640, `COMMENT comment_value`)를 따르고 플래그 배선은 `column_invisible_def`(:10596) 선례를 따른다. `identifier` 규칙(:20663 부근)에 `STORAGE`/`PREFER_INLINE` echo 항목 추가(빠뜨리면 `storage` 를 식별자로 쓰던 스키마가 깨진다). `attr_def_one`(:9961) 의 중복-옵션 마스크 처리. |
+| `src/parser/keyword.c` | `{STORAGE, "STORAGE", 1}`, `{PREFER_INLINE, "PREFER_INLINE", 1}` (세 번째 인자 1 = 비예약). 예약어 판정(`pt_is_reserved_word`)에 쓰는 테이블이다. |
+| `src/parser/csql_lexer.l` | **필수**: 키워드 토큰화 규칙 추가. 렉서의 일반 식별자 규칙은 무조건 `IdName` 을 반환하므로, 키워드는 키워드별 flex 규칙(`[sS][tT][oO][rR][aA][gG][eE] { ...; return STORAGE; }`)이 있어야 토큰이 만들어진다. `INVISIBLE` 규칙(`[iI][nN][vV]...`)을 본떠 `STORAGE`/`PREFER_INLINE` 규칙을 추가하고, `<cptr>` 토큰이므로 `csql_yylval.cptr = pt_makename(yytext)` 를 설정한다. 이 규칙을 빠뜨리면 문법과 keyword.c 가 맞아도 `STORAGE` 가 식별자로 렉싱되어 파싱이 실패한다. |
+| `src/parser/parse_tree.h` | `PT_ATTR_STORAGE_SETTING` enum (UNSET/DEFAULT/PREFER_INLINE) 추가. `pt_attr_def_info`(:1927) 에 `attr_storage:2` 비트필드 추가 (`attr_invisible:2` (:1938) 와 동일 패턴, 기본값 UNSET). |
+| `src/parser/parse_tree_cl.c` | `pt_print_attr_def`(함수 시작 :6715, INVISIBLE 출력 블록 :6851 옆)에 PREFER_INLINE 출력 블록 추가 (라운드트립 필수). |
+| `src/parser/semantic_check.c` | 검증 + MODIFY/CHANGE 시 UNSET 보존 처리 (`attr_invisible` 의 :4894 / :8722 UNSET 처리 패턴을 따름). |
 | `src/storage/storage_common.h` | `SM_ATTFLAG_OOS_PREFER_INLINE = 4096` 추가 (:1086 다음, 현재 최대 `SM_ATTFLAG_INVISIBLE_COLUMN = 2048`). |
 | `src/query/execute_schema.c` | PT `attr_storage` 값을 `att->flags |= SM_ATTFLAG_OOS_PREFER_INLINE` 로 반영 (INVISIBLE 의 :8192 / ALTER 경로 :11685-11689 패턴). |
 | `src/object/class_object.c` | 필요 시 플래그 복사 경로 보강 (INVISIBLE 의 :6614 패턴). |
-| `src/base/object_representation_sr.h` | `OR_ATTRIBUTE`(:89) 에 `unsigned oos_prefer_inline:1;` 추가 (`is_invisible:1` (:117) 옆). 생성자 memset 범위 안이라 자동 0 초기화. |
-| `src/base/object_representation_sr.c` | `or_get_attributes` (:2505 부근) 에서 플래그 비트 -> `oos_prefer_inline` 복원 한 줄. |
+| `src/base/object_representation_sr.h` | `OR_ATTRIBUTE`(:89) 에 `unsigned oos_prefer_inline:1;` 추가 (`is_invisible:1` (:117) 옆). 생성자 memset 범위 안이라 0 으로 자동 초기화된다. |
+| `src/base/object_representation_sr.c` | `or_get_attributes` (:2505 부근)에서 플래그 비트 → `oos_prefer_inline` 로 복원하는 한 줄. |
 
 ### 정렬 키 변경 (핵심)
 
@@ -139,7 +139,7 @@ std::vector<std::pair<int, int>> oos_candidates;  /* {column_size, attr index} *
 std::sort (oos_candidates.begin (), oos_candidates.end (), std::greater<std::pair<int, int>> ());
 ```
 
-변경 후 - 후보에 `prefer_inline` 플래그를 함께 담고, 1차 키로 정렬한다:
+변경 후 — 후보에 `prefer_inline` 플래그를 함께 담고, 이를 1차 정렬 키로 사용한다:
 
 ```cpp
 struct oos_cand { int prefer_inline; int size; int idx; };  /* prefer_inline: 0=일반, 1=후순위 */
@@ -161,26 +161,26 @@ std::sort (oos_candidates.begin (), oos_candidates.end (),
            });
 ```
 
-`idx` 내림차순 tiebreak 는 필수다. 현재 코드의 `std::greater<std::pair<int,int>>` 는 `{크기, idx}` 쌍을 크기 -> idx 순으로 비교해 동률에서도 결정적(deterministic) 순서를 보장하는데, `std::sort` 는 stable 이 아니므로 idx 키를 빼면 동일 크기 컬럼 2개의 demote 순서가 빌드/STL 버전마다 달라져 회귀 테스트가 flaky 해진다. idx 키를 넣으면 PREFER_INLINE 미지정(DEFAULT) 컬럼만 있는 경우의 정렬 순서가 현행과 비트 단위로 동일하다(회귀 없음).
+`idx` 내림차순 tiebreak 는 반드시 필요하다. 현재 코드의 `std::greater<std::pair<int,int>>` 는 `{크기, idx}` 쌍을 크기 → idx 순으로 비교하므로, 크기가 같아도 결정적(deterministic) 순서가 보장된다. 그런데 `std::sort` 는 stable 정렬이 아니어서, idx 키를 빼면 크기가 같은 두 컬럼의 demote 순서가 빌드나 STL 버전에 따라 달라지고 회귀 테스트가 flaky 해진다. idx 키를 넣으면, PREFER_INLINE 을 지정하지 않은(DEFAULT) 컬럼만 있을 때의 정렬 순서가 현행과 비트 단위로 동일해진다(회귀 없음).
 
-demote 루프(`:12140-12151`)와 후보 자격 필터(`:12129`)는 그대로 둔다. PREFER_INLINE 컬럼도 여전히 후보이므로(soft), 다른 후보를 모두 소진하고도 레코드가 안 맞으면 자연히 demote 된다.
+demote 루프(`:12140-12151`)와 후보 자격 필터(`:12129`)는 그대로 둔다. PREFER_INLINE 컬럼도 여전히 후보로 남아 있으므로(soft), 다른 후보를 모두 써버리고도 레코드가 들어맞지 않으면 결국 이 컬럼도 demote 된다.
 
 ### 키워드 비예약 처리 주의
 
-`STORAGE` 는 흔한 식별자라, 비예약으로 등록하되 `identifier` 규칙에 echo 를 반드시 넣어야 한다. 누락 시 `CREATE TABLE storage (...)` 같은 기존 스키마가 깨진다. `COMMENT`/`INVISIBLE` 이 동일 메커니즘으로 식별자 충돌을 피한다.
+`STORAGE` 는 흔히 쓰는 식별자이므로, 비예약으로 등록하되 `identifier` 규칙에 echo 를 반드시 넣어야 한다. 빠뜨리면 `CREATE TABLE storage (...)` 같은 기존 스키마가 깨진다. `COMMENT` 와 `INVISIBLE` 도 같은 방식으로 식별자 충돌을 피하고 있다.
 
 ## Acceptance Criteria
 
-- [ ] `CREATE TABLE ... (col VARCHAR(N) STORAGE PREFER_INLINE)` 파싱/생성 성공, 동일 구문이 `ALTER TABLE ... MODIFY` 에서도 동작.
-- [ ] `SHOW CREATE TABLE` 출력에 `STORAGE PREFER_INLINE` 이 다시 나타나고, 덤프 -> 재적재(loaddb) 후에도 보존됨 (PREFER_INLINE 한정 - DEFAULT/생략은 출력 없음, 위 라운드트립 절 참고).
-- [ ] **값 정합성**: 위 테이블에서 PREFER_INLINE 컬럼을 조회해도 원본 값과 일치(인라인이든 OOS 든 값은 동일). 검증 패턴은 압축 비대상 `BIT VARYING` 사용:
+- [ ] `CREATE TABLE ... (col VARCHAR(N) STORAGE PREFER_INLINE)` 가 정상적으로 파싱·생성되고, 같은 구문이 `ALTER TABLE ... MODIFY` 에서도 동작한다.
+- [ ] `SHOW CREATE TABLE` 출력에 `STORAGE PREFER_INLINE` 이 다시 나타나고, 덤프 → 재적재(loaddb) 후에도 보존된다 (PREFER_INLINE 만 해당 — DEFAULT/생략은 출력되지 않는다. 위 라운드트립 절 참고).
+- [ ] **값 정합성**: 위 테이블에서 PREFER_INLINE 컬럼을 조회했을 때 원본 값과 일치한다(인라인에 있든 OOS 에 있든 값은 같다). 검증에는 압축 대상이 아닌 `BIT VARYING` 을 사용한다:
   ```sql
   CREATE TABLE t (id INT, hot BIT VARYING STORAGE PREFER_INLINE, cold BIT VARYING);
   INSERT INTO t VALUES (1, CAST(REPEAT('AA', 1500) AS BIT VARYING),
                            CAST(REPEAT('BB', 1500) AS BIT VARYING));
   SELECT (hot = CAST(REPEAT('AA', 1500) AS BIT VARYING)) FROM t WHERE id = 1;  -- 1 기대
   ```
-- [ ] **배치(placement) 확인 (discriminating test)**: PREFER_INLINE 가 demote 순서를 실제로 바꾸는지는, **더 큰** 컬럼을 PREFER_INLINE 으로 보호해 **더 작은** 컬럼이 대신 OOS 로 가게 만들어 검증한다(크기순 기본 정책의 정반대). `DISK_SIZE()` 는 논리적 값 크기만 돌려줘 OOS 여부를 구분하지 못하므로, debug 빌드의 `$CUBRID/log/oos.log` 에 찍히는 `oos_insert ... src.size=` 값으로 어느 컬럼이 demote 됐는지 확인한다(release 빌드엔 컬럼별 OOS 가시성 없음 - CBRD-26871):
+- [ ] **배치(placement) 확인 (discriminating test)**: PREFER_INLINE 가 demote 순서를 실제로 바꾸는지는, **더 큰** 컬럼을 PREFER_INLINE 으로 보호해서 **더 작은** 컬럼이 대신 OOS 로 가도록 만들어 확인한다(크기순 기본 정책과는 정반대 결과다). `DISK_SIZE()` 는 논리적 값 크기만 돌려주기 때문에 OOS 여부를 구분하지 못한다. 그래서 debug 빌드의 `$CUBRID/log/oos.log` 에 찍히는 `oos_insert ... src.size=` 값으로 어느 컬럼이 demote 됐는지 확인한다(release 빌드에는 컬럼별 OOS 가시성이 없다 — CBRD-26871):
   ```sql
   CREATE TABLE demo  (id INT, hot BIT VARYING STORAGE PREFER_INLINE, cold BIT VARYING);
   CREATE TABLE demo2 (id INT, hot BIT VARYING,                       cold BIT VARYING);
@@ -188,20 +188,20 @@ demote 루프(`:12140-12151`)와 후보 자격 필터(`:12129`)는 그대로 둔
   INSERT INTO demo2 VALUES (1, CAST(REPEAT('AA',3000) AS BIT VARYING), CAST(REPEAT('BB',2000) AS BIT VARYING));
   -- oos.log: demo 는 src.size~=2000 (작은 cold demote, hot 보호), demo2 는 src.size~=3000 (큰 hot demote, 크기순)
   ```
-- [ ] **soft 불변식**: PREFER_INLINE 컬럼만 남아 레코드가 페이지를 못 맞추면 그 컬럼도 결국 OOS 로 demote 되어 INSERT 가 실패하지 않는다.
-- [ ] **회귀 없음**: 플래그 미설정(기존 테이블 / `STORAGE DEFAULT`) 시 demotion 결과가 현행과 동일(동일 크기 컬럼의 demote 순서 포함 - idx tiebreak 참고).
-- [ ] 고정 길이 컬럼에 `STORAGE PREFER_INLINE` 지정 시 에러 없이 허용되며, 플래그는 저장되나 demotion 에 영향 없음.
+- [ ] **soft 불변식**: PREFER_INLINE 컬럼만 남아 레코드가 페이지에 맞지 않으면, 그 컬럼도 결국 OOS 로 demote 되어 INSERT 가 실패하지 않는다.
+- [ ] **회귀 없음**: 플래그를 설정하지 않으면(기존 테이블 / `STORAGE DEFAULT`) demotion 결과가 현행과 동일하다(크기가 같은 컬럼의 demote 순서까지 — 위 idx tiebreak 참고).
+- [ ] 고정 길이 컬럼에 `STORAGE PREFER_INLINE` 을 지정하면 에러 없이 허용되고, 플래그는 저장되지만 demotion 에는 영향을 주지 않는다.
 
 ## Definition of done
 
-- [ ] 위 Acceptance Criteria 충족
-- [ ] 기존 OOS 회귀 테스트(insert/select/update/delete, 크래시 복구, 복제) 통과
-- [ ] QA 통과
-- [ ] SQL 매뉴얼에 `STORAGE` 컬럼 옵션 및 ALTER 적용 시점 주의 반영
+- [ ] 위 Acceptance Criteria 를 모두 충족한다.
+- [ ] 기존 OOS 회귀 테스트(insert/select/update/delete, 크래시 복구, 복제)를 통과한다.
+- [ ] QA 를 통과한다.
+- [ ] SQL 매뉴얼에 `STORAGE` 컬럼 옵션과 ALTER 적용 시점 주의사항을 반영한다.
 
 ## Open Questions
 
-1. **catalog `_db_attribute.flags` 노출 여부**: 런타임 기능에는 불필요하나, 사용자가 `_db_attribute` 에서 힌트를 조회하게 하려면 `catcls_filter_attflag`(`src/storage/catalog_class.c:5846`, INVISIBLE 매핑은 :5851) 에 새 매핑을, `DB_ATTRIBUTE_OPTION_TYPE`(`src/compat/dbtype_def.h:481-486`) 에 `DB_ATTOPT_OOS_PREFER_INLINE` 멤버를 추가해야 한다. 플래그 기본값이 0 이라 기존 행과 DEFAULT 컬럼은 `_db_attribute.flags` 가 그대로이므로(QA 카탈로그 단언 작성 시 참고), 노출하지 않아도 회귀는 없다. 선택 사항. `TBD - 합의 미확인`.
+1. **catalog `_db_attribute.flags` 노출 여부**: 런타임 기능에는 필요 없다. 다만 사용자가 `_db_attribute` 에서 이 힌트를 조회할 수 있게 하려면, `catcls_filter_attflag`(`src/storage/catalog_class.c:5846`, INVISIBLE 매핑은 :5851)에 새 매핑을 추가하고 `DB_ATTRIBUTE_OPTION_TYPE`(`src/compat/dbtype_def.h:481-486`)에 `DB_ATTOPT_OOS_PREFER_INLINE` 멤버를 추가해야 한다. 플래그 기본값이 0 이라서 기존 행과 DEFAULT 컬럼의 `_db_attribute.flags` 는 그대로 유지되므로(QA 카탈로그 단언을 작성할 때 참고), 노출하지 않아도 회귀는 생기지 않는다. 선택 사항이다. `TBD — 합의 미확인`.
 
 ## 참고 코드
 
@@ -214,6 +214,6 @@ demote 루프(`:12140-12151`)와 후보 자격 필터(`:12129`)는 그대로 둔
 
 ## Remarks
 
-- 후속 분리: (a) hard 강제(`FORCE_INLINE` 등, 절대 OOS 금지 - overflow page 상호작용 검증 필요), (b) ALTER 시 기존 데이터 소급 재배치, (c) 통계/접근빈도 기반 자동 demotion.
+- 후속 이슈로 분리: (a) hard 강제(`FORCE_INLINE` 등, 컬럼을 절대 OOS 로 보내지 않음 — overflow page 상호작용 검증 필요), (b) ALTER 시 기존 데이터 소급 재배치, (c) 통계·접근 빈도 기반 자동 demotion.
 - 이슈 타입: Improve (Function/Performance). 대상 브랜치: `feat/oos` (11.5.x 베이스, OOS 기능 릴리스와 함께 반영, 정확한 Fix Version 미정).
-- 본 이슈는 OOS feat 브랜치(`feat/oos`) 기준. OOS-CONTEXT 문서의 임계치(`DB_PAGESIZE/8`, 512B)는 stale 이며, 실제 코드는 `DB_PAGESIZE/4` + `OR_OOS_INLINE_SIZE`(16B) 를 사용한다.
+- 이 이슈는 OOS feat 브랜치(`feat/oos`) 기준이다. OOS-CONTEXT 문서에 적힌 임계치(`DB_PAGESIZE/8`, 512B)는 오래된 값이며, 실제 코드는 `DB_PAGESIZE/4` 와 `OR_OOS_INLINE_SIZE`(16B)를 사용한다.

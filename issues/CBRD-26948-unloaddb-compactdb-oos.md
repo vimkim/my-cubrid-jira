@@ -8,7 +8,7 @@
 
 `OOS` (Out-of-row Storage. heap 레코드의 큰 가변 컬럼을 별도 페이지로 분리하고, heap 안에는 그 위치(8바이트 OID)와 길이(8바이트)로 이루어진 16바이트 인라인 스텁(`OR_OOS_INLINE_SIZE`)만 남기는 저장 방식)에서, `unloaddb` 가 큰 컬럼 값을 통째로 잃는 회귀가 있다.
 
-- **현재 동작 / 배경**: #6766 (CBRD-26458, `OOS supports unloaddb`) 은 fetch 공통 경로 `heap_get_record_data_when_all_ready` 에서 OOS 를 **무조건** 펼치게 만들어, `unloaddb` 가 값을 받도록 고쳤다. 이후 #7093 (CBRD-26729) 이 펼침을 opt-in 으로 바꾸면서(`if (!context->expand_oos) return`, `heap_oos.cpp:342`) 호출자들을 `heap_get_visible_version_expand_oos` 로 전환했는데, 형제 경로 `xlocator_lock_and_fetch_all` (`locator_sr.c:12125` 부근)은 전환됐지만 `unloaddb` 가 실제로 쓰는 대량 인스턴스 경로 `xlocator_fetch_all` (`heap_next` 사용, `locator_sr.c:2906`)은 누락됐다. 받는 쪽 디코더 `desc_disk_to_obj` -> `get_desc_current` (`load_object.c`) 는 OOS 를 전혀 모르므로(이 파일에 `oos` 코드 0줄) 펼치지 않은 스텁을 값으로 해석하지 못한다.
+- **현재 동작 / 배경**: #6766 (CBRD-26458, `OOS supports unloaddb`) 은 fetch 공통 경로 `heap_get_record_data_when_all_ready` 에서 OOS 를 **무조건** 펼치게 만들어, `unloaddb` 가 값을 받도록 고쳤다. 이후 #7093 (CBRD-26729) 이 펼침을 opt-in 으로 바꾸면서(`if (!context->expand_oos) return`, `heap_oos.cpp:342`) 호출자들을 `heap_get_visible_version_expand_oos` 로 전환했는데, 형제 경로 `xlocator_lock_and_fetch_all` (`locator_sr.c:12125` 부근)은 전환됐지만 `unloaddb` 가 실제로 쓰는 대량 인스턴스 경로 `xlocator_fetch_all` (`heap_next` 사용, `locator_sr.c:2906`)은 누락됐다. 받는 쪽 디코더 `desc_disk_to_obj` -> `get_desc_current` (`src/loaddb/load_object.c`) 는 OOS 를 전혀 모르므로(이 파일에 `oos` 코드 0줄) 펼치지 않은 스텁을 값으로 해석하지 못한다.
 - **영향**: 데이터 손실(회귀). 실측 결과 OOS 컬럼(`DISK_SIZE` 50008바이트)을 가진 행을 `unloaddb` 하면 그 컬럼이 빈 값 `X''` 로 나온다. 같은 테이블의 비-OOS 행은 정상이라, 백업/이행 시 큰 컬럼만 조용히 통째로 사라진다.
 
 **이슈 수행 방안**:
@@ -20,7 +20,7 @@
 | 값(value) | `unloaddb` 의 `xlocator_fetch_all`, `compactdb` 오프라인 참조정리의 `locator_fetch_all` | 형제 `xlocator_lock_and_fetch_all` 처럼 OOS 를 펼쳐서(expand) 클라이언트에 보낸다 |
 | 물리(physical) | heap 페이지 압축 `spage_compact` (`heap_compact_pages`) | 이 경로를 타지 않으며 OOS 스텁을 그대로 둬야 한다. 변경 금지, 검증 테스트만 |
 
-`compactdb` 오프라인 참조정리는 `unloaddb` 와 같은 `locator_fetch_all` + `desc_disk_to_obj` 경로라 같은 회귀를 공유한다(코드 경로 동일, 별도 실측은 후속). 다시 저장(`disk_update_instance`)까지 하므로 깨진 값이 영구 기록될 수 있어 더 위험하다. 단일 객체 fetch `xlocator_fetch` -> 워크스페이스 디코드 `tf_disk_to_mem` 도 같은 노출 가능성이 있어 확인 후 결정. 정확한 수정 위치 선택은 `TBD - ANALYSIS 단계에서 결정`.
+`compactdb` 오프라인 참조정리는 `unloaddb` 와 같은 `locator_fetch_all` + `desc_disk_to_obj` 경로라 같은 회귀를 공유한다(코드 경로 동일 기반 추론, 별도 실측은 후속). 다시 저장(`disk_update_instance`)까지 하므로 깨진 값이 영구 기록될 수 있어 더 위험하다. 다만 compactdb 는 재저장 의미 때문에 단순 server expand 가 맞는지 자체가 ANALYSIS 대상이다(`unloaddb` 와 수정 방식이 다를 수 있다). 단일 객체 fetch `xlocator_fetch` -> 워크스페이스 디코드 `tf_disk_to_mem` 도 같은 노출 가능성이 있어 확인 후 결정. 정확한 수정 위치 선택은 `TBD - ANALYSIS 단계에서 결정`.
 
 사용자 인용: "unloaddb focuses on reading the values ... so OOS OIDs must disappear before network send, while compactdb tries to compact the heap page so it must know the exact size of recdes, without OOS OIDs replaced to value".
 
@@ -54,7 +54,7 @@
 
 ```
 a8a192f33  #6766 [CBRD-26458] OOS supports unloaddb: client receives OOS values instead of raw OOS OIDs
-            -> heap_get_record_data_when_all_ready 에서 OOS 를 무조건 펼침. unloaddb 정상 동작.
+            -> heap_get_record_data_when_all_ready 에서 OOS 를 무조건 펼침 (커밋 의도상 unloaddb 가 값을 받게 됨; a8a192f33 시점 실측은 미수행).
 
 4a6805e37  #7093 [CBRD-26729] Re-enable OOS OID replacement without class repr
             -> 펼침을 opt-in 으로 변경 (heap_oos.cpp: if (!context->expand_oos) return).
@@ -75,8 +75,8 @@ a8a192f33  #6766 [CBRD-26458] OOS supports unloaddb: client receives OOS values 
 
 [heap 압축 경로 = 물리 구조: 그대로 둬야 하고, 실제로 그대로 둔다 (정상)]
 
- xboot_heap_compact (boot_sr.c:5851) -> heap_compact_pages (heap_file.c:18341)
-        -> spage_compact (heap_file.c:18421)
+ xboot_heap_compact (boot_sr.c:5851) -> heap_compact_pages (heap_file.c:18339)
+        -> spage_compact (heap_file.c:18419)
            [ok] 페이지 안에서 레코드 바이트를 통째로 옮김. 값 해석 안 함, OOS 파일 안 건드림
 ```
 
@@ -87,7 +87,7 @@ a8a192f33  #6766 [CBRD-26458] OOS supports unloaddb: client receives OOS values 
 ### Repro
 
 ```sql
--- 1) 비-OOS 대조행(id=1)과 OOS 행(id=2) 삽입. id=2 는 demotion 임계치(heap_file.c:12206 의 DB_PAGESIZE/4)를 넘겨 OOS 로 분리된다.
+-- 1) 비-OOS 대조행(id=1)과 OOS 행(id=2) 삽입. id=2 는 demotion 임계치(heap_file.c:12206 의 DB_PAGESIZE/4, 기본 16K 페이지 기준 4096바이트)를 넘겨 OOS 로 분리된다.
 csql -S -c "CREATE TABLE t (id INT PRIMARY KEY, big BIT VARYING); INSERT INTO t VALUES (1, REPEAT(X'CD', 10)); INSERT INTO t VALUES (2, REPEAT(X'AB', 50000)); COMMIT;" testdb
 
 -- 2) 저장 크기 확인: id=2 의 DISK_SIZE 가 임계치를 크게 넘는다 (실측 50008바이트)

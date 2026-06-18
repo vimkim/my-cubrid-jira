@@ -21,9 +21,9 @@ upload:
 upload-file file:
     bash cubrid-jira-upload.sh {{file}}
 
-# Live-preview the notes in a browser (markserv on http://localhost:8000).
+# Live-preview the notes in a browser (markserv on http://0.0.0.0:8000 — reachable from other machines on the LAN).
 serve:
-    markserv . --port 8000 --browser false
+    markserv . --address 0.0.0.0 --port 8000 --browser false
 
 # List local issue files, newest first.
 list:

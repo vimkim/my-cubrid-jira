@@ -77,13 +77,15 @@ ALTER TABLE t MODIFY logs    BIT VARYING   STORAGE PREFER_INLINE;
 
 - 옵션을 생략하면 `STORAGE DEFAULT` 와 동일하다.
 - `STORAGE` 와 `PREFER_INLINE` 은 새 비예약(non-reserved) 키워드로 추가한다. `storage` 를 이미 식별자(테이블·컬럼명)로 쓰고 있던 스키마가 깨지지 않도록, `identifier` 규칙에 echo 항목을 넣는다. `DEFAULT` 는 이미 예약어이므로 그 토큰을 재사용한다.
-- 고정 길이 컬럼(예: `CHAR`, `INT`)에 지정하더라도 OOS 대상이 아니라서 효과가 없다. 이때는 에러 없이 허용하고 플래그만 저장한다(PostgreSQL 도 이 경우 무시한다). demotion 후보는 가변 컬럼뿐이므로 저장된 플래그는 사용되지 않다가, 나중에 ALTER 로 가변 타입으로 바뀌면 자연스럽게 적용된다.
+- **OOS 대상이 아닌 컬럼에는 에러로 거부한다**(2026-06-18 결정). PostgreSQL 은 이 경우 조용히 무시하지만, CUBRID 는 힌트가 무의미한 자리에 붙는 것을 명시적으로 막는다. 거부 기준은 "값이 OOS 로 빠질 수 있는 컬럼인가" 이고, 정확한 술어는 `pr_is_variable_type()`(런타임 demote 가 보는 `OR_ATTRIBUTE.is_fixed` 와 동일 기준)다.
+  - **주의 — `CHAR` 는 이제 가변 타입이다.** `CBRD-26663`(CHAR/VARCHAR 가변 길이 통합) 이후 `tp_Char.variable_p = 1` 이므로 `CHAR`/`VARCHAR`/`BIT VARYING`/`STRING` 등 가변 타입은 **허용**되고, `INT`·`NUMERIC`·`DATE` 같은 진짜 고정 타입에만 에러를 낸다. (예전 스펙의 "고정 길이 컬럼 예: `CHAR`" 서술은 폐기 — `CHAR` 는 고정이 아니다.)
+  - 뷰(VCLASS)의 컬럼에 지정하면 거부한다 — 뷰는 heap/OOS 저장 자체가 없다. `INVISIBLE` 이 뷰에서 `MSGCAT_SEMANTIC_VCLASS_ATT_CANT_SET_VISIBILITY` 로 막는 것과 같은 정책(`semantic_check.c:4894`, `:8722`)을 따른다.
 
 ### ALTER 의 적용 시점 (중요 - 사용자 가시 동작)
 
 `ALTER ... STORAGE PREFER_INLINE` 은 **그 이후의 INSERT/UPDATE 부터** 적용된다. 이미 OOS 로 나가 있는 기존 값은 ALTER 만으로는 인라인으로 되돌아오지 않는다. 이는 PostgreSQL 의 `SET STORAGE` 와 같은 동작이다. 기존 데이터를 곧바로 재배치하려면 해당 행을 다시 쓰거나 테이블을 재구성해야 한다(소급 재배치는 후속 이슈로 다룬다).
 
-`ALTER ... MODIFY` 에서 `STORAGE` 절을 **생략하면 기존 힌트가 그대로 보존된다**(DEFAULT 로 초기화되지 않는다). PT 계층은 3상태 enum(UNSET/DEFAULT/PREFER_INLINE)을 사용해서, UNSET(절 생략)일 때는 기존 플래그를 유지한다. 이는 `INVISIBLE` 의 UNSET 보존 처리(`semantic_check.c:4894`, `:8722`)와 같은 방식이다. 힌트를 명시적으로 되돌리려면 `STORAGE DEFAULT` 를 적으면 된다.
+`ALTER ... MODIFY` 에서 `STORAGE` 절을 **생략하면 기존 힌트가 그대로 보존된다**(DEFAULT 로 초기화되지 않는다). PT 계층은 3상태 enum(UNSET/DEFAULT/PREFER_INLINE)을 사용해서, UNSET(절 생략)일 때는 기존 플래그를 유지한다. 보존 처리는 `build_attr_change_map` 이 담당한다 — UNSET 을 `ATT_CHG_PROPERTY_UNCHANGED` 로 표시하면 `do_change_att_schema_only` 가 `found_att->flags` 의 기존 비트를 건드리지 않는다(`INVISIBLE` 과 동일한 change-map 방식). 힌트를 명시적으로 되돌리려면 `STORAGE DEFAULT` 를 적으면 된다. (`semantic_check.c:4894/:8722` 은 보존이 아니라 뒤에서 설명하는 **VCLASS 거부** 지점이다.)
 
 ### 스키마 덤프 라운드트립
 
@@ -122,7 +124,7 @@ ALTER TABLE t MODIFY logs    BIT VARYING   STORAGE PREFER_INLINE;
 | `src/parser/csql_lexer.l` | **필수**: 키워드 토큰화 규칙 추가. 렉서의 일반 식별자 규칙은 무조건 `IdName` 을 반환하므로, 키워드는 키워드별 flex 규칙(`[sS][tT][oO][rR][aA][gG][eE] { ...; return STORAGE; }`)이 있어야 토큰이 만들어진다. `INVISIBLE` 규칙(`[iI][nN][vV]...`)을 본떠 `STORAGE`/`PREFER_INLINE` 규칙을 추가하고, `<cptr>` 토큰이므로 `csql_yylval.cptr = pt_makename(yytext)` 를 설정한다. 이 규칙을 빠뜨리면 문법과 keyword.c 가 맞아도 `STORAGE` 가 식별자로 렉싱되어 파싱이 실패한다. |
 | `src/parser/parse_tree.h` | `PT_ATTR_STORAGE_SETTING` enum (UNSET/DEFAULT/PREFER_INLINE) 추가. `pt_attr_def_info`(:1927) 에 `attr_storage:2` 비트필드 추가 (`attr_invisible:2` (:1938) 와 동일 패턴, 기본값 UNSET). |
 | `src/parser/parse_tree_cl.c` | `pt_print_attr_def`(함수 시작 :6715, INVISIBLE 출력 블록 :6851 옆)에 PREFER_INLINE 출력 블록 추가 (라운드트립 필수). |
-| `src/parser/semantic_check.c` | 검증 + MODIFY/CHANGE 시 UNSET 보존 처리 (`attr_invisible` 의 :4894 / :8722 UNSET 처리 패턴을 따름). |
+| `src/parser/semantic_check.c` | **검증(신규 — 현재 미구현 갭)**: (a) 뷰(VCLASS) 컬럼 지정 거부, (b) `pr_is_variable_type()` 이 아닌 고정 타입 컬럼 지정 거부, (c) `STORAGE` 뒤에 `DEFAULT`/`PREFER_INLINE` 외 토큰(PG 의 PLAIN/EXTERNAL/EXTENDED/MAIN 등)이 올 때 읽기 쉬운 에러. `:4894`/`:8722` 는 `INVISIBLE` 의 **VCLASS 거부** 선례다(예전 표기 "UNSET 보존" 은 오기 — UNSET 보존은 `build_attr_change_map` 담당). |
 | `src/storage/storage_common.h` | `SM_ATTFLAG_OOS_PREFER_INLINE = 4096` 추가 (:1086 다음, 현재 최대 `SM_ATTFLAG_INVISIBLE_COLUMN = 2048`). |
 | `src/query/execute_schema.c` | PT `attr_storage` 값을 `att->flags |= SM_ATTFLAG_OOS_PREFER_INLINE` 로 반영 (INVISIBLE 의 :8192 / ALTER 경로 :11685-11689 패턴). |
 | `src/object/class_object.c` | 필요 시 플래그 복사 경로 보강 (INVISIBLE 의 :6614 패턴). |
@@ -190,18 +192,20 @@ demote 루프(`:12140-12151`)와 후보 자격 필터(`:12129`)는 그대로 둔
   ```
 - [ ] **soft 불변식**: PREFER_INLINE 컬럼만 남아 레코드가 페이지에 맞지 않으면, 그 컬럼도 결국 OOS 로 demote 되어 INSERT 가 실패하지 않는다.
 - [ ] **회귀 없음**: 플래그를 설정하지 않으면(기존 테이블 / `STORAGE DEFAULT`) demotion 결과가 현행과 동일하다(크기가 같은 컬럼의 demote 순서까지 — 위 idx tiebreak 참고).
-- [ ] 고정 길이 컬럼에 `STORAGE PREFER_INLINE` 을 지정하면 에러 없이 허용되고, 플래그는 저장되지만 demotion 에는 영향을 주지 않는다.
+- [ ] **고정 타입 거부**: 진짜 고정 타입 컬럼(예: `INT`)에 `STORAGE PREFER_INLINE` 을 지정하면 에러로 거부된다. 단, `CHAR` 는 `CBRD-26663` 이후 가변 타입이므로 **허용**된다(거부 기준 = `!pr_is_variable_type()`).
+- [ ] **뷰 거부**: 뷰(VCLASS) 컬럼에 지정하면 `INVISIBLE` 과 같은 방식으로 거부된다.
+- [ ] **미지원 STORAGE 값**: `STORAGE EXTENDED` 등 PG 토큰은 맨몸 `syntax error` 가 아니라 "`DEFAULT`/`PREFER_INLINE` 만 지원" 을 알려 주는 읽기 쉬운 에러를 낸다.
 
 ## Definition of done
 
 - [ ] 위 Acceptance Criteria 를 모두 충족한다.
 - [ ] 기존 OOS 회귀 테스트(insert/select/update/delete, 크래시 복구, 복제)를 통과한다.
 - [ ] QA 를 통과한다.
-- [ ] SQL 매뉴얼에 `STORAGE` 컬럼 옵션과 ALTER 적용 시점 주의사항을 반영한다.
+- [ ] SQL 매뉴얼에 `STORAGE` 컬럼 옵션과 ALTER 적용 시점 주의사항을 반영한다. 특히 **PG 와의 차이**를 명시한다: CUBRID `STORAGE` 는 OOS demote 우선순위만 제어하며, PG 의 PLAIN/EXTERNAL/EXTENDED/MAIN 이나 압축 의미는 없고 지원 값은 `DEFAULT`/`PREFER_INLINE` 뿐이다.
 
 ## Open Questions
 
-1. **catalog `_db_attribute.flags` 노출 여부**: 런타임 기능에는 필요 없다. 다만 사용자가 `_db_attribute` 에서 이 힌트를 조회할 수 있게 하려면, `catcls_filter_attflag`(`src/storage/catalog_class.c:5846`, INVISIBLE 매핑은 :5851)에 새 매핑을 추가하고 `DB_ATTRIBUTE_OPTION_TYPE`(`src/compat/dbtype_def.h:481-486`)에 `DB_ATTOPT_OOS_PREFER_INLINE` 멤버를 추가해야 한다. 플래그 기본값이 0 이라서 기존 행과 DEFAULT 컬럼의 `_db_attribute.flags` 는 그대로 유지되므로(QA 카탈로그 단언을 작성할 때 참고), 노출하지 않아도 회귀는 생기지 않는다. 선택 사항이다. `TBD — 합의 미확인`.
+1. **catalog `_db_attribute.flags` 노출 여부**: 런타임 기능에는 필요 없다. 다만 사용자가 `_db_attribute` 에서 이 힌트를 조회할 수 있게 하려면, `catcls_filter_attflag`(`src/storage/catalog_class.c:5846`, INVISIBLE 매핑은 :5851)에 새 매핑을 추가하고 `DB_ATTRIBUTE_OPTION_TYPE`(`src/compat/dbtype_def.h:481-486`)에 `DB_ATTOPT_OOS_PREFER_INLINE` 멤버를 추가해야 한다. 플래그 기본값이 0 이라서 기존 행과 DEFAULT 컬럼의 `_db_attribute.flags` 는 그대로 유지되므로(QA 카탈로그 단언을 작성할 때 참고), 노출하지 않아도 회귀는 생기지 않는다. **결정(2026-06-18): 이번 범위에서는 노출하지 않는다(defer).** `SHOW CREATE TABLE` 라운드트립으로 힌트가 보존되고, QA 의 배치(placement) 검증은 `oos.log` 를 쓰므로(CBRD-26871) 카탈로그 노출이 없어도 충분하다. 플래그 기본값 0 이라 나중에 무중단으로 추가 가능 — 필요해지면 위 매핑을 더한다.
 
 ## 참고 코드
 

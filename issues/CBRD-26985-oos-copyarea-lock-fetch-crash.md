@@ -149,7 +149,12 @@ at log_lsa=(47149, 16240), rcv = {mvccid=27691, vpid=(0, 29057), offset = 3, dat
 
 ### 구현 방향
 
-공통 계산은 helper 로 둔다.
+공통 동작은 helper 두 개로 둔다.
+
+| helper | 역할 |
+|--------|------|
+| `locator_copyarea_prepare_fetch_recdes` | 현재 offset 기준 copyarea slot 과 남은 payload 크기를 계산하고, fetch 직전에 `recdes.data` / `recdes.area_size` 를 그 slot 으로 맞춘다. |
+| `locator_copyarea_pack_fetch_recdes` | fetch 결과가 현재 slot 에 들어가는지 확인하고, `recdes.data` 가 scan cache 등 copyarea 밖이면 descriptor publish 전에 copyarea 로 복사한다. |
 
 ```text
 copyarea->length

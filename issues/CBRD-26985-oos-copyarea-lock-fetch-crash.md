@@ -1,20 +1,19 @@
-# [OOS] copyarea fetch 경로가 OOS expand 후 record 위치를 잘못 publish 해 crash
+# [OOS] caller-owned heap fetch buffer 가 scan cache 로 바뀌어 copyarea fetch 가 crash
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS expand 가 필요한 대량 fetch 경로에서 `LC_COPYAREA` descriptor 가 항상 실제 record bytes 를 가리키도록 고친다. `ALTER TABLE ... CHANGE` domain upgrade 중 서버가 죽고, 이후 SQL runner 가 깨진 DB 에 재접속을 반복하는 cascade 를 차단한다.
+**이슈 수행 목적**: OOS expand 가 필요한 heap fetch 에서 caller 가 지정한 `RECDES.data` buffer 소유권을 보존한다. `LC_COPYAREA` descriptor 가 실제 record bytes 를 계속 가리키게 하여 `ALTER TABLE ... CHANGE` domain upgrade 중 crash 와 후속 DB recovery 실패를 막는다.
 
 **이슈 수행 이유**:
 
-- **현재 동작 / 배경**: `feat/oos` 는 raw record 를 클라이언트/상위 계층으로 보내는 locator fetch 경로를 `heap_next_expand_oos` / `heap_get_visible_version_expand_oos` 로 바꿨다. 이 fetch 는 OOS expand, `REC_BIGONE`, MVCC undo 복원처럼 record 를 조립해야 하는 경우 `recdes.data` 를 caller buffer 가 아니라 heap scan cache 로 rebind 할 수 있다. 기존 locator packing 루프는 `recdes.data` 가 계속 copyarea 내부라고 가정해 descriptor `offset` 을 기록한다.
-- **영향**: QA 실패. `function_index_skip_alter_table.sql` 의 `alter table t change i a int` 에서 `xlocator_lock_and_fetch_all` 이 copyarea descriptor 와 실제 bytes 의 buffer 기준을 어긋나게 만들고 `SIGSEGV` 로 종료한다. follow-on `function_index_skip_bit.sql` 의 접속 실패와 recovery fatal 은 같은 DB 가 이미 깨진 뒤의 2차 증상이다.
+- **현재 동작 / 배경**: `xlocator_lock_and_fetch_all` 은 `LC_RECDES_IN_COPYAREA` 로 `RECDES.data` 를 copyarea payload slot 에 맞춘 뒤, 각 object 마다 `recdes.data += DB_ALIGN(recdes.length, MAX_ALIGNMENT)` 및 `recdes.area_size -= round_length + sizeof(*obj)` 로 다음 slot 을 준비한다. 기존 `heap_init_get_context` 는 `recdes->area_size >= 0` 일 때만 이 buffer 를 caller-owned 로 보았으므로, copyarea 여유 공간이 소진된 순간 OOS expand heap fetch 가 `recdes.data` 를 heap scan cache 로 rebind 할 수 있었다.
+- **영향**: QA 실패. `function_index_skip_alter_table.sql` 의 `alter table t change i a int` 에서 descriptor `offset` 은 copyarea 기준으로 publish 되지만 실제 bytes 는 scan cache 에 남아 `SIGSEGV` 로 종료한다. 뒤따른 `function_index_skip_bit.sql` 의 접속 실패와 recovery fatal 은 같은 DB 가 이미 깨진 뒤의 2차 증상이다.
 
 **이슈 수행 방안**:
 
-- 각 fetch 직전에 남은 copyarea payload 크기를 다시 계산하고, `recdes.data` / `recdes.area_size` 를 현재 slot 으로 재설정한다.
-- fetch 성공 후 `recdes.data` 가 scan cache 등 copyarea 밖으로 rebind 됐으면 descriptor 를 만들기 전에 record bytes 를 현재 copyarea slot 으로 복사한다.
-- 현재 slot 에 record 가 안 들어가면 `S_DOESNT_FIT` 으로 기존 copyarea grow/retry 흐름을 탄다. 첫 object 를 이미 읽은 뒤 부족함을 알게 된 경우에는 OID 를 직전 값으로 되돌려 같은 object 를 더 큰 copyarea 에 다시 fetch 한다.
-- 같은 copyarea packing 계약을 쓰는 `xlocator_fetch_all` 도 동일하게 보정한다. `xlocator_lock_and_fetch_all` 만 고치면 `unloaddb` / `compactdb` 대량 fetch 계열에 같은 rebind 위험이 남는다.
+- `heap_init_get_context` 의 `keep_recdes_buffer` 판정에서 `recdes->area_size >= 0` 조건을 제거한다. caller 가 위치시킨 non-scan-cache `RECDES.data` 는 남은 writable area 가 0 이하가 되어도 caller-owned 로 유지한다.
+- `heap_scancache::is_recdes_assigned_to_area` 는 scan-cache 시작 주소만 비교하지 않고, scan-cache block 내부 전체 범위를 검사한다. scan-cache pointer 가 record 단위로 전진한 뒤에도 scan-cache-owned 로 판정되게 한다.
+- heap 은 caller-owned buffer 가 부족할 때 scan cache 로 성공 rebind 하지 않고 `S_DOESNT_FIT` 을 노출한다. 기존 locator copyarea grow/retry 흐름이 같은 object 를 더 큰 copyarea 로 다시 fetch 한다.
 
 ---
 
@@ -24,7 +23,7 @@
 
 ### Summary
 
-- **변경 범위 / 영향**: `src/transaction/locator_sr.c` 의 copyarea packing 경로 두 곳(`xlocator_lock_and_fetch_all`, `xlocator_fetch_all`)만 수정한다. SQL 문법, catalog, OOS on-disk layout, WAL format 은 바뀌지 않는다. 기존 PR 문맥은 https://github.com/CUBRID/cubrid/pull/7368 이다.
+- **변경 범위 / 영향**: `src/storage/heap_file.c`, `src/storage/heap_file.h` 의 heap fetch buffer ownership 판정만 수정한다. SQL 문법, catalog, OOS on-disk layout, WAL format, locator copyarea layout 은 바뀌지 않는다. PR 문맥은 https://github.com/CUBRID/cubrid/pull/7368 이다.
 
 ---
 
@@ -32,7 +31,7 @@
 
 ### 한 줄 결론
 
-OOS expand 자체가 잘못된 것이 아니다. heap fetch API 의 정상 계약은 "`recdes.data` 가 caller buffer 를 계속 가리킨다" 가 아니라 "성공한 record 의 위치를 `recdes.data` 로 돌려준다" 이다. locator copyarea packing 코드가 이 계약을 잘못 이해했다.
+OOS expand 자체가 문제는 아니다. 문제는 caller 가 이미 output 위치로 지정한 `RECDES.data` 를 heap 계층이 "scan cache 로 바꿔도 되는 buffer" 로 잘못 분류한 점이다.
 
 ### 실패 호출 흐름
 
@@ -42,48 +41,59 @@ ALTER TABLE ... CHANGE
     -> locator_upgrade_instances_domain
       -> xlocator_upgrade_instances_domain
         -> xlocator_lock_and_fetch_all
-          -> heap_next_expand_oos / heap_get_visible_version_expand_oos
+          -> heap_next / heap_get_visible_version_expand_oos
 ```
 
-`xlocator_lock_and_fetch_all` 은 `LC_COPYAREA` 하나에 record bytes 와 descriptor 를 같이 싣는다.
+`xlocator_lock_and_fetch_all` 은 `LC_COPYAREA` 하나에 record bytes 와 descriptor 를 같이 담는다.
 
 ```text
 copyarea->mem
-  | record bytes 는 위로 자란다
+  | record bytes 는 앞에서 뒤로 증가
   v
   [ rec0 ][ rec1 ][ free space ... ][ obj1 ][ obj0 ][ LC_COPYAREA_MANYOBJS ]
                                       ^
-                                      descriptor 는 아래로 자란다
+                                      descriptor 는 뒤에서 앞으로 증가
 ```
 
-descriptor (`LC_COPYAREA_ONEOBJ`) 의 `offset` 은 `copyarea->mem` 기준이다. 따라서 descriptor 를 publish 하기 전에는 실제 record bytes 가 반드시 copyarea 내부의 해당 offset 에 있어야 한다.
+`LC_COPYAREA_ONEOBJ.offset` 은 `copyarea->mem` 기준 record 시작 위치이다. 따라서 descriptor 를 publish 할 때는 실제 record bytes 가 반드시 `copyarea->mem + offset` 에 있어야 한다.
 
-### OOS branch 에서 깨진 가정
+### 왜 OOS branch 에서만 드러났나
 
-`develop` 의 일반 fetch 는 대개 caller 가 준 `recdes.data` 에 page record 를 복사한다. 그래서 locator 코드는 아래처럼 단순히 pointer 를 전진시켜도 우연히 맞았다.
-
-```text
-fetch into recdes.data
-descriptor.offset = offset
-offset += aligned_length
-recdes.data += aligned_length
-recdes.area_size -= aligned_length + descriptor_size
-```
-
-`feat/oos` 에서는 같은 raw-byte fetch 경로가 OOS expand 를 요청한다. 이때 heap layer 는 inline OOS OID 를 실제 value bytes 로 바꿔 full record 를 조립해야 한다. 조립 결과가 caller slot 에 안 들어가거나, `REC_BIGONE` / MVCC undo 복원처럼 별도 조립이 필요한 경우 heap scan cache 의 `m_area` 에 record 를 만들고 `recdes.data` 를 그쪽으로 돌릴 수 있다.
+`feat/oos` 는 raw record 를 클라이언트나 상위 계층으로 넘기는 일부 fetch 경로에서 inline OOS OID 를 실제 column bytes 로 펼친다. 이 작업은 `heap_next_expand_oos` 또는 `heap_get_visible_version_expand_oos` 아래에서 실행된다.
 
 ```text
 xlocator_lock_and_fetch_all
-  └ heap_get_visible_version_expand_oos
-     └ heap_get_visible_version_internal
-        └ heap_record_replace_oos_oids
-           └ heap_oos_build_record
-              ★ recdes.data = scan_cache.m_area 로 rebind 가능
+  -> heap_get_visible_version_expand_oos
+     -> heap_get_visible_version_internal
+        -> heap_get_record_data_when_all_ready
+           -> heap_record_replace_oos_oids
 ```
 
-문제는 rebind 뒤에도 locator 가 descriptor `offset` 을 copyarea 기준으로 기록한다는 점이다. 실제 bytes 는 scan cache 에 있는데 descriptor 는 copyarea 내부를 가리킨다. 더 나쁘게는 루프 끝의 `recdes.data += round_length` 가 scan cache pointer 를 전진시키므로, 다음 record 부터는 copyarea 가 아니라 scan cache 중간을 caller buffer 처럼 쓰게 된다.
+OOS expand 결과가 caller buffer 에 들어가지 않으면 heap 은 `S_DOESNT_FIT` 을 반환해야 한다. 그러면 locator 는 기존 copyarea grow/retry 로 같은 object 를 더 큰 copyarea 에 다시 읽는다.
 
-core 에서 확인된 값도 이 상태와 맞다.
+pre-fix 에서는 `heap_init_get_context` 가 다음 조건으로 caller-owned 여부를 판단했다.
+
+```text
+recdes != NULL
+&& recdes->data != NULL
+&& recdes->area_size >= 0
+&& recdes->data 가 scan-cache 시작 주소가 아님
+```
+
+copyarea loop 는 object 를 하나 pack 할 때마다 `recdes.area_size` 에서 record payload 와 descriptor 크기를 뺀다. 이 값은 copyarea 의 남은 writable area 이지 buffer 소유권이 아니다. 그러나 pre-fix heap 은 이 값이 0 이하가 되면 caller buffer 가 아니라고 판단했고, 이후 `heap_prepare_recdes_copy_area` 가 `heap_scan_cache_allocate_recdes_data` 를 통해 `recdes.data` 를 scan cache 로 바꿀 수 있었다.
+
+이 상태에서 locator 는 기존처럼 descriptor 를 만든다.
+
+```text
+obj->offset = offset                  copyarea 기준 metadata
+recdes.data = scan_cache.m_area + n    실제 bytes 위치
+```
+
+metadata 와 payload 의 기준 주소가 갈라지므로, 다음 단계가 copyarea descriptor 로 record 를 다시 해석할 때 잘못된 bytes 를 읽는다.
+
+### core 에서 보인 단서
+
+관찰된 core 값은 "큰 OOS value 가 copyarea 를 넘쳤다" 보다 "buffer 기준이 이미 scan cache 로 오염됐다" 에 가깝다.
 
 ```text
 mobjs->num_objs = 532
@@ -93,22 +103,14 @@ recdes.area_size = 8672
 recdes.data = scan_cache.m_area 내부 주소
 ```
 
-32바이트 record 자체가 OOS record 라서 scan cache 로 간 것이 아니다. 앞선 fetch 의 rebind 가 `recdes.data` 기준을 바꿔 놓았고, 이후 작은 record 까지 그 오염된 기준을 물려받은 것이다.
-
-### develop / feat/oos / current 비교
-
-| 코드 기준 | locator fetch 동작 | 판정 |
-|-----------|-------------------|------|
-| `develop` (`a25a6b6d4`) | `xlocator_fetch_all` 은 `heap_next`, `xlocator_lock_and_fetch_all` 은 일반 heap fetch 중심. OOS expand 가 없어서 scan-cache rebind 가 이 경로에 거의 들어오지 않는다. | 잠복 버그에 가깝다. copyarea packing 계약은 약하지만 trigger 가 적다. |
-| `feat/oos` (`53e8d6b9a`) | raw-byte 경로가 `_expand_oos` fetch 로 바뀌었다. 그런데 copyarea slot 재설정, rebind 후 copy, 실제 남은 payload 계산이 없다. | CBRD-26985 원인. OOS 가 heap fetch 의 정상 rebind 경로를 이 루프에 끌어오면서 기존 가정이 깨졌다. |
-| current before 추가 보정 | `xlocator_lock_and_fetch_all` 만 copyarea 재설정/복사로 고쳤다. | `ALTER CHANGE` crash 는 막지만 sibling `xlocator_fetch_all` 에 같은 hazard 가 남는다. |
-| current after 추가 보정 | 두 대량 fetch 경로 모두 같은 copyarea 계약을 따른다. | CBRD-26985 범위에서는 맞다. |
+`recdes.length = 32` 이므로 현재 record 자체가 큰 payload 라서 실패한 것이 아니다. 앞선 fetch 중 `recdes.data` 가 scan cache 로 바뀌었고, locator loop 가 그 pointer 를 계속 전진시키면서 작은 record 도 scan cache 기준으로 pack 하려 한 것이다.
 
 ## Test Build
 
 - 대상 브랜치: `CBRD-26985-infinite-loop`
-- 기준: `feat/oos` 위의 CBRD-26985 수정
-- 원래 재현 기준 커밋: `53e8d6b9a`
+- PR HEAD: `e4db120d3` (`[CBRD-26985] Preserve caller-owned heap fetch buffers`)
+- 기준 브랜치: `feat/oos`
+- 원래 재현 기준: `53e8d6b9a` 부근의 pre-fix `feat/oos`
 - 분석 중 확인한 런타임 버전: `CUBRID 11.5.0.2335-53e8d6b`, 64bit release build
 - 실행 모드: SA mode (standalone, 서버와 클라이언트가 한 프로세스에서 도는 모드)
 - OS: `TBD - 합의 미확인`
@@ -126,7 +128,7 @@ csql -S -u dba -i function_index_skip_bit.sql <db_name>
 alter table t change i a int;
 ```
 
-해당 statement 는 30,000 row 테이블에서 `char` -> `int` domain upgrade 를 수행한다.
+해당 statement 는 30,000 row 테이블에서 `char` 계열 값을 `int` domain 으로 upgrade 하는 경로를 실행한다.
 
 ## Expected Result
 
@@ -147,57 +149,46 @@ at log_lsa=(47149, 16240), rcv = {mvccid=27691, vpid=(0, 29057), offset = 3, dat
 
 ## Additional Information
 
-### 구현 방향
+### 실제 수정 내용
 
-공통 동작은 helper 두 개로 둔다.
-
-| helper | 역할 |
-|--------|------|
-| `locator_copyarea_prepare_fetch_recdes` | 현재 offset 기준 copyarea slot 과 남은 payload 크기를 계산하고, fetch 직전에 `recdes.data` / `recdes.area_size` 를 그 slot 으로 맞춘다. |
-| `locator_copyarea_pack_fetch_recdes` | fetch 결과가 현재 slot 에 들어가는지 확인하고, `recdes.data` 가 scan cache 등 copyarea 밖이면 descriptor publish 전에 copyarea 로 복사한다. |
-
-```text
-copyarea->length
-  - sizeof(LC_COPYAREA_MANYOBJS)
-  - offset
-  - num_objs * sizeof(LC_COPYAREA_ONEOBJ)
-```
-
-각 fetch 반복은 아래 순서를 지킨다.
-
-```text
-1. 현재 offset 기준 copyarea slot 과 남은 payload 크기를 계산한다.
-2. recdes.data / recdes.area_size 를 그 slot 으로 reset 한다.
-3. heap_next_expand_oos 또는 heap_get_visible_version_expand_oos 를 호출한다.
-4. 반환된 length 가 현재 slot 보다 크면 S_DOESNT_FIT 으로 빠진다.
-5. recdes.data 가 현재 slot 이 아니면 bytes 를 copyarea slot 으로 복사한다.
-6. descriptor offset/length 를 publish 한다.
-```
-
-`xlocator_lock_and_fetch_all` 의 lock branch 는 OID 를 얻기 위해 `heap_next` 를 한 번 호출한 뒤 lock 을 잡고 `heap_get_visible_version_expand_oos` 로 다시 읽는다. 두 번째 fetch 직전에도 `recdes` 를 copyarea slot 으로 다시 맞춰야 한다. 첫 fetch 가 `recdes.data` 를 바꿨을 수 있기 때문이다.
-
-`xlocator_fetch_all` 은 lock branch 는 없지만 같은 `LC_COPYAREA` descriptor/payload layout 을 사용하고 `heap_next_expand_oos` 를 호출한다. 따라서 같은 보정이 필요하다.
-
-### 추가 grill 결과
-
-| 항목 | 결론 | 조치 |
+| 파일 | 변경 | 의미 |
 |------|------|------|
-| `xlocator_lock_and_fetch_all` fix | 맞는 방향이다. rebind 후 copyarea 로 복사하고, 공간 부족 시 grow/retry 로 돌리는 것이 heap fetch 계약과 맞다. | CBRD-26985 본문에 유지. |
-| `xlocator_fetch_all` sibling path | 기존 CBRD-26985 패치는 여기까지 확장되지 않아 같은 copyarea rebind 위험이 남았다. `unloaddb` / `compactdb` 대량 fetch 는 이 경로와 연결된다. | 같은 보정 적용. |
-| CircleCI job 133950 의 18 SQL failures | CBRD-26985 copyarea crash 와 다른 실패다. stack 이 `locator_insert_force` 아래 insert path 이고, `heap_insert_adjust_recdes_header` 의 `HEAP ABORT (OOS+REC_BIGONE insert)` 임시 guard 와 맞는다. | CBRD-26937 범위로 분리. CBRD-26985 로 해결됐다고 쓰면 안 된다. |
-| develop 대비 OOS+heap 구현 | `develop` 은 big heap record 에서 `HEAP_MVCC_SET_HEADER_MAXIMUM_SIZE` 만 수행한다. current OOS branch 는 `has_oos && heap_is_big_length(record_size)` 에서 release build 도 `abort()` 한다. 주석도 `REVERT BEFORE MERGE` 라고 명시한다. | 현재 OOS+heap 구현은 잘못된 상태다. OOS 청크 쓰기 전 사용자 에러로 거부하거나, OOS+`REC_BIGONE` ownership/vacuum semantics 를 구현해야 한다. 기존 CBRD-26937 문서가 전자 방향을 제안한다. |
+| `src/storage/heap_file.c` | `heap_init_get_context` 의 `keep_recdes_buffer` 조건에서 `area_size >= 0` 제거 | caller 가 위치시킨 `RECDES.data` 는 남은 공간이 부족해도 caller-owned 이다. 공간 부족은 `S_DOESNT_FIT` 으로 드러나야 한다. |
+| `src/storage/heap_file.c` | `heap_scancache::is_recdes_assigned_to_area` 를 시작 주소 비교에서 block range 비교로 변경 | scan-cache pointer 가 block 중간을 가리켜도 scan-cache-owned 로 판정한다. |
+| `src/storage/heap_file.h` | `keep_recdes_buffer` 주석을 caller-positioned buffer 기준으로 갱신 | field 의미를 "rebind 금지" 보다 "caller 가 위치시킨 buffer 보존" 으로 명확히 한다. |
 
-### 검증 결과
+### 변경 전후 계약
 
-- `git diff --check` 통과
-- `locator_sr.c` server-mode single-file compile 통과
-- `locator_sr.c` SA-mode single-file compile 통과
-- 기존 재현 SQL 은 패치 후 `csql` exit 0 으로 종료했고 core 를 만들지 않았다.
-- `function_index_skip_alter_table.result` 와 line-for-line 으로 일치했다.
-- `function_index_skip_bit.sql` 도 follow-on cascade 없이 통과했다.
+```text
+AS-IS
+  recdes.data != NULL && recdes.area_size >= 0 이면 caller-owned
+  recdes.data == scan_cache.m_area 시작 주소이면 scan-cache-owned
+
+TO-BE
+  recdes.data != NULL 이고 scan-cache block 밖이면 caller-owned
+  recdes.data 가 scan-cache block 내부이면 scan-cache-owned
+```
+
+이 변경으로 heap fetch 의 성공 반환 계약이 분명해진다.
+
+```text
+caller-owned RECDES.data 에 record 가 들어감
+  -> S_SUCCESS, recdes.data 유지
+
+caller-owned RECDES.data 에 record 가 안 들어감
+  -> S_DOESNT_FIT, caller 가 buffer 를 키워 재시도
+
+scan-cache-owned 또는 empty RECDES.data
+  -> heap 이 scan-cache area 를 할당하거나 키울 수 있음
+```
+
+### locator 를 직접 고치지 않는 이유
+
+`xlocator_fetch_all` 과 `xlocator_lock_and_fetch_all` 은 이미 `S_DOESNT_FIT` 일 때 copyarea 를 키워 재시도하는 구조를 갖고 있다. lock fetch 경로는 `heap_get_visible_version_expand_oos` 의 `S_DOESNT_FIT` 에서 `retry_current_oid` 를 세우고 `prev_oid` 로 되돌리는 보정도 갖고 있다.
+
+따라서 이번 수정은 locator 에 새 packing helper 를 넣는 대신 heap 계층의 buffer ownership 판정을 바로잡는다. 그러면 locator 의 기존 copyarea grow/retry 계약이 정상적으로 동작한다.
 
 ### 관련 자료
 
 - 풀 리퀘스트: https://github.com/CUBRID/cubrid/pull/7368
 - 관련 follow-up: CBRD-26937 (`OOS+REC_BIGONE` 임시 abort 제거 / 정식 거부)
-- 관련 OOS fetch 이슈: CBRD-26948 (`xlocator_fetch_all` / unloaddb / compactdb OOS expand)

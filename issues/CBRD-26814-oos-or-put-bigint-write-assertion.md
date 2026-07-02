@@ -1,304 +1,244 @@
-# [OOS] [M2] OOS 컬럼이 여러 개 있는 row 를 INSERT 하면 csql 가 죽는다
+# [OOS] [M2] OOS inline stub 공간 검사 위치 오류로 INSERT 계열 크래시가 발생한다
 
 ## Issue Triage
 
-**이슈 수행 목적**: 큰 OOS 컬럼이 여러 개 들어 있는 row 를 INSERT 할 때 `csql` 가 assertion 으로 죽는 회귀를 고친다. `bigPageSize.sh` 의 `init.sql` 이 256 row 를 모두 INSERT 할 수 있어야 한다.
+**이슈 수행 목적**: OOS inline stub을 heap record에 쓸 때 실제 쓰기 위치 기준으로 공간을 검사하도록 고친다. `bigPageSize.sh` 와 `bug_xdbms3693.sh` 가 `or_put_bigint` 또는 `or_put_oid` assert 없이 INSERT 경로를 통과해야 한다.
 
 **이슈 수행 이유**:
 
-- **현재 동작 / 배경**: INSERT 가 row 를 disk 포맷으로 변환하는 단계 (`heap_attrinfo_transform_variable_to_disk`, `heap_file.c:13009-13018`) 의 OOS 분기는 한 OOS 컬럼마다 18 바이트 (`OR_OOS_INLINE_SIZE = OR_OID_SIZE + OR_BIGINT_SIZE`) 의 메타데이터를 record buffer 에 적는다. 그런데 buffer 공간이 충분한지 체크하는 위치와 실제로 쓰는 위치가 다르다. 체크는 offset table 영역에서 하고, 쓰기는 값 영역으로 점프해서 한다. 둘 다 같은 buffer 안이지만 위치가 다르다.
-- **영향**: LOB/ELO 클러스터 회귀 9 건 (CBRD-26660) 의 머지 게이트가 막힌다. `bigPageSize.sh` 의 `init.sql` 첫 INSERT 에서 SIGABRT 가 나서 row 가 0 개 들어가고, 그 뒤의 unloaddb / loaddb 도 빈 입력으로 실패한다. 자매 회귀 CBRD-26813 (READ 측 fix) 도 데이터가 없으니 검증 불가.
+| 구분 | 내용 |
+|------|------|
+| **AS-IS (현재 동작 / 배경)** | OOS Demotion이 발생한 row를 disk format으로 만들 때 16바이트 inline stub의 공간 검사를 record 앞쪽 cursor 기준으로 수행한다. `bigPageSize.sh` 는 `or_put_bigint`, `bug_xdbms3693.sh` 는 `or_put_oid` 에서 debug assert로 서버가 종료된다. |
+| **TO-BE (목표 상태 / 기대 동작)** | inline stub이 실제로 기록되는 variable value area 기준으로 16바이트 여유를 확인하고, 부족하면 `S_DOESNT_FIT` 을 반환해 기존 resize-and-retry 흐름으로 복구한다. |
+| **영향** | QA 실패 - OOS M2 manual run에서 `bug_xdbms3693` 서버 core가 발생하고, release 빌드에서는 같은 out-of-bounds write가 assert 없이 heap 메모리를 오염시킬 수 있다. |
 
-**이슈 수행 방안**:
-
-- **수정 위치**: `heap_file.c:13013` 의 bounds check `buf->ptr + OR_OOS_INLINE_SIZE > buf->endptr` 를 실제 쓰기 위치 기준 (`*ptr_varvals + OR_OOS_INLINE_SIZE > buf->endptr`) 으로 바꾸거나, `buf->ptr = *ptr_varvals` 점프 직후에 같은 체크를 한 번 더 둔다.
-- **흐름 합류**: 체크가 정확해지면 buffer 가 부족할 때 `S_DOESNT_FIT` 가 반환되고, 호출자 `locator_allocate_copy_area_by_attr_info` (`locator_sr.c:7486`) 가 더 큰 buffer 로 재시도하는 기존 로직이 정상 작동한다.
-- **검증 기준**: `csql -udba -S -i init.sql tdb1` 가 SIGABRT 없이 256 row 를 모두 INSERT 한다. CBRD-26813 패치와 함께 `bigPageSize.sh` 가 OK 로 통과하는지 확인.
-- **TBD**:
-    - bounds check 의 정확한 식이 `buf->endptr` 기준이 맞는지 `buf->buffer + buffer_size` 기준이 맞는지: `TBD - ANALYSIS 단계에서 결정`.
-    - 단위 테스트로 쓸 최소 repro (현재는 `init.sql` 전체가 필요한데, OOS 컬럼 2-3 개짜리 작은 schema 로 좁히는 게 첫 작업): `TBD - ANALYSIS 단계에서 결정`.
+**이슈 수행 방안**: `heap_attrinfo_transform_variable_to_disk` 의 OOS 분기에서 `OR_OOS_INLINE_SIZE` 검사 기준을 `buf->ptr` 가 아니라 `*ptr_varvals` 로 바꾼다. `bigPageSize.sh` 기존 재현과 `bug_xdbms3693.sh` manual 재현을 모두 회귀 검증에 포함한다. BLOB/CLOB locator를 OOS 후보에서 제외할지는 이번 bounds-check 필수 수정과 분리된 storage policy 판단이므로 `TBD - 합의 미확인` 으로 둔다.
 
 ---
 
 ## AI-Generated Context
 
-> 아래 내용은 AI 가 코드와 gdb 스택을 대조해 작성한 자료다. 빠른 triage 에는 위 **Issue Triage** 블록만 보면 충분하다.
+> 아래는 AI 가 코드와 로컬 분석 자료를 대조해 작성한 상세 자료다. 빠른 triage 에는 위 Issue Triage 블록만으로 충분하며, 본문은 구현/리뷰 단계에서 참고하면 된다.
 
-### Summary
+### 요약
 
-- **문제**: INSERT 의 disk transform 단계에서 OOS 분기의 buffer 공간 체크가 잘못된 위치에서 일어나, 실제 쓰기 위치에서 buffer 가 부족할 때 assertion 으로 죽는다.
-- **배경**: OOS 컬럼은 row 안에 실제 값 대신 18 바이트짜리 포인터(OOS OID 10 + 길이 8) 만 남긴다. 여러 OOS 컬럼이 한 row 에 들어가면 그 18 바이트들이 누적돼서 어느 순간 buffer 끝을 넘는다.
-- **변경**: bounds check 위치를 실제 쓰기 위치(`*ptr_varvals`) 기준으로 옮긴다. `S_DOESNT_FIT` 가 반환되면 호출자가 더 큰 buffer 로 재시도하는 기존 흐름과 합류.
-- **영향 범위**: OOS-eligible 컬럼이 들어 있는 모든 INSERT/UPDATE. LOB/ELO 클러스터 회귀 9 건의 첫 단계 차단 원인일 가능성이 높다.
-
----
+- **변경 범위 / 영향**: 핵심 수정 파일은 `src/storage/heap_file.c` 다. `src/base/object_representation.h` 의 OOS inline layout 정의와 debug assert는 참조 대상이며, on-disk format 자체는 바꾸지 않는다.
+- **호환성**: heap record 안의 OOS inline stub은 계속 `OR_OOS_INLINE_SIZE` 16바이트를 사용한다. WAL(Write-Ahead Logging) format, OOS file format, replication log format 변경은 필요하지 않다.
+- **검증 표면**: INSERT, INSERT ... SELECT, UPDATE처럼 `heap_attrinfo_transform_variable_to_disk` 를 거쳐 OOS inline stub을 쓰는 경로가 대상이다.
 
 ## Description
 
-### 버그를 쉬운 말로
-
-INSERT 가 disk 에 row 를 쓰기 직전에, CUBRID 는 row 를 record buffer 에 한 번 직렬화한다. row 의 가변 컬럼 (varchar, JSON, BLOB 같은 것들) 은 두 곳에 나눠 적힌다:
-
-1. **offset table 영역**: 각 컬럼이 buffer 의 어디서 시작하는지 알려주는 작은 표.
-2. **값 영역**: 컬럼의 실제 byte 들.
-
-OOS 컬럼은 (1) 의 offset table 에는 평소처럼 짧은 entry 만 두지만, (2) 의 값 영역에는 실제 데이터 대신 18 바이트짜리 포인터 (`OOS OID 10 바이트 + 길이 8 바이트`) 를 남긴다. 진짜 값은 OOS file 에 따로 저장돼 있다.
-
-이번 버그는 이 18 바이트를 값 영역에 적기 직전의 공간 체크가 잘못된 위치에서 일어난다는 점이다. 비유하자면, 노트의 두 섹션 중 **앞 섹션에 18 페이지 여유가 있는지** 확인한 다음 정작 **뒷 섹션에 18 페이지를 적는** 셈이다. 앞 섹션은 여유가 있지만 뒷 섹션은 이미 끝에 와 있으면 글이 노트 밖으로 빠져 나간다.
-
-### 코드 위치
-
-`src/storage/heap_file.c:13009-13018` (`heap_attrinfo_transform_variable_to_disk` 안의 OOS 분기):
-
-```c
-if (is_oos)
-{
-  /* (A) 공간 체크 — 그런데 buf->ptr 는 offset table 영역의 현재 위치다 */
-  if (buf->ptr + OR_OOS_INLINE_SIZE > buf->endptr)
-    {
-      return S_DOESNT_FIT;
-    }
-
-  /* (B) 값 영역으로 점프 — 같은 buffer 안의 다른 위치 */
-  buf->ptr = *ptr_varvals;
-
-  /* (C) OOS OID 를 쓴다 (10 바이트) */
-  or_put_oid (buf, oos_oid);
-
-  /* (D) OOS 길이를 쓴다 (8 바이트) — buffer 끝을 넘으면 여기서 죽는다 */
-  or_put_bigint (buf, oos_length);
-
-  *ptr_varvals = buf->ptr;
-}
-```
-
-(A) 의 체크가 통과한 뒤 (B) 가 `buf->ptr` 을 다른 위치로 옮긴다. 그 새 위치에서 18 바이트가 들어갈 공간이 있는지는 다시 확인하지 않는다. 그 결과 (D) 의 `or_put_bigint` 가 `buf->ptr + OR_BIGINT_SIZE <= buf->endptr` assertion 에서 죽는다.
-
-### 왜 컬럼이 여럿이어야 발동하나
-
-OOS 컬럼이 하나뿐이면 18 바이트 한 번만 쓰면 끝이라 buffer 가 충분하기 쉽다. 그러나 OOS 컬럼이 둘, 셋, 그 이상이면 매 OOS 컬럼마다 18 바이트씩 값 영역에 누적된다. 어느 순간 `*ptr_varvals` 가 `buf->endptr` 근처에 닿고, 다음 OOS 컬럼의 18 바이트가 buffer 밖으로 비어져 나간다.
-
-`bigPageSize` 의 schema 는 OOS 임계치를 넘는 컬럼이 5 개 이상 (`c2 varchar(10757)`, `c3 string`, `cl clob`, `bl blob`, `j json`) 이라 이 버그가 첫 INSERT 부터 바로 터진다.
-
-### 호출자 retry 흐름과의 관계
-
-(A) 가 `S_DOESNT_FIT` 를 반환하면 호출자 `locator_allocate_copy_area_by_attr_info` (`locator_sr.c:7486`) 가 더 큰 copyarea 를 받아 retry 한다. 이 흐름은 이미 잘 짜여 있다. 본 회귀는 그 retry 가 발동돼야 할 자리에서 assertion 으로 죽는 것이 핵심이다 — 체크 위치만 정확해지면 retry 흐름으로 자연스럽게 합류한다.
-
-### gdb 스택 (debug build, `8d7b97a` + CBRD-26813 패치 상태)
+OOS (Out-of-row Storage - heap의 큰 가변 컬럼을 OOS file로 분리하고 heap record에는 OOS OID와 길이만 남기는 저장 방식)는 write 시점에 큰 가변 컬럼을 OOS record로 보낸다. heap record 안에는 원래 값 대신 16바이트 inline stub이 남는다.
 
 ```
-#0  or_put_bigint                            object_representation.h:1745
-       buf=0x7fffffff4b40, num=1096
-#1  heap_attrinfo_transform_variable_to_disk heap_file.c:13017
-       is_oos=true, oos_oid=0x4ad9ae8, oos_length=1096, index=25,
-       offset_size=2, header_size=16
-#2  heap_attrinfo_transform_columns_to_disk  heap_file.c:13129
-#3  heap_attrinfo_transform_to_disk_internal heap_file.c:13271
-#4  heap_attrinfo_transform_to_disk          heap_file.c:12726
-#5  locator_allocate_copy_area_by_attr_info  locator_sr.c:7486
-#6  locator_attribute_info_force             locator_sr.c:7668
-#7  qexec_execute_insert                     query_executor.c:13047
-...
-#19 do_execute_insert                        execute_statement.c:14075
-#23 csql_execute_statements                  csql.c:2295
+OOS inline stub
+  OOS OID        8 bytes
+  full_length    8 bytes
+  ----------------------
+  total          16 bytes = OR_OOS_INLINE_SIZE
 ```
 
-`oos_length=1096`, `index=25` (25 번째 컬럼) — schema 의 마지막 즈음 OOS 컬럼이 들어가는 시점에 발동.
+heap record builder는 가변 컬럼 하나를 쓸 때 두 위치를 오간다.
+
+| cursor | 의미 |
+|--------|------|
+| `buf->ptr` | 현재 작업 cursor다. VOT(Variable Offset Table - 가변 컬럼의 시작 offset 표)를 쓸 때는 record 앞쪽을 가리키고, 값을 쓸 때는 뒤쪽으로 이동한다. |
+| `*ptr_varvals` | variable value area 전용 cursor다. 다음 가변 값 또는 OOS inline stub이 실제로 기록될 위치를 가리킨다. |
+
+현재 OOS 분기는 VOT entry를 쓴 직후의 `buf->ptr` 로 16바이트 여유를 검사한다. 이때 `buf->ptr` 은 record 앞쪽 VOT 근처에 남아 있다. 그 다음에야 `buf->ptr = *ptr_varvals` 로 실제 값 영역으로 이동하고 `or_put_oid`, `or_put_bigint` 를 호출한다.
+
+```
+heap_attrinfo_transform_variable_to_disk
+
+  [1] buf->ptr = VOT entry 위치
+  [2] VOT entry 기록
+  [3] buf->ptr + OR_OOS_INLINE_SIZE 로 공간 검사     <- record 앞쪽 기준
+  [4] buf->ptr = *ptr_varvals                         <- 실제 write 위치로 이동
+  [5] or_put_oid / or_put_bigint                      <- record 뒤쪽에 write
+```
+
+검사 위치와 쓰기 위치가 다르므로, 실제 값 영역 끝에 공간이 부족해도 [3]은 통과한다. 이 경로는 원래 `S_DOESNT_FIT` 을 반환해야 한다. `heap_attrinfo_transform_to_disk_internal` 은 이 값을 받으면 record buffer를 키워 처음부터 다시 조립한다. 그러나 잘못된 검사 때문에 retry 신호가 나오지 않고, debug 빌드에서는 `or_put_oid` 또는 `or_put_bigint` 의 assert가 마지막에 잡는다.
+
+`bug_xdbms3693` 는 이 문제를 LOB locator drift로 드러낸다. BLOB/CLOB의 in-row 값은 LOB payload가 아니라 외부 LOB 파일을 가리키는 locator 문자열이다. `heap_attrinfo_transform_variable_to_disk` 의 LOB 분기는 write 중 `db_elo_copy_with_prefix` 로 새 locator를 만들고 DB_VALUE를 교체한다. 그러면 layout 산정 시점에 본 locator 길이와 실제 write 시점의 locator 길이가 달라질 수 있다.
+
+```
+layout 산정: 복사 전 locator 길이로 inline_size_after_oos 추정
+record 작성: prefix가 붙은 새 locator를 DB_VALUE에 넣고 기록
+결과: inline으로 남은 LOB locator들이 예상보다 길어져 *ptr_varvals가 더 빨리 전진
+```
+
+이 drift 자체는 `S_DOESNT_FIT` retry 계약 안에서 처리될 수 있다. 일반 non-OOS 값 쓰기 경로는 `buf->ptr = *ptr_varvals` 로 실제 쓰기 위치를 먼저 잡은 뒤 크기를 검사하므로 공간 부족을 정상적으로 반환한다. OOS inline stub 경로만 VOT 쪽 cursor로 검사했기 때문에 같은 계약에서 벗어났다.
+
+`bigPageSize.sh` 의 기존 CBRD-26814 재현은 여러 OOS 컬럼의 16바이트 stub이 누적되다가 `or_put_bigint` 에서 assert가 났다. `bug_xdbms3693.sh` 의 manual 재현은 50개 BLOB + 50개 CLOB locator가 섞인 row에서 낮은 index의 inline LOB locator들이 drift를 만들고, 이후 OOS inline stub을 쓰는 index 47 부근에서 `or_put_oid` 가 assert로 종료됐다. 두 증상은 crash site만 다르고 같은 write-position bug다.
 
 ## Test Build
 
-- `CUBRID 11.5.0 (11.5.0.2328-8d7b97a) (64bit debug build for Linux)`
-- 브랜치: `feat-oos-m2-manual` (commit `8d7b97a88`).
-- 자매 sub-task CBRD-26813 (`vk/cbrd-26813-oos-bigone-expand`, commit `6087ed163`) 가 적용된 상태에서도 동일하게 재현.
-- OS: RHEL 9.6 (5.14.0-570.30.1.el9_6.x86_64).
+- 기존 CBRD-26814 재현: `CUBRID 11.5.0.2328-8d7b97a`, 64-bit debug build, RHEL 9.6.
+- manual run 재현: `CUBRID 11.5.0.2434-4ddbc7c`, branch `feature/oos-m2`, 64-bit debug build. OS 상세는 `TBD - ANALYSIS 단계에서 결정`.
 
 ## Repro
+
+### 기존 CBRD-26814 재현
 
 ```bash
 cubrid service start
 cubrid deletedb tdb1 2>/dev/null
 cubrid createdb -r tdb1 en_US
 
-CASES=/home/vimkim/cubrid-testcases-private-ex/shell/_35_cherry/issue_21654_server_side_loaddb/bigPageSize/cases
-csql -udba -S -i ${CASES}/createtbl.sql tdb1
+TESTCASE_ROOT=/path/to/cubrid-testcases-private-ex
+CASES="${TESTCASE_ROOT}/shell/_35_cherry/issue_21654_server_side_loaddb/bigPageSize/cases"
 
-# 실패 단계:
-csql -udba -S -i ${CASES}/init.sql tdb1
+csql -u dba -S -i "${CASES}/createtbl.sql" tdb1
+csql -u dba -S -i "${CASES}/init.sql" tdb1
+csql -u dba -S -c "select count(*) from t;" tdb1
 ```
 
-결과:
+### 매뉴얼 run 추가 재현
 
+`ctp.sh` 를 사용하는 경우 `shell_ci.conf` 의 scenario를 아래 test case로 좁힌 뒤 shell suite를 실행한다.
+
+```text
+cubrid-testcases-private-ex/shell/_06_issues/_10_2h/bug_xdbms3693/cases/bug_xdbms3693.sh
 ```
-Execute OK. (0.000000 sec) Committed. (0.000000 sec)    # set @j='...';
+
+직접 실행할 경우 test case checkout 위치만 환경에 맞게 지정한다.
+
+```bash
+TESTCASE_ROOT=/path/to/cubrid-testcases-private-ex
+bash "${TESTCASE_ROOT}/shell/_06_issues/_10_2h/bug_xdbms3693/cases/bug_xdbms3693.sh"
+```
+
+## Expected Result
+
+```text
+bigPageSize init.sql:
+  - csql abort 없음
+  - select count(*) from t; 결과가 256
+
+bug_xdbms3693.sh:
+  - server core 없음
+  - client-side css_readn core 같은 2차 증상 없음
+```
+
+## Actual Result
+
+기존 CBRD-26814 재현은 첫 INSERT 중 `or_put_bigint` assert로 종료된다.
+
+```text
 csql: src/base/object_representation.h:1745:
   int or_put_bigint(OR_BUF *, DB_BIGINT):
   Assertion `buf->ptr + OR_BIGINT_SIZE <= buf->endptr' failed.
 ```
 
-`select count(*) from t` 결과: 0 row.
+manual run의 `bug_xdbms3693` 는 OOS inline stub의 OOS OID를 쓰는 중 `or_put_oid` assert로 서버 core가 발생한다.
 
-핵심 schema (`createtbl.sql` 발췌) — OOS 임계치를 넘는 컬럼이 다수:
-
-```sql
-CREATE TABLE t (
-  id INT AUTO_INCREMENT,
-  col1 SMALLINT, col2 INT, col3 BIGINT,
-  col4 NUMERIC(4,4), col5 FLOAT, col6 DOUBLE,
-  d1 DATE, ..., d8 DATETIMETZ,
-  b1 BIT, c1 CHAR(4),
-  c2 VARCHAR(10757),
-  c3 STRING,
-  e ENUM (...),
-  cl CLOB,
-  bl BLOB,
-  s1 SET (CHAR(1)), s2 MULTISET (CHAR(1)), s3 LIST (CHAR(1)),
-  j JSON
-);
+```text
+or_put_oid
+heap_attrinfo_transform_variable_to_disk(... is_oos=true, oos_length=88, index=47 ...)
+heap_attrinfo_transform_columns_to_disk
+heap_attrinfo_transform_to_disk_internal
 ```
-
-`init.sql` 첫 INSERT 는 `c2 = repeat(@j, 780)` (수 MB), `c3 = repeat(@j, 780)`, `cl = CHAR_TO_CLOB('...')`, `bl = BIT_TO_BLOB(X'000001')`, `j = repeat(@j, 780)` 등 OOS-eligible 컬럼이 여럿 동시에 채워진다.
-
-### TBD - 최소 repro
-
-분석 시작 시점에 `varchar(20000) + blob` 1 row 로는 재현되지 않았다. OOS 컬럼 한 개로는 부족하고 두 개 이상 + 일정 크기가 필요해 보인다. 분석 단계의 첫 작업으로 최소 schema 를 좁힌 뒤 단위 테스트화 가능한 형태로 정리.
-
-## Expected Result
-
-```
-$ csql -udba -S -i ${CASES}/init.sql tdb1
-... (no abort) ...
-$ csql -udba -S -c "select count(*) from t;" tdb1
-                     256
-```
-
-## Actual Result
-
-첫 INSERT 에서 `or_put_bigint` assertion 으로 SIGABRT. row 0 개.
 
 ## Additional Information
 
-### CBRD-26813 과의 관계
+### 크래시 위치가 둘로 보이는 이유
 
-두 sub-task 는 같은 OOS 경로의 서로 다른 단계 회귀다.
+OOS inline stub은 `or_put_oid` 8바이트와 `or_put_bigint` 8바이트를 순서대로 쓴다. `*ptr_varvals` 가 buffer 끝에서 얼마나 가까운지에 따라 첫 8바이트에서 죽으면 `or_put_oid`, 두 번째 8바이트에서 죽으면 `or_put_bigint` 가 crash site가 된다.
 
-| Sub-task | 단계 | 위치 |
-|---|---|---|
-| **본 sub-task (CBRD-26814)** | WRITE | `heap_attrinfo_transform_variable_to_disk` (`heap_file.c:13017`) |
-| CBRD-26813 | READ | `heap_get_record_data_when_all_ready` 의 `REC_BIGONE` 분기 (`heap_file.c:7934`) |
+```
+남은 공간 < 8 bytes       -> or_put_oid assert
+8 bytes <= 남은 공간 < 16 -> or_put_bigint assert
+```
 
-CBRD-26813 만 머지하면 `init.sql` 단계에서 막혀 검증이 불가하다. CBRD-26814 가 먼저 (또는 같이) 머지돼야 `bigPageSize.sh` 가 끝까지 진행된다.
+따라서 `or_put_oid` 와 `or_put_bigint` 는 서로 다른 bug가 아니라 같은 16바이트 stub write의 서로 다른 실패 지점이다.
 
-### 영향 클러스터
+### 릴리스 빌드 위험
 
-CBRD-26660 의 LOB/ELO 클러스터 9 건이 본 회귀의 영향권. 각각의 테스트 모두 BLOB/CLOB/JSON + 큰 varchar 가 섞인 row 를 INSERT 해야 본 시나리오에 도달하는데, INSERT 자체가 막히면 후속 단계 전체가 불통이다.
+`or_put_oid` 와 `or_put_bigint` 의 마지막 bounds check는 debug `assert` 다. release 빌드에서는 assert가 제거되므로 같은 상황에서 `S_DOESNT_FIT` 없이 record buffer 밖 8-16바이트를 쓸 수 있다. debug core는 조기 탐지이며, release에서는 더 늦은 crash나 데이터 오염으로 나타날 수 있다.
+
+### BLOB/CLOB locator OOS 후보 정책
+
+`bug_xdbms3693` 는 BLOB/CLOB locator가 많은 schema라 BLOB/CLOB OOS 후보 정책도 같이 드러낸다. LOB payload는 이미 외부 LOB storage에 있고 heap에는 locator만 남으므로, locator를 다시 OOS로 보내면 다음 구조가 된다.
+
+```text
+heap row -> OOS inline stub -> OOS record -> LOB locator -> LOB file
+```
+
+이 정책은 storage design 판단이다. BLOB/CLOB locator를 OOS 후보에서 제외하면 `bug_xdbms3693` 는 OOS path 자체를 피할 수 있지만, 이 이슈의 crash-safety 수정은 그래도 필요하다. LOB가 아닌 미래의 크기 추정 mismatch도 같은 위치 검사를 지나기 때문이다.
+
+### 관련 이슈
+
+| 이슈 | 관계 |
+|------|------|
+| CBRD-26813 | READ side에서 REC_BIGONE/OOS expansion을 다루는 자매 회귀다. CBRD-26814가 막히면 `bigPageSize.sh` 가 READ side 검증까지 가지 못한다. |
+| CBRD-26822 | LOB prefix 누락으로 LOB 파일이 만들어지지 않는 별도 LOB 경로 회귀다. 같은 LOB/ELO cluster에 있지만 본 write-position bug와 직접 원인은 다르다. |
+| CBRD-26660 | OOS M2 shell/manual 실패를 묶어 분류한 상위 분석 맥락이다. |
 
 ## Implementation
 
-### 1단계: 최소 repro 좁히기
+### 패치 방향
 
-`init.sql` 의 첫 INSERT 에서 컬럼을 하나씩 빼며 어느 조합부터 SIGABRT 가 사라지는지 확인. 예상은 OOS-eligible 컬럼 (`c2`, `c3`, `cl`, `bl`, `j`) 중 둘 이상이 동시에 있을 때 발동.
-
-```bash
-csql -udba -S tdb1 -c "create table t (c2 varchar(10000), c3 string, j json);"
-csql -udba -S tdb1 -c "insert into t values (repeat('x', 8000), repeat('y', 8000), repeat('{\"k\":\"v\"}', 200));"
-```
-
-좁힌 schema 를 단위 테스트로 등록.
-
-### 2단계: gdb 로 가설 확인
-
-```
-break heap_file.c:13013   # bounds check
-break heap_file.c:13017   # or_put_oid 직전
-break heap_file.c:13018   # or_put_bigint 직전 (크래시 직전)
-```
-
-각 break 에서 다음 값을 dump:
-
-- `buf->buffer`, `buf->buffer_size`, `buf->endptr` (buffer 전체)
-- `buf->ptr` (현재 offset table 위치)
-- `*ptr_varvals` (값 영역 쓰기 위치)
-- 차이값: `buf->endptr - *ptr_varvals`
-
-가설이 맞으면 (A) 의 체크는 통과 (`buf->endptr - buf->ptr >= 18`) 하지만 (B) 점프 후 `*ptr_varvals + 18 > buf->endptr` 가 된다.
-
-### 3단계: 패치
-
-`heap_file.c:13007-13018` 의 OOS 분기를 다음 패턴으로 (정확한 식은 2단계 후 결정):
+OOS 분기에서 실제 write 위치를 지역 변수로 먼저 잡고, 그 위치 기준으로 16바이트 여유를 검사한다.
 
 ```c
 if (is_oos)
-{
-  assert (dbvalue != NULL && db_value_is_null (dbvalue) != true);
+  {
+    char *oos_stub_ptr = *ptr_varvals;
 
-  /* offset table entry 공간 체크 (기존) */
-  if ((buf->ptr + offset_size) > buf->endptr)
-    {
-      return S_DOESNT_FIT;
-    }
+    if (oos_stub_ptr + OR_OOS_INLINE_SIZE > buf->endptr)
+      {
+        return S_DOESNT_FIT;
+      }
 
-  length = CAST_BUFLEN (*ptr_varvals - buf->buffer - header_size);
-  length = OR_SET_VAR_OOS (length);
-  or_put_offset_internal (buf, length, offset_size);
-
-  /* NEW: 값 영역 쓰기 위치 기준으로 다시 체크 */
-  if (*ptr_varvals + OR_OOS_INLINE_SIZE > buf->endptr)
-    {
-      return S_DOESNT_FIT;
-    }
-
-  buf->ptr = *ptr_varvals;
-  or_put_oid (buf, oos_oid);
-  or_put_bigint (buf, oos_length);
-  *ptr_varvals = buf->ptr;
-}
+    buf->ptr = oos_stub_ptr;
+    or_put_oid (buf, oos_oid);
+    or_put_bigint (buf, oos_length);
+    *ptr_varvals = buf->ptr;
+  }
 ```
 
-`S_DOESNT_FIT` 반환 시 호출자 `locator_allocate_copy_area_by_attr_info` (`locator_sr.c:7486`) 가 더 큰 copyarea 로 retry 하는 기존 로직과 합류.
+VOT entry 자체의 공간 검사는 기존처럼 VOT 위치에서 유지한다. 바꾸는 것은 OOS inline stub write의 검사 기준뿐이다.
 
-### 4단계: 회귀 재실행
+### 검증 포인트
 
-```bash
-# 본 sub-task 단독
-csql -udba -S -i ${CASES}/init.sql tdb1
-csql -udba -S tdb1 -c "select count(*) from t;"     # 256 가 나와야 함
+`gdb` 로 확인할 때는 `heap_attrinfo_transform_variable_to_disk` 의 OOS 분기에서 다음 값을 비교한다.
 
-# CBRD-26813 과 같이
-bash ${CASES}/bigPageSize.sh
+```text
+buf->endptr - buf->ptr       # VOT write 직후 cursor 기준 잔여 공간
+buf->endptr - *ptr_varvals   # 실제 OOS inline stub write 위치 기준 잔여 공간
 ```
 
-### 5단계: 단위 테스트 (TBD)
-
-`unit_tests/` 에 OOS-eligible 컬럼이 둘 이상 있는 row 의 disk transform round-trip 테스트 추가. write -> read 가 원래 값과 같아야 한다.
+재현이 맞으면 기존 코드는 첫 값이 16 이상이라 통과하고, 두 번째 값은 16 미만이라 실제 write가 buffer 끝을 넘는다. 수정 후에는 두 번째 값이 16 미만일 때 `S_DOESNT_FIT` 이 반환되어 retry 경로로 들어간다.
 
 ## Acceptance Criteria
 
-- [ ] `csql -udba -S -i init.sql tdb1` 가 SIGABRT 없이 256 row 를 모두 INSERT.
-- [ ] CBRD-26813 패치와 함께 적용했을 때 `bigPageSize.sh` 가 OK 로 통과.
-- [ ] CBRD-26660 의 LOB/ELO 클러스터 9 건 일괄 재실행 결과를 본 sub-task 댓글에 표로 기록 — 같이 풀리는 항목은 close-out, 남는 항목은 별도 sub-task 로 분리.
-- [ ] 최소 repro 가 좁혀져 본 sub-task 댓글 또는 단위 테스트로 등록.
+- [ ] `bigPageSize.sh` 의 `init.sql` 단계가 debug assert 없이 끝나고 `select count(*) from t;` 가 256을 반환한다.
+- [ ] `bug_xdbms3693.sh` 가 `or_put_oid` server core 없이 통과한다.
+- [ ] OOS inline stub write에서 `S_DOESNT_FIT` 이 발생하면 기존 buffer resize-and-retry 경로로 재조립된다.
+- [ ] release 빌드에서 OOS inline stub write가 record buffer 밖으로 쓰지 않는다.
+- [ ] BLOB/CLOB locator OOS 후보 제외 여부는 PR 설명 또는 후속 이슈에 명시한다.
 
 ## Definition of done
 
-- [ ] 위 A/C 충족.
-- [ ] PR merge.
-- [ ] CBRD-26660 의 클러스터 1 표에 본 sub-task 번호 기록.
+- [ ] 위 Acceptance Criteria 충족.
+- [ ] OOS 관련 SQL/shell 회귀를 재실행하고 결과를 PR 또는 JIRA comment에 기록.
+- [ ] 필요하면 `bug_xdbms3693` 형태의 many LOB locator regression을 추가.
 
-## 참고 코드
+## Code References
 
 | 파일:줄 | 역할 |
-|---|---|
-| `src/storage/heap_file.c:13009-13018` | **수정 대상**. OOS 분기의 bounds check 가 잘못된 위치 기준. |
-| `src/storage/heap_file.c:13017` (`or_put_oid`), `:13018` (`or_put_bigint`) | 크래시 사이트. 실제 write 가 일어나는 곳. |
-| `src/base/object_representation.h:455` | `OR_OOS_INLINE_SIZE = OR_OID_SIZE + OR_BIGINT_SIZE = 18`. |
-| `src/base/object_representation.h:1745` (`or_put_bigint`) | assertion 사이트. |
-| `src/transaction/locator_sr.c:7486` (`locator_allocate_copy_area_by_attr_info`) | `S_DOESNT_FIT` retry 호출자. fix 가 들어가면 이 retry 흐름으로 합류. |
-| `src/storage/heap_file.c:13129` (`heap_attrinfo_transform_columns_to_disk`) | 컬럼 단위 dispatch. |
-| `src/query/query_executor.c:13047` (`qexec_execute_insert`) | INSERT XASL 실행 진입점. |
+|---------|------|
+| `src/storage/heap_file.c:12786` | `heap_attrinfo_transform_variable_to_disk` 진입점. |
+| `src/storage/heap_file.c:12846` | 기존 OOS inline stub bounds check가 `buf->ptr` 기준으로 수행되는 위치. |
+| `src/storage/heap_file.c:12851` | 실제 write 위치인 `*ptr_varvals` 로 이동하는 위치. |
+| `src/storage/heap_file.c:12852` | `or_put_oid` 호출. `bug_xdbms3693` 의 crash site로 이어진다. |
+| `src/storage/heap_file.c:12853` | `or_put_bigint` 호출. 기존 CBRD-26814 `bigPageSize.sh` 의 crash site로 이어진다. |
+| `src/storage/heap_file.c:12888` | LOB locator를 `db_elo_copy_with_prefix` 로 재생성하는 위치. |
+| `src/base/object_representation.h:455` | `OR_OOS_INLINE_SIZE = OR_OID_SIZE + OR_BIGINT_SIZE`, 현재 16바이트. |
+| `src/base/object_representation.h:3049` | `or_put_oid` debug assert. |
+| `src/base/object_representation.h:2029` | `or_put_bigint` debug assert. |
 
 ## Remarks
 
-- 부모 epic: CBRD-26583 (OOS M2 epic).
-- 자매 sub-task: CBRD-26813 (REC_BIGONE OOS expansion, READ 측 회귀).
-- 동반 sub-task: CBRD-26660 (M2 매뉴얼 회귀 분류).
-- 본 회귀가 풀려야 CBRD-26813 의 fix 가 `bigPageSize.sh` 끝까지 검증 가능.
+- JIRA metadata 기준 이 이슈는 CBRD-26835의 Sub-task이며, bug-fix 내용상 Correct Error template로 정리했다.
+- 기존 CBRD-26814 본문에는 `OR_OOS_INLINE_SIZE` 를 18바이트로 적은 부분이 있었으나, 현재 `feature/oos-m2` 코드와 OOS context 기준으로는 16바이트가 맞다.

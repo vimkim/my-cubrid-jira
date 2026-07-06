@@ -17,8 +17,10 @@
 - 기존 public heap fetch 함수 이름은 유지하되, `HEAP_OOS_EXPAND_POLICY` enum 인자를 추가한다.
 - `HEAP_GET_CONTEXT` 와 `heap_init_get_context()` 에 기본 OOS 정책을 두지 않고, 모든 호출자가 `HEAP_WITH_OOS_EXPAND` 또는 `HEAP_WITHOUT_OOS_EXPAND` 를 직접 넘기게 한다.
 - `*_expand_oos()` / `*_skip_oos_expand()` wrapper 는 제거한다. 의미를 함수 이름으로 우회하지 않고 기존 call site 의 인자에서 드러낸다.
+- 소비자가 혼합된 locator getter 3종 (`locator_lock_and_get_object()`, `locator_lock_and_get_object_with_evaluation()`, `locator_get_object()`) 도 정책 인자를 signature 로 스레딩해 caller 가 선언하게 한다. getter 내부에 정책을 고정하지 않는다.
 - develop merge 로 발생한 OOS 회귀 call site 를 전수 조사해 raw `RECDES` 소비 경로와 attribute-layer 소비 경로로 다시 분류한다.
-- raw `RECDES` 소비 경로는 `HEAP_WITH_OOS_EXPAND`, `heap_attrinfo_read_dbvalues()` 로 곧장 들어가는 경로는 `HEAP_WITHOUT_OOS_EXPAND` 로 분류한다.
+- raw `RECDES` 소비 경로는 `HEAP_WITH_OOS_EXPAND`, `heap_attrinfo_read_dbvalues()` 로 곧장 들어가는 경로 및 recdes 미소비(존재 확인, OID 전진) 경로는 `HEAP_WITHOUT_OOS_EXPAND` 로 분류한다. fetch mode 가 `COPY` 라는 이유만으로 WITH 를 고르지 않는다 (COPY 는 저장 소유권이지 정책이 아님).
+- 정책을 내부에 고정한 소수 API (`heap_first()`/`heap_last()` WITH, scanrange 내부 WITHOUT)는 코드 주석으로 계약을 남긴다.
 - visible-version fast path 가 expanded raw record 요청을 우회하지 않도록, OOS 포함 record 에서 `HEAP_WITH_OOS_EXPAND` 가 필요하면 full path 로 내려간다.
 
 ---
@@ -66,6 +68,9 @@ CBRD-27029 는 그 누락 가능성을 compile break 로 바꾼다. heap fetch A
 | `heap_get_visible_version()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
 | `heap_scan_get_visible_version()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
 | `heap_init_get_context()` | `HEAP_GET_CONTEXT` 생성 시 enum 정책을 필수로 받음 |
+| `locator_lock_and_get_object()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 (소비자 혼합 → caller 선언) |
+| `locator_lock_and_get_object_with_evaluation()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
+| `locator_get_object()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
 
 아래 wrapper 이름은 제거 대상이다.
 
@@ -100,13 +105,14 @@ caller 판정 기준은 아래처럼 유지한다.
 
 | caller 종류 | 정책 | 예 |
 |-------------|------|----|
-| raw record 소비자 | `HEAP_WITH_OOS_EXPAND` | `LC_COPYAREA` fetch-all, class/root catalog 의 `or_*` parser, scanrange helper, compactdb 의 old record image, lock dump 의 MVCC header 확인 |
-| OOS-capable attribute-layer 소비자 | `HEAP_WITHOUT_OOS_EXPAND` | `scan_manager`, `query_executor` LOB cleanup, `btree_load`, dblink/catalog metadata scan, foreign-key/index consistency check, parallel non-covering index scan |
+| raw record 소비자 | `HEAP_WITH_OOS_EXPAND` | `LC_COPYAREA` fetch-all/client 전송, class/root catalog 의 `or_*` parser, compactdb 의 old record 재기록 image, partition redistribution 재삽입 |
+| OOS-capable attribute-layer 소비자 | `HEAP_WITHOUT_OOS_EXPAND` | `scan_manager` (scanrange grouped scan 포함), `query_executor` LOB cleanup, `btree_load`, serial/SP code fetch, dblink/catalog metadata scan, foreign-key/index consistency check, parallel non-covering index scan |
+| recdes 미소비 | `HEAP_WITHOUT_OOS_EXPAND` | 존재 확인 (recdes=NULL), lock dump 의 MVCC header 확인 (`or_mvcc_get_header` 는 variable area 밖) |
 | OID 전진용 scan 뒤 재조회 | `HEAP_WITHOUT_OOS_EXPAND` 후 필요한 지점에서 expanded fetch | locking branch 처럼 첫 scan 은 다음 OID 만 찾고, 실제 record 는 lock 획득 후 다시 읽는 경로 |
 
 ## Acceptance Criteria
 
-- [ ] `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 의 직접 호출자가 모두 `HEAP_OOS_EXPAND_POLICY` 를 명시한다.
+- [ ] `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 및 locator getter 3종의 직접 호출자가 모두 `HEAP_OOS_EXPAND_POLICY` 를 명시한다.
 - [ ] 제거 대상 `*_expand_oos()` / `*_skip_oos_expand()` wrapper 이름이 source tree 에 남지 않는다.
 - [ ] raw `RECDES` 소비 경로는 `HEAP_WITH_OOS_EXPAND` 로 분류되고, OOS-capable record 를 곧장 attribute layer 로 넘기는 hot path 는 `HEAP_WITHOUT_OOS_EXPAND` 로 분류된다.
 - [ ] `HEAP_WITH_OOS_EXPAND` 요청에서 visible-version fast path 가 inline OOS OID 슬롯을 그대로 반환하지 않는다.
@@ -121,17 +127,17 @@ caller 판정 기준은 아래처럼 유지한다.
 
 ## Verification
 
-작성 시점의 로컬 commit report 기준으로 아래 확인이 완료됐다.
+PR #7416 HEAD `6f6519c25` 기준으로 아래 확인이 완료됐다.
 
 ```sh
 git diff --check
-cmake --build build_preset_debug_gcc -j"$(nproc)"
+just build-test   # debug_gcc build + unit tests 23/23
 ```
 
-결과: build completed successfully.
+- call-site 전수 grep: 정책 API 6종 + locator getter 3종 호출부 전부 정책 인자 명시, wrapper 잔존 0건, `POLICY_INVALID` 전달 0건
+- SA-mode spot check: OOS row (`BIT VARYING` 5000B) 에서 SELECT round-trip / UPDATE / serial next_value / `compactdb -S` / `unloaddb -S` full `X'..'` emission 통과
 
 ## References
 
 - JIRA: <http://jira.cubrid.org/browse/CBRD-27029>
-- 설계 메모: `/home/vimkim/gh/my-cubrid-docs/cbrd-27029/CBRD-27029-expand-raw-records.md`
-- 로컬 commit report: `CBRD-27029-commit-report.md`
+- 설계 메모 (caller review table 포함): `/home/vimkim/gh/my-cubrid-docs/cbrd-27029/CBRD-27029-expand-raw-records.md`

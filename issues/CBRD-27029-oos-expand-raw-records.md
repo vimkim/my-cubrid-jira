@@ -105,8 +105,8 @@ caller 판정 기준은 아래처럼 유지한다.
 
 | caller 종류 | 정책 | 예 |
 |-------------|------|----|
-| raw record 소비자 | `HEAP_WITH_OOS_EXPAND` | `LC_COPYAREA` fetch-all/client 전송, class/root catalog 의 `or_*` parser, compactdb 의 old record 재기록 image, partition redistribution 재삽입 |
-| OOS-capable attribute-layer 소비자 | `HEAP_WITHOUT_OOS_EXPAND` | `scan_manager` (scanrange grouped scan 포함), `query_executor` LOB cleanup, `btree_load`, serial/SP code fetch, dblink/catalog metadata scan, foreign-key/index consistency check, parallel non-covering index scan |
+| raw record 소비자 | `HEAP_WITH_OOS_EXPAND` | `LC_COPYAREA` fetch-all/client 전송, class/root catalog 의 `or_*` parser, partition redistribution 재삽입 |
+| OOS-capable attribute-layer 소비자 | `HEAP_WITHOUT_OOS_EXPAND` | `scan_manager` (scanrange grouped scan 포함), `query_executor` LOB cleanup, `btree_load`, serial/SP code fetch, dblink/catalog metadata scan, foreign-key/index consistency check, parallel non-covering index scan, update/delete old-record fetch (`locator_update_force`, `locator_delete_lob_force`, compactdb — 소비가 `locator_update_index`/attr-layer 뿐) |
 | recdes 미소비 | `HEAP_WITHOUT_OOS_EXPAND` | 존재 확인 (recdes=NULL), lock dump 의 MVCC header 확인 (`or_mvcc_get_header` 는 variable area 밖) |
 | OID 전진용 scan 뒤 재조회 | `HEAP_WITHOUT_OOS_EXPAND` 후 필요한 지점에서 expanded fetch | locking branch 처럼 첫 scan 은 다음 OID 만 찾고, 실제 record 는 lock 획득 후 다시 읽는 경로 |
 
@@ -127,15 +127,16 @@ caller 판정 기준은 아래처럼 유지한다.
 
 ## Verification
 
-PR #7416 HEAD `6f6519c25` 기준으로 아래 확인이 완료됐다.
+PR #7416 HEAD `846b5c7cf` 기준으로 아래 확인이 완료됐다.
 
 ```sh
 git diff --check
 just build-test   # debug_gcc build + unit tests 23/23
 ```
 
-- call-site 전수 grep: 정책 API 6종 + locator getter 3종 호출부 전부 정책 인자 명시, wrapper 잔존 0건, `POLICY_INVALID` 전달 0건
-- SA-mode spot check: OOS row (`BIT VARYING` 5000B) 에서 SELECT round-trip / UPDATE / serial next_value / `compactdb -S` / `unloaddb -S` full `X'..'` emission 통과
+- call-site 전수 grep: 정책 API 6종 + locator getter 3종의 활성 호출부 전부 정책 인자 명시, wrapper 잔존 0건, `POLICY_INVALID` 전달 0건 (disabled `ENABLE_UNUSED_FUNCTION` 블록의 legacy `heap_get()` 6곳은 제거된 API 를 부르는 죽은 코드라 제외)
+- 남은 `HEAP_WITH_OOS_EXPAND` site 는 전부 raw-byte 소비자다 (`LC_COPYAREA` 전송, `or_*` class parse, partition 재삽입, catalog raw parse); attr-layer/header-only old-record fetch 는 `846b5c7cf` 에서 전부 `HEAP_WITHOUT_OOS_EXPAND` 로 정리됨
+- SA-mode spot check (at `846b5c7cf`): index 있는 OOS row (`BIT VARYING` 10000B) 에서 INSERT / indexed-column UPDATE / SELECT round-trip(md5) / DELETE / `compactdb -S` 후 md5 불변 / `checkdb -S` exit 0; serial next_value 와 `unloaddb -S` full `X'..'` emission 은 pre-rebase head 에서 통과
 
 ## References
 

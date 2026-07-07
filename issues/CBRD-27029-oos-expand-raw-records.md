@@ -2,7 +2,9 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: develop merge 후 약 300건의 shell test 실패로 드러난 OOS heap fetch 회귀를 전수 조사하고 수정한다. OOS 적용 후 heap fetch 호출자가 record-level Expand 여부를 호출 지점에서 명시하도록 public API 계약을 바꾼다.
+**이슈 수행 목적**: OOS 적용 후 heap fetch 호출자가 record-level Expand 여부를 호출 지점에서 명시하도록 public API 계약을 바꾼다. 동작 변경은 없다 — 모든 call site 는 기존 동작을 그대로 유지한다.
+
+> **스코프 축소 (2026-07-07)**: 최초에는 develop merge 후 약 300건의 shell test 실패 회귀를 전수 조사·수정하는 이슈였으나, 해당 실패는 CI 환경 버그 (OOS unittestdb conf 미복원, #7427 hotfix 로 해결) 로 판명됐다. 이에 따라 본 이슈는 API 계약 명시화만 남기고, call site 재분류 (WITH↔WITHOUT flip) 는 CBRD-26847 audit 으로 이관한다.
 
 **이슈 수행 이유**:
 
@@ -18,10 +20,10 @@
 - `HEAP_GET_CONTEXT` 와 `heap_init_get_context()` 에 기본 OOS 정책을 두지 않고, 모든 호출자가 `HEAP_WITH_OOS_EXPAND` 또는 `HEAP_WITHOUT_OOS_EXPAND` 를 직접 넘기게 한다.
 - `*_expand_oos()` / `*_skip_oos_expand()` wrapper 는 제거한다. 의미를 함수 이름으로 우회하지 않고 기존 call site 의 인자에서 드러낸다.
 - 소비자가 혼합된 locator getter 3종 (`locator_lock_and_get_object()`, `locator_lock_and_get_object_with_evaluation()`, `locator_get_object()`) 도 정책 인자를 signature 로 스레딩해 caller 가 선언하게 한다. getter 내부에 정책을 고정하지 않는다.
-- develop merge 로 발생한 OOS 회귀 call site 를 전수 조사해 raw `RECDES` 소비 경로와 attribute-layer 소비 경로로 다시 분류한다.
-- raw `RECDES` 소비 경로는 `HEAP_WITH_OOS_EXPAND`, `heap_attrinfo_read_dbvalues()` 로 곧장 들어가는 경로 및 recdes 미소비(존재 확인, OID 전진) 경로는 `HEAP_WITHOUT_OOS_EXPAND` 로 분류한다. fetch mode 가 `COPY` 라는 이유만으로 WITH 를 고르지 않는다 (COPY 는 저장 소유권이지 정책이 아님).
-- 정책을 내부에 고정한 소수 API (`heap_first()`/`heap_last()` WITH, scanrange 내부 WITHOUT)는 코드 주석으로 계약을 남긴다.
-- visible-version fast path 가 expanded raw record 요청을 우회하지 않도록, OOS 포함 record 에서 `HEAP_WITH_OOS_EXPAND` 가 필요하면 full path 로 내려간다.
+- 모든 call site 는 base (feat/oos) 동작을 1:1 로 보존한다: 기존 `*_expand_oos()` 호출부 → `HEAP_WITH_OOS_EXPAND`, 기존 일반 호출부 → `HEAP_WITHOUT_OOS_EXPAND`. 동작 변경 0건.
+- raw `RECDES` / attribute-layer 소비 경로 재분류 (WITH↔WITHOUT flip) 는 본 이슈에서 수행하지 않고 CBRD-26847 audit 으로 이관한다. flip 은 diff review 난도를 크게 올리는 반면, CI 로 필요성이 입증되지 않았다.
+- 정책을 내부에 고정한 소수 API (`heap_first()`/`heap_last()`, 기존 무확장 동작 유지)는 코드 주석으로 계약을 남긴다.
+- visible-version fast path 가 expanded raw record 요청을 우회하지 않도록, OOS 포함 record 에서 `HEAP_WITH_OOS_EXPAND` 가 필요하면 full path 로 내려간다 (base 에 이미 존재하는 동작 유지).
 
 ---
 
@@ -101,7 +103,7 @@ heap_scan_get_visible_version_skip_oos_expand()
 
 visible-version scan 에는 기존 fast path 가 있다. `peeked_recdes` 가 `REC_HOME` 이고 MVCC visible 이면 `heap_get_visible_version_internal()` 을 건너뛰어 record 를 바로 반환한다. 이 fast path 는 inline OOS OID 슬롯을 그대로 돌려주므로, `HEAP_WITH_OOS_EXPAND` 요청이면서 `heap_recdes_contains_oos()` 가 참이면 fast path 를 쓰지 않고 full path 로 내려간다.
 
-caller 판정 기준은 아래처럼 유지한다.
+caller 판정 기준은 아래와 같다. **본 이슈의 PR 은 이 분류를 적용하지 않는다** — 아래 표는 CBRD-26847 audit 에서 flip 을 검토할 때의 참고 기준이다.
 
 | caller 종류 | 정책 | 예 |
 |-------------|------|----|
@@ -112,11 +114,11 @@ caller 판정 기준은 아래처럼 유지한다.
 
 ## Acceptance Criteria
 
-- [ ] `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 및 locator getter 3종의 직접 호출자가 모두 `HEAP_OOS_EXPAND_POLICY` 를 명시한다.
-- [ ] 제거 대상 `*_expand_oos()` / `*_skip_oos_expand()` wrapper 이름이 source tree 에 남지 않는다.
-- [ ] raw `RECDES` 소비 경로는 `HEAP_WITH_OOS_EXPAND` 로 분류되고, OOS-capable record 를 곧장 attribute layer 로 넘기는 hot path 는 `HEAP_WITHOUT_OOS_EXPAND` 로 분류된다.
-- [ ] `HEAP_WITH_OOS_EXPAND` 요청에서 visible-version fast path 가 inline OOS OID 슬롯을 그대로 반환하지 않는다.
-- [ ] develop merge 로 새 heap fetch 호출자가 들어오면, 정책 인자를 추가하기 전에는 빌드가 실패한다.
+- [x] `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 및 locator getter 3종의 직접 호출자가 모두 `HEAP_OOS_EXPAND_POLICY` 를 명시한다.
+- [x] 제거 대상 `*_expand_oos()` / `*_skip_oos_expand()` wrapper 이름이 source tree 에 남지 않는다.
+- [x] 모든 call site 가 base 동작을 보존한다 (기존 `*_expand_oos()` → WITH, 기존 일반 호출 → WITHOUT 의 1:1 기계적 매핑) — 스크립트 audit 으로 전수 검증.
+- [x] `HEAP_WITH_OOS_EXPAND` 요청에서 visible-version fast path 가 inline OOS OID 슬롯을 그대로 반환하지 않는다.
+- [x] develop merge 로 새 heap fetch 호출자가 들어오면, 정책 인자를 추가하기 전에는 빌드가 실패한다.
 
 ## Definition of done
 
@@ -127,16 +129,16 @@ caller 판정 기준은 아래처럼 유지한다.
 
 ## Verification
 
-PR #7416 HEAD `846b5c7cf` 기준으로 아래 확인이 완료됐다.
+PR #7416 HEAD `6496b4ba2` (squashed, 동작 변경 0건) 기준으로 아래 확인이 완료됐다.
 
 ```sh
 git diff --check
 just build-test   # debug_gcc build + unit tests 23/23
 ```
 
-- call-site 전수 grep: 정책 API 6종 + locator getter 3종의 활성 호출부 전부 정책 인자 명시, wrapper 잔존 0건, `POLICY_INVALID` 전달 0건 (disabled `ENABLE_UNUSED_FUNCTION` 블록의 legacy `heap_get()` 6곳은 제거된 API 를 부르는 죽은 코드라 제외)
-- 남은 `HEAP_WITH_OOS_EXPAND` site 는 전부 raw-byte 소비자다 (`LC_COPYAREA` 전송, `or_*` class parse, partition 재삽입, catalog raw parse); attr-layer/header-only old-record fetch 는 `846b5c7cf` 에서 전부 `HEAP_WITHOUT_OOS_EXPAND` 로 정리됨
-- SA-mode spot check (at `846b5c7cf`): index 있는 OOS row (`BIT VARYING` 10000B) 에서 INSERT / indexed-column UPDATE / SELECT round-trip(md5) / DELETE / `compactdb -S` 후 md5 불변 / `checkdb -S` exit 0; serial next_value 와 `unloaddb -S` full `X'..'` emission 은 pre-rebase head 에서 통과
+- **동작 보존 전수 audit** (스크립트, paren-matched call 추출): 변경된 19개 파일에서 정책 API 6종 + locator getter 3종의 모든 호출을 base(feat/oos `891c2c802`)와 순서대로 대조 — 기존 `*_expand_oos()` 호출은 전부 `HEAP_WITH_OOS_EXPAND`, 기존 일반 호출은 전부 `HEAP_WITHOUT_OOS_EXPAND` 로 1:1 매핑됨을 확인. 유일한 call-count 차이 1건은 wrapper 2개가 1개 함수로 병합되며 중복 `heap_init_get_context` 호출이 사라진 것 (수동 확인).
+- wrapper 잔존 0건, `POLICY_INVALID` 전달 0건, lefthook codestyle (`.github/workflows/codestyle.sh`) 통과.
+- **Follow-up (analysis needed)**: `locator_lock_and_return_object` 의 단건 client fetch 는 base 부터 OOS 를 확장하지 않는다 (`xlocator_fetch_all` 은 확장). CS-mode client 는 inline OOS OID 슬롯을 resolve 할 수 없으므로 잠재적 정합성 gap — 별도 이슈로 repro test 와 함께 분석 필요 (코드에 CBRD-26847 TODO 주석 표기).
 
 ## References
 

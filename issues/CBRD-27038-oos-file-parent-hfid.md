@@ -14,7 +14,7 @@
 | **TO-BE (목표 상태 / 기대 동작)** | OOS 파일 descriptor 에 부모 HFID(테이블 heap 파일 식별자)와 class OID 를 저장한다. `diagdb` 는 부모 HFID 를 출력하고, online `checkdb` 는 class lock 을 잡은 뒤 OOS file table 을 검사한다. |
 | **영향** | 진단/QA 곤란. OOS 공간이 어느 테이블에서 생겼는지 알 수 없고, online `checkdb` 는 현재 OOS file table 손상을 검사하지 못한다. |
 
-**이슈 수행 방안**: OOS 파일 생성 시 `FILE_DESCRIPTORS` 의 기존 `heap_overflow` 영역을 재사용해 부모 HFID 와 class OID 를 채운다. 그 뒤 `FILE_OOS` 를 heap overflow 파일과 같은 방식으로 dump 하고, online `checkdb` 의 tracker 순회에서도 class lock 으로 보호한 뒤 반환한다. 기존 OOS 파일의 빈 descriptor 처리 정책은 `TBD - 합의 미확인`.
+**이슈 수행 방안**: OOS 파일 생성 시 `FILE_DESCRIPTORS` 의 기존 `heap_overflow` 영역을 재사용해 부모 HFID 와 class OID 를 채운다. 기존 heap overflow 파일도 같은 descriptor 영역에 부모 정보를 저장하고 있다. 그 뒤 `FILE_OOS` 를 heap overflow 파일과 같은 방식으로 dump 하고, online `checkdb` 의 tracker 순회에서도 class lock 으로 보호한 뒤 반환한다. 기존 OOS 파일의 빈 descriptor 처리 정책은 `TBD - 합의 미확인`.
 
 ---
 
@@ -78,7 +78,17 @@ struct file_ovf_heap_des
 };
 ```
 
-OOS 파일도 테이블 heap 에 딸린 파일이므로 이 구조를 재사용할 수 있다. 새 멤버를 추가하지 않아도 된다.
+OOS 파일도 테이블 heap 에 딸린 파일이므로 이 구조를 재사용할 수 있다. 새 멤버를 추가하지 않아도 된다. 기존 heap overflow 파일도 같은 descriptor 영역에 부모 정보를 저장하고 있다.
+
+근거 코드: `heap_ovf_find_vfid()` 는 heap overflow 파일을 만들 때 같은 `heap_overflow` descriptor 에 부모 HFID 와 class OID 를 채운다.
+
+```c
+/* src/storage/heap_file.c */
+memset (&des, 0, sizeof (des));
+HFID_COPY (&des.heap_overflow.hfid, hfid);
+des.heap_overflow.class_oid = heap_hdr->class_oid;
+if (file_create_with_npages (thread_p, FILE_MULTIPAGE_OBJECT_HEAP, 1, &des, ovf_vfid) != NO_ERROR)
+```
 
 ```
 oos_create_file()
@@ -117,6 +127,14 @@ FILE_OOS tracker item
           ├─ class lock 성공 -> VFID 반환, file_table_check 실행
           └─ class lock 실패 -> 해당 파일만 건너뜀
 ```
+
+기존 heap overflow 파일은 이미 같은 흐름으로 online `checkdb` 보호를 받는다.
+
+1. checkdb 의 heap overflow 검사는 `CHECKDB_FILE_TRACKER_CHECK` 경로에서 수행된다.
+2. `file_tracker_interruptable_iterate(FILE_UNKNOWN_TYPE)` 가 `FILE_MULTIPAGE_OBJECT_HEAP` 항목을 만난다.
+3. `file_tracker_get_and_protect()` 가 `descriptor.heap_overflow.class_oid` 를 읽고 class 에 `SCH_S_LOCK` 을 조건부로 건다.
+4. lock 성공 시 overflow VFID 를 반환하고, `file_table_check()` 가 overflow 파일 테이블과 할당 sector 유효성을 검사한다.
+5. 즉 overflow 레코드 내용을 heap 처럼 의미적으로 스캔하는 것이 아니라, DROP 과 겹치지 않게 보호한 뒤 파일 테이블 무결성을 검사한다.
 
 기존 파일처럼 class OID 가 비어 있으면 보호할 수 없다. 이 경우는 기존 OOS 파일 처리 정책에 맞춰 skip 하거나 보정한다. 정책은 아직 미정이다.
 

@@ -12,7 +12,7 @@
 | **TO-BE (목표 상태 / 기대 동작)** | 읽기 전용 진단 경로는 OOS 파일을 출력, 순회, 집계 대상으로 처리하고, OOS 전용 소유자 메타데이터가 없는 부분은 추정하지 않는다. |
 | **영향** | QA 실패 — OOS 회귀 테스트가 실제 데이터 검증 전에 진단 유틸리티 assertion 으로 중단될 수 있어, TDE/backup/diagdb/checkdb 계열 테스트 결과를 분리 판단하기 어렵다. |
 
-**이슈 수행 방안**: `FILE_OOS` 단순 assert 를 제거하고, 현재 파일 포맷 안에서 가능한 최소 처리만 추가한다. Descriptor dump 는 `OOS file` 로 표시하고, file tracker 의 읽기 전용 순회는 OOS VFID 를 class lock 없이 반환하며, `spacedb` 는 새 출력 행을 만들지 않고 OOS 페이지를 기존 heap totals 에 포함한다. `SPACEDB_OOS_FILE` 신설과 OOS owner descriptor 저장은 output/protocol 변경이므로 후속 이슈로 분리한다.
+**이슈 수행 방안**: `FILE_OOS` 단순 assert 를 제거하고, 현재 파일 포맷 안에서 가능한 최소 처리만 추가한다. Descriptor dump 는 `OOS file` 로 표시하고, interruptible file tracker 순회는 OOS VFID 를 class lock 없이 반환하지 않고 건너뛰며, `spacedb` 는 새 출력 행을 만들지 않고 OOS 페이지를 기존 heap totals 에 포함한다. `SPACEDB_OOS_FILE` 신설, OOS owner descriptor 저장, `checkdb` 의 OOS file table 검사는 후속 이슈로 분리한다.
 
 ---
 
@@ -32,7 +32,7 @@ OOS (Out-of-row Overflow Storage — heap 의 큰 가변 컬럼 값을 OOS file 
 
 문제는 파일 타입별 switch 에서 `FILE_OOS` case 가 "아직 구현되지 않은 경로"처럼 남아 있다는 점이다. Generic file dump 는 descriptor 를 출력하려다 멈추고, file tracker iteration 은 OOS 항목을 보호할 class OID 를 얻으려다 멈추며, `spacedb` 집계는 OOS 공간을 어느 카테고리에 넣을지 정하기 전에 `assert_release (false)` 를 실행한다.
 
-OOS 파일에는 아직 owner class OID 가 들어 있지 않다. 따라서 이번 수정은 OOS 파일을 특정 class 로 귀속시키려 하지 않는다. 읽기 전용 utility 에서는 OOS VFID 자체를 순회 대상으로 인정하고, `spacedb` 는 출력 형식을 유지하기 위해 OOS 를 heap totals 에 합산한다.
+OOS 파일에는 아직 owner class OID 가 들어 있지 않다. 따라서 이번 수정은 OOS 파일을 특정 class 로 귀속시키려 하지 않는다. Interruptible file tracker 순회는 OOS VFID 를 보호 없이 반환하지 않고 skip 하며, `spacedb` 는 출력 형식을 유지하기 위해 OOS 를 heap totals 에 합산한다.
 
 ## Test Build
 
@@ -80,7 +80,7 @@ FILE_OOS utility path
 ├─ descriptor dump
 │  └─ "OOS file" 출력
 ├─ file tracker iteration
-│  └─ OOS VFID 반환, class_oid 는 null 유지
+│  └─ OOS VFID 는 owner descriptor 전까지 skip
 └─ spacedb accounting
    └─ SPACEDB_HEAP_FILE totals 에 합산
 ```
@@ -89,7 +89,7 @@ FILE_OOS utility path
 
 - `git diff --check` 통과.
 - debug GCC preset 빌드 성공.
-- OOS 행이 있는 DB 에서 `diagdb` file table/capacity 출력, `spacedb` file accounting, `checkdb` file tracker iteration 이 `FILE_OOS` assertion 없이 완료됨.
+- OOS 행이 있는 DB 에서 `diagdb` file table/capacity 출력, `spacedb` file accounting, `checkdb` file tracker iteration 이 `FILE_OOS` assertion 없이 완료됨. `checkdb` 의 OOS file table 검사는 owner descriptor 후속 작업 전까지 수행하지 않음.
 - targeted CTP `utility_19` 성공.
 - `cbrd_26527`, `tbl_enc_14` 는 아직 실패하지만 실패 원인은 `FILE_OOS` assertion/fatal 이 아니라 별도 expected-output 가정 차이로 분류됨.
 

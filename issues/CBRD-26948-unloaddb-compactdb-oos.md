@@ -8,13 +8,13 @@
 
 | 구분 | 내용 |
 |------|------|
-| **AS-IS (현재 동작 / 배경)** | `xlocator_fetch_all()` 의 Expand는 CBRD-26818에서 복구됐지만 검증이 남아 있다. standalone Compactdb는 Expand된 값을 정상 OOS Demotion 경로 없이 직접 갱신하며, server Compactdb는 OOS-aware attribute 계층을 사용하면서도 record 전체를 Expand한 길이로 처리 예산을 계산한다. |
+| **AS-IS (현재 동작 / 배경)** | `xlocator_fetch_all()` 의 Expand는 복구됐지만 검증이 남아 있다. standalone Compactdb는 Expand된 값을 정상 OOS Demotion 경로 없이 직접 갱신하며, server Compactdb는 OOS-aware attribute 계층을 사용하면서도 record 전체를 Expand한 길이로 처리 예산을 계산한다. |
 | **TO-BE (목표 상태 / 기대 동작)** | raw `RECDES` 를 OOS-blind decoder로 보내는 경로만 Expand하고, attribute 계층은 OOS Resolve를 사용하며, 물리 compaction은 OOS inline stub을 보존한다. Compactdb가 record를 다시 쓸 때는 PG-style four-record heap target을 적용하는 정상 OOS Demotion 경로를 거친다. |
-| **영향** | 설계 의도 훼손 및 export 장애. 회귀 상태에서는 `unloaddb` dump의 큰 값이 `X''` 로 빠졌고, 현재 standalone Compactdb의 강제 rewrite는 logical value를 inline 또는 `REC_BIGONE` 으로 되돌려 OOS 배치와 I/O 이점을 잃을 수 있다. Server mode에서는 큰 OOS logical value가 처리 예산보다 크다는 이유로 건너뛰어질 수 있다. |
+| **영향** | 설계 의도 훼손 및 export 장애. 회귀 상태에서는 `unloaddb` dump의 큰 값이 `X''` 로 빠졌고, 현재 standalone Compactdb의 강제 rewrite는 logical value를 inline 또는 `REC_BIGONE` 으로 되돌려 OOS 배치와 I/O 이점을 잃을 수 있다. Server mode에서는 expanded `obj->length > max_space_to_process` 인 OOS-backed row가 big object로 분류되어 건너뛰어질 수 있다. |
 
 **이슈 수행 방안**:
 
-- CBRD-26818의 `xlocator_fetch_all()` Expand를 CS/SA `unloaddb` E2E로 검증한다.
+- 현재 `xlocator_fetch_all()` Expand 동작을 CS/SA `unloaddb` E2E로 검증한다.
 - standalone Compactdb의 read Expand는 유지하되, rewrite는 OOS-aware attribute transformation/Demotion 경로로 통합한다.
 - server Compactdb는 stored-form record를 받고 `heap_attrinfo_read_dbvalues()` 에서 attribute별로 Resolve하도록 변경하는 방안을 검토한다. `space_to_process` 의 기준은 stored record length로 하는 것을 권장하나 최종 결정은 `TBD - 합의 미확인` 이다.
 - `heap_compact_pages()` 의 물리 compaction은 OOS inline stub을 그대로 보존한다.
@@ -37,8 +37,6 @@
 
 CBRD-26729에서 record-level OOS Expand를 opt-in으로 바꾼 뒤, raw record 소비자가 Expand를 요청하지 않으면 OOS OID가 값처럼 노출될 수 있었다. `unloaddb` 의 `desc_disk_to_obj()` 는 raw object representation을 해석하지만 OOS inline stub을 알지 못한다. 회귀 상태에서 50,008-byte `BIT VARYING` 값이 dump에 `X''` 로 기록된 이유다. 이 실패는 원본 database를 변경하는 손실이 아니라 export/dump 값 손실이다.
 
-현재 `xlocator_fetch_all()` 의 복구는 CBRD-26818 commit `1561c3b9c` 에서 이미 반영됐다. 이 commit이 `heap_next()` 를 `heap_next_expand_oos()` 로 바꾸고 copyarea ownership 및 `S_DOESNT_FIT` 처리를 보강했다. PR #7416의 CBRD-27029 변경은 기존 동작을 `HEAP_WITH_OOS_EXPAND` 로 명시하고, 별도의 `locator_lock_and_return_object()` 단건 fetch를 수정한 것이다.
-
 Compactdb에는 세 가지 서로 다른 흐름이 있다.
 
 | 흐름 | 실제 역할 | 필요한 OOS 처리 |
@@ -49,7 +47,7 @@ Compactdb에는 세 가지 서로 다른 흐름이 있다.
 
 standalone phase 1은 `sa/CMakeLists.txt` 에 포함되는 `src/executables/compactdb.c` 구현이다. `desc_disk_to_obj()` 가 OOS를 모르므로 읽기에는 Expand가 필요하다. 다만 변경된 object를 `desc_obj_to_disk()` 로 직렬화한 뒤 `heap_update_logical()` 로 직접 쓰면 `heap_attrinfo_determine_disk_layout()` 의 OOS Demotion을 거치지 않는다. logical value는 유지될 수 있지만 새 record가 완전 inline 또는 `REC_BIGONE` 이 되고, SA mode는 기존 record가 소유한 OOS value chain을 정리한다. 따라서 별도 재현 없이 영구 logical value 손실로 단정하지 않고, OOS 배치 정책을 잃는 확정적인 연동 gap으로 본다.
 
-server phase 1의 `src/storage/compactdb_sr.c` 는 `heap_attrinfo_read_dbvalues()` 로 OOS-backed attribute를 Resolve하고, 갱신도 `locator_attribute_info_force()` 를 사용한다. record-level Expand는 중복이다. 더구나 `process_class()` 는 Expand된 `obj->length` 를 `space_to_process` 와 비교하므로, heap에는 작은 stub record로 저장된 큰 OOS value가 big object로 분류되어 처리 대상에서 빠질 수 있다.
+server phase 1의 `src/storage/compactdb_sr.c` 는 `heap_attrinfo_read_dbvalues()` 로 OOS-backed attribute를 Resolve하고, 갱신도 `locator_attribute_info_force()` 를 사용한다. record-level Expand는 중복이다. 더구나 `process_class()` 는 Expand된 `obj->length` 를 `space_to_process` 와 비교하므로, `obj->length > max_space_to_process` 인 경우 heap에는 작은 stub record로 저장된 OOS value도 big object로 분류되어 처리 대상에서 빠진다. 최대 예산은 충분하지만 현재 호출의 남은 예산만 부족하면 다음 호출로 미룬다.
 
 `heap_compact_pages()` 가 호출하는 `spage_compact()` 는 attribute 값을 해석하지 않고 page 안에서 physical record bytes만 재배치한다. 이 경로는 OOS file을 읽거나 갱신하지 않으며 OOS inline stub을 그대로 보존해야 한다.
 
@@ -63,7 +61,7 @@ server phase 1의 `src/storage/compactdb_sr.c` 는 `heap_attrinfo_read_dbvalues(
 | OOS-aware attribute 계층으로 논리 값을 읽음 | OOS Resolve |
 | page/slot의 물리 record bytes를 이동 | stored form과 OOS inline stub 보존 |
 
-정책 enum type은 `HEAP_RECDES_CONSUMPTION_POLICY` 를 사용하고, 값은 호출 의도를 드러내는 `HEAP_RECDES_RAW_CONSUMER` / `HEAP_RECDES_ATTR_CONSUMER` 를 우선 검토한다. 실제 이름 확정은 `TBD - 합의 미확인` 이다.
+정책 enum type은 `HEAP_RECDES_CONSUMPTION_POLICY` 를 사용하고, 값은 raw record bytes의 실제 소비 여부를 드러내는 `HEAP_RECDES_RAW_BYTES_CONSUMED` / `HEAP_RECDES_RAW_BYTES_NOT_CONSUMED` 를 우선 검토한다. 실제 이름 확정은 `TBD - 합의 미확인` 이다.
 
 OOS Demotion 기준은 고정 `DB_PAGESIZE/4` 가 아니다. `heap_oos_inline_target_size()` 가 계산하는 PG-style four-record heap target이며, 현재 16KB I/O page layout에서는 4,060B다. 이 값은 heap page와 네 개 slot의 물리 overhead를 반영하고 heap unfill은 제외한다.
 
@@ -124,20 +122,20 @@ xlocator_lock_and_fetch_all()
 - [ ] CS와 SA mode `unloaddb` 에서 OOS-backed `BIT VARYING` 의 dump/reload 값이 원본과 byte-identical하다.
 - [ ] multi-chunk OOS value를 `unloaddb` 로 내보내도 빈 값 또는 truncated value가 생기지 않는다.
 - [ ] standalone Compactdb가 object를 갱신하지 않는 경우 logical value와 OOS 배치가 유지된다.
-- [ ] dangling OID 또는 old representation으로 standalone Compactdb rewrite를 유도한 뒤 logical value가 동일하고, 큰 가변 값이 정상 OOS Demotion을 다시 거친다.
-- [ ] server Compactdb가 expanded logical length만을 이유로 작은 stored OOS record를 big object로 건너뛰지 않는다.
-- [ ] `spage_compact()` 전후 OOS inline stub과 OOS value chain이 보존되고 logical value가 동일하다.
-- [ ] CBRD-27029 단건 client fetch에서 copyarea보다 큰 Expand가 `S_DOESNT_FIT` grow/retry로 정상 처리된다.
+- [ ] OOS-backed `BIT VARYING` 과 dangling OID 또는 old representation을 함께 가진 fixture로 standalone Compactdb rewrite를 유도한다. 값의 byte equality와 debug `oos.log` 의 새 `oos_insert` 를 확인한다. Fixture 생성 절차는 `TBD - 재현 절차 확정 필요` 다.
+- [ ] `stored length < max_space_to_process < expanded length` 인 row를 server Compactdb로 처리할 때 expansion만으로 `big_objects` 가 증가하지 않고 row가 처리된다.
+- [ ] OOS-backed row가 있는 page에서 같은 slot의 stored `RECDES` 를 `spage_compact()` 전후 byte-compare하고, compact 후 SELECT 값도 byte-identical함을 확인한다.
 
 ## Definition of done
 
 - [ ] 위 A/C를 모두 충족한다.
 - [ ] SQL 및 관련 utility regression test를 통과한다.
-- [ ] fix ownership과 Compactdb mode 구분을 PR/commit/JIRA 중 최소 한 곳에 남긴다.
+- [ ] live JIRA의 관련 이슈와 PR link를 실제 수정 소유권에 맞게 갱신한다.
 - [ ] Compactdb 잔여 범위를 별도 이슈로 분리할 경우 상호 링크를 추가한다.
 
 ## Remarks
 
 - `BIT VARYING` 을 테스트 데이터로 사용한다. `VARCHAR` 는 압축되어 disk size가 예측과 달라질 수 있다.
 - release build에서는 attribute가 실제 OOS-backed 상태인지 SQL만으로 직접 확인하기 어렵다. debug `oos.log` 의 `oos_insert` 기록을 사용하고, CBRD-26871의 관측 기능이 제공되면 그 방식으로 교체한다.
+- CBRD-27029의 single-object client fetch와 `S_DOESNT_FIT` grow/retry 검증은 관련 작업이지만 이 이슈의 A/C에는 포함하지 않는다.
 - live JIRA 유형은 Sub-task, 상태는 Open이다.

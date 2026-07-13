@@ -61,7 +61,7 @@ server phase 1의 `src/storage/compactdb_sr.c` 는 `heap_attrinfo_read_dbvalues(
 | OOS-aware attribute 계층으로 논리 값을 읽음 | OOS Resolve |
 | page/slot의 물리 record bytes를 이동 | stored form과 OOS inline stub 보존 |
 
-정책 enum type은 `HEAP_RECDES_CONSUMPTION_POLICY` 를 사용하고, 값은 raw record bytes의 실제 소비 여부를 드러내는 `HEAP_RECDES_RAW_BYTES_CONSUMED` / `HEAP_RECDES_RAW_BYTES_NOT_CONSUMED` 를 우선 검토한다. 실제 이름 확정은 `TBD - 합의 미확인` 이다.
+정책 enum type은 `HEAP_RECDES_CONSUMPTION_POLICY` 를 사용하고, 값은 raw record bytes의 실제 소비 여부를 드러내는 `HEAP_RECDES_CONSUME_RAW_BYTES` / `HEAP_RECDES_DONT_CONSUME_RAW_BYTES` 로 확정한다. 네트워크 전송은 대표적인 raw 소비 사례지만 유일한 사례가 아니므로, transport가 아니라 caller의 소비 계약을 이름에 사용한다.
 
 OOS Demotion 기준은 고정 `DB_PAGESIZE/4` 가 아니다. `heap_oos_inline_target_size()` 가 계산하는 PG-style four-record heap target이며, 현재 16KB I/O page layout에서는 4,060B다. 이 값은 heap page와 네 개 slot의 물리 overhead를 반영하고 heap unfill은 제외한다.
 
@@ -79,15 +79,15 @@ a8a192f33  CBRD-26458 / PR #6766
 1561c3b9c  CBRD-26818 / PR #7337
   xlocator_fetch_all() Expand 복구와 copyarea 처리 보강
 
-309753de6, f59e9b8b2  CBRD-27029 / PR #7416
-  explicit policy enum 적용, single-object client fetch 수정
+309753de6, f59e9b8b2, 81f7dbbf3  CBRD-27029 / PR #7416
+  explicit RECDES consumption policy 적용, single-object client fetch 수정
 ```
 
 ### unloaddb와 standalone Compactdb read
 
 ```text
 xlocator_fetch_all()
-  -> heap_next(..., HEAP_WITH_OOS_EXPAND)
+  -> heap_next(..., HEAP_RECDES_CONSUME_RAW_BYTES)
   -> expanded RECDES를 LC_COPYAREA에 적재
   -> desc_disk_to_obj()가 raw record parse
 ```

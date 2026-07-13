@@ -12,7 +12,7 @@
 |------|------|
 | **AS-IS (`feat/oos`)** | `heap_attrinfo_determine_disk_layout()` 의 trigger 와 loop stop 이 모두 `DB_PAGESIZE / 4` 를 직접 사용한다. Current layout 에서는 4,086B 이며 slotted-page header, heap chain record/slot, 네 user slot 과 alignment 를 반영하지 않아 target-sized record 네 개가 물리적으로 들어간다는 보장이 없다. |
 | **TO-BE** | `heap_nonheader_page_capacity()` 기반 four-record target 4,060B 를 trigger 와 loop stop 에 함께 사용한다. P사의 TOAST threshold/target 과 fillfactor 분리처럼 CUBRID `unfill_factor` 는 target 계산에서 제외한다. |
-| **영향** | 4,060B 초과 4,086B 이하 record 가 `feat/oos` 에서는 OOS demotion 없이 inline 으로 남는다. 따라서 “한 page 에 네 record 가 들어가는 target”이라는 설계 의도와 실제 gate 가 다르고, heap page 사용량/fragmentation 과 OOS 선택이 의도한 P사 방식에서 벗어난다. |
+| **영향** | 각각 4,064B인 record 네 개와 slot 네 개에는 16,272B가 필요하지만, 한 page에서 record에 쓸 수 있는 공간은 16,268B뿐이다. 따라서 네 개를 한 page에 함께 저장할 수 없다. 그런데 `feat/oos` 는 4,064B가 4,086B보다 작다는 이유로 OOS를 시작하지 않고 이 record를 heap에 그대로 둔다. 즉 “한 page에 네 record가 들어가는 크기까지만 inline으로 둔다”는 기준과 실제 동작이 다르다. |
 
 **이슈 수행 방안**: `heap_nonheader_page_capacity()` 에서 네 `SPAGE_SLOT_SIZE` 를 뺀 뒤 4로 나누고
 `HEAP_MAX_ALIGN` 으로 내림 정렬한 helper 를 추가한다. 이 값을 record gate 와 largest-first loop stop 에 함께
@@ -41,7 +41,7 @@ P사는 TOAST activation/target과 heap fillfactor를 서로 다른 call path에
 |----|----------|-------------|
 | trigger | `TOAST_TUPLE_THRESHOLD = MaximumBytesPerTuple(4)`. INSERT/UPDATE 경로에서 tuple이 threshold를 넘거나 external value를 포함하면 toaster를 호출한다. | `heap_attrinfo_determine_disk_layout()` 에서 recdes가 OOS target을 넘으면 demotion을 시작한다. |
 | target/stop | 기본 `TOAST_TUPLE_TARGET` 은 threshold와 같다. Toaster는 tuple data가 target 이하가 될 때까지 큰 attribute를 처리한다. | trigger와 largest-first loop stop에 같은 `heap_oos_inline_target_size()` 를 사용한다. |
-| four-record 계산 | Page header와 네 `ItemIdData` 를 제외한 공간을 4로 나눈 뒤 alignment를 내림한다. 기본 8KB build에서는 2,040B다. | Non-header heap capacity에서 네 `SPAGE_SLOT_SIZE` 를 제외하고 4로 나눈 뒤 `HEAP_MAX_ALIGN` 으로 내림한다. Current layout에서는 4,060B다. |
+| four-record 계산 | Page header와 네 `ItemIdData` 를 제외한 공간을 4로 나눈 뒤 alignment를 내림한다. 8-byte `MAXALIGN` 을 사용하는 기본 8KB build에서는 2,032B다. | Non-header heap capacity에서 네 `SPAGE_SLOT_SIZE` 를 제외하고 4로 나눈 뒤 `HEAP_MAX_ALIGN` 으로 내림한다. Current layout에서는 4,060B다. |
 | fillspace | `RelationGetBufferForTuple()` 가 fillfactor로 `saveFreeSpace` 를 계산하여 FSM/target page 선택에 사용한다. `MaximumBytesPerTuple(4)` 에는 넣지 않는다. | `heap_stats_find_best_page()` 가 `heap_hdr->unfill_space` 를 page 선택에 사용한다. OOS target helper에는 넣지 않는다. |
 | 이번 이슈 범위 밖 | Relation별 `toast_tuple_target`, `STORAGE MAIN` 용 `MaximumBytesPerTuple(1)`, compression/storage strategy가 있다. | Table별 target, MAIN 대응 target, compression 및 기존 `STORAGE PREFER_INLINE` priority 변경은 추가하지 않는다. |
 

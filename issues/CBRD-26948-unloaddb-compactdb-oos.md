@@ -1,133 +1,143 @@
-# [OOS] unloaddb/compactdb 의 OOS 컬럼 값 손실 (#7093 expand opt-in 회귀)
+# [OOS] unloaddb raw record 값 보존 및 Compactdb OOS 연동 정리
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS 컬럼(큰 가변 컬럼)을 가진 행을 `unloaddb` 로 내보내거나 `compactdb` 오프라인 정리로 다룰 때, #6766 에서 넣었다가 #7093 에서 빠진 OOS 값 펼침(expand)을 복구해 값이 손실되지 않도록 한다.
+**이슈 수행 목적**: `unloaddb` 와 Compactdb가 OOS-backed attribute를 각 소비 방식에 맞게 처리하도록 한다. 이미 반영된 raw fetch 수정의 소유권을 바로잡고, Compactdb의 남은 OOS 쓰기 및 처리 예산 문제를 분리한다.
 
 **이슈 수행 이유**:
 
-`OOS` (Out-of-row Storage. heap 레코드의 큰 가변 컬럼을 별도 페이지로 분리하고, heap 안에는 그 위치(8바이트 OID)와 길이(8바이트)로 이루어진 16바이트 인라인 스텁(`OR_OOS_INLINE_SIZE`)만 남기는 저장 방식)에서, `unloaddb` 가 큰 컬럼 값을 통째로 잃는 회귀가 있다.
-
-- **현재 동작 / 배경**: #6766 (CBRD-26458, `OOS supports unloaddb`) 은 fetch 공통 경로 `heap_get_record_data_when_all_ready` 에서 OOS 를 **무조건** 펼치게 만들어, `unloaddb` 가 값을 받도록 고쳤다. 이후 #7093 (CBRD-26729) 이 펼침을 opt-in 으로 바꾸면서(`if (!context->expand_oos) return`, `heap_oos.cpp:342`) 호출자들을 `heap_get_visible_version_expand_oos` 로 전환했는데, 형제 경로 `xlocator_lock_and_fetch_all` (`locator_sr.c:12125` 부근)은 전환됐지만 `unloaddb` 가 실제로 쓰는 대량 인스턴스 경로 `xlocator_fetch_all` (`heap_next` 사용, `locator_sr.c:2906`)은 누락됐다. 받는 쪽 디코더 `desc_disk_to_obj` -> `get_desc_current` (`src/loaddb/load_object.c`) 는 OOS 를 전혀 모르므로(이 파일에 `oos` 코드 0줄) 펼치지 않은 스텁을 값으로 해석하지 못한다.
-- **영향**: 데이터 손실(회귀). 실측 결과 OOS 컬럼(`DISK_SIZE` 50008바이트)을 가진 행을 `unloaddb` 하면 그 컬럼이 빈 값 `X''` 로 나온다. 같은 테이블의 비-OOS 행은 정상이라, 백업/이행 시 큰 컬럼만 조용히 통째로 사라진다.
+| 구분 | 내용 |
+|------|------|
+| **AS-IS (현재 동작 / 배경)** | `xlocator_fetch_all()` 의 Expand는 CBRD-26818에서 복구됐지만 검증이 남아 있다. standalone Compactdb는 Expand된 값을 정상 OOS Demotion 경로 없이 직접 갱신하며, server Compactdb는 OOS-aware attribute 계층을 사용하면서도 record 전체를 Expand한 길이로 처리 예산을 계산한다. |
+| **TO-BE (목표 상태 / 기대 동작)** | raw `RECDES` 를 OOS-blind decoder로 보내는 경로만 Expand하고, attribute 계층은 OOS Resolve를 사용하며, 물리 compaction은 OOS inline stub을 보존한다. Compactdb가 record를 다시 쓸 때는 PG-style four-record heap target을 적용하는 정상 OOS Demotion 경로를 거친다. |
+| **영향** | 설계 의도 훼손 및 export 장애. 회귀 상태에서는 `unloaddb` dump의 큰 값이 `X''` 로 빠졌고, 현재 standalone Compactdb의 강제 rewrite는 logical value를 inline 또는 `REC_BIGONE` 으로 되돌려 OOS 배치와 I/O 이점을 잃을 수 있다. Server mode에서는 큰 OOS logical value가 처리 예산보다 크다는 이유로 건너뛰어질 수 있다. |
 
 **이슈 수행 방안**:
 
-`unloaddb` 의 fetch 경로가 OOS 를 다시 펼치도록 복구하되, #7093 의 opt-in 설계는 유지한다 (전체 무조건 펼침으로 되돌리지 않는다).
-
-| 수준 | 경로 | 조치 |
-|------|------|------|
-| 값(value) | `unloaddb` 의 `xlocator_fetch_all`, `compactdb` 오프라인 참조정리의 `locator_fetch_all` | 형제 `xlocator_lock_and_fetch_all` 처럼 OOS 를 펼쳐서(expand) 클라이언트에 보낸다 |
-| 물리(physical) | heap 페이지 압축 `spage_compact` (`heap_compact_pages`) | 이 경로를 타지 않으며 OOS 스텁을 그대로 둬야 한다. 변경 금지, 검증 테스트만 |
-
-`compactdb` 오프라인 참조정리는 `unloaddb` 와 같은 `locator_fetch_all` + `desc_disk_to_obj` 경로라 같은 회귀를 공유한다(코드 경로 동일 기반 추론, 별도 실측은 후속). 다시 저장(`disk_update_instance`)까지 하므로 깨진 값이 영구 기록될 수 있어 더 위험하다. 다만 compactdb 는 재저장 의미 때문에 단순 server expand 가 맞는지 자체가 ANALYSIS 대상이다(`unloaddb` 와 수정 방식이 다를 수 있다). 단일 객체 fetch `xlocator_fetch` -> 워크스페이스 디코드 `tf_disk_to_mem` 도 같은 노출 가능성이 있어 확인 후 결정. 정확한 수정 위치 선택은 `TBD - ANALYSIS 단계에서 결정`.
-
-사용자 인용: "unloaddb focuses on reading the values ... so OOS OIDs must disappear before network send, while compactdb tries to compact the heap page so it must know the exact size of recdes, without OOS OIDs replaced to value".
+- CBRD-26818의 `xlocator_fetch_all()` Expand를 CS/SA `unloaddb` E2E로 검증한다.
+- standalone Compactdb의 read Expand는 유지하되, rewrite는 OOS-aware attribute transformation/Demotion 경로로 통합한다.
+- server Compactdb는 stored-form record를 받고 `heap_attrinfo_read_dbvalues()` 에서 attribute별로 Resolve하도록 변경하는 방안을 검토한다. `space_to_process` 의 기준은 stored record length로 하는 것을 권장하나 최종 결정은 `TBD - 합의 미확인` 이다.
+- `heap_compact_pages()` 의 물리 compaction은 OOS inline stub을 그대로 보존한다.
+- Compactdb 잔여 구현을 별도 이슈로 분리할지 여부는 `TBD - 합의 미확인` 이다.
 
 ---
 
 ## AI-Generated Context
 
-> 아래 내용은 AI 가 코드/git 이력/실측을 분석해 작성한 상세 자료다. 빠른 triage 에는 위 Issue Triage 블록만으로 충분하며, 본문은 구현/리뷰 단계에서 참고하면 된다.
+> 아래는 AI가 코드와 git 이력을 분석해 작성한 상세 자료다. 빠른 triage에는 위 Issue Triage 블록만으로 충분하며, 본문은 구현과 리뷰 단계에서 참고하면 된다.
 
 ### Summary
 
-- **문제 / 목적**: `unloaddb` 가 OOS 컬럼 값을 빈 값으로 내보내는 회귀를 고친다.
-- **원인 / 배경**: #7093 이 OOS 펼침을 opt-in 으로 바꾸며 `xlocator_fetch_all`(unloaddb 경로)을 `_expand_oos` 로 전환하지 못해, #6766 이 넣은 펼침이 무력화됐다.
-- **제안 / 변경**: value 소비자 경로에서 서버가 다시 펼쳐 보낸다. physical 압축은 그대로 둔다.
-- **영향 범위**: `unloaddb`, `compactdb` 오프라인 정리, 클라이언트 디코더 `load_object.c`. OOS 컬럼을 가진 테이블만 해당. 출시 전 `feat/oos` 기능.
-
----
+- **변경 범위 / 영향**: `src/transaction/locator_sr.c`, `src/loaddb/load_object.c`, `src/executables/compactdb.c`, `src/storage/compactdb_sr.c`, `src/storage/heap_file.c` 가 대상이다. 출시 전 `feat/oos` 동작이며 저장 형식 호환성 변경은 없다.
+- **관련 작업**: CBRD-26458/PR #6766, CBRD-26729/PR #7093, CBRD-26818/PR #7337, CBRD-27029/PR #7416과 연결된다.
 
 ## Description
 
-비유로 먼저 보면 이렇다. heap 레코드는 "상자"이고, 큰 컬럼 값은 너무 커서 상자 밖 창고에 두고 상자 안에는 "창고 위치 메모(16바이트 인라인 스텁: 8바이트 OID + 8바이트 길이)" 만 넣어 둔다. `unloaddb` 는 상자 내용을 베껴 파일로 내보내는데, 받는 쪽 디코더가 이 메모를 해석하지 못해 그 컬럼을 빈 값으로 떨어뜨린다. 결국 내보낸 파일에는 창고 안의 진짜 물건이 통째로 빠진다.
+`OOS` (Out-of-row Overflow Storage)는 큰 가변 attribute 값을 별도 OOS value chain에 두고 heap record에는 16-byte OOS inline stub만 남긴다. stub은 8-byte head OOS OID와 8-byte full length로 구성된다.
 
-핵심은 같은 heap 레코드를 두 방식으로 쓴다는 점이다.
+CBRD-26729에서 record-level OOS Expand를 opt-in으로 바꾼 뒤, raw record 소비자가 Expand를 요청하지 않으면 OOS OID가 값처럼 노출될 수 있었다. `unloaddb` 의 `desc_disk_to_obj()` 는 raw object representation을 해석하지만 OOS inline stub을 알지 못한다. 회귀 상태에서 50,008-byte `BIT VARYING` 값이 dump에 `X''` 로 기록된 이유다. 이 실패는 원본 database를 변경하는 손실이 아니라 export/dump 값 손실이다.
 
-- **값(value) 으로 해석하는 소비자** (`SELECT`, `unloaddb`): 컬럼의 실제 값이 필요하므로, 서버가 인라인 스텁을 실제 값으로 펼쳐서 줘야 한다.
-- **물리(physical) 구조로 다루는 소비자** (heap 페이지 압축): 디스크에 적힌 레코드 바이트 그 자체를 옮기므로, 16바이트 스텁이 그대로 있어야 한다. 펼쳐서 값으로 바꾸면 레코드가 슬롯보다 커져 페이지가 깨진다.
+현재 `xlocator_fetch_all()` 의 복구는 CBRD-26818 commit `1561c3b9c` 에서 이미 반영됐다. 이 commit이 `heap_next()` 를 `heap_next_expand_oos()` 로 바꾸고 copyarea ownership 및 `S_DOESNT_FIT` 처리를 보강했다. PR #7416의 CBRD-27029 변경은 기존 동작을 `HEAP_WITH_OOS_EXPAND` 로 명시하고, 별도의 `locator_lock_and_return_object()` 단건 fetch를 수정한 것이다.
 
-`SELECT` 가 멀쩡한 이유는, 질의 결과는 OOS 를 아는 속성 계층(`heap_attrinfo_read_dbvalues`)을 거쳐 펼쳐진 값 튜플로 나오기 때문이다. `unloaddb` 는 그 계층을 거치지 않고 `recdes` (heap 레코드 디스크립터. 디스크에 적힌 레코드 바이트와 길이를 담는 구조체) 바이트를 직접 해석하므로, 서버가 미리 펼쳐 주지 않으면 값을 잃는다.
+Compactdb에는 세 가지 서로 다른 흐름이 있다.
 
-### 회귀 이력 (git)
+| 흐름 | 실제 역할 | 필요한 OOS 처리 |
+|------|-----------|-----------------|
+| standalone phase 1 | raw `RECDES` 를 decode해 dangling OID/object reference와 old representation을 정리하고, 변경 시 다시 기록 | read 전에 Expand, write 전에 정상 OOS Demotion |
+| server phase 1 | `HEAP_CACHE_ATTRINFO` 로 attribute를 읽고 같은 논리 정리를 수행 | record Expand 없이 attribute별 Resolve |
+| physical page compaction | page 안에서 stored record bytes를 이동 | OOS inline stub 보존 |
 
-```
-a8a192f33  #6766 [CBRD-26458] OOS supports unloaddb: client receives OOS values instead of raw OOS OIDs
-            -> heap_get_record_data_when_all_ready 에서 OOS 를 무조건 펼침 (커밋 의도상 unloaddb 가 값을 받게 됨; a8a192f33 시점 실측은 미수행).
+standalone phase 1은 `sa/CMakeLists.txt` 에 포함되는 `src/executables/compactdb.c` 구현이다. `desc_disk_to_obj()` 가 OOS를 모르므로 읽기에는 Expand가 필요하다. 다만 변경된 object를 `desc_obj_to_disk()` 로 직렬화한 뒤 `heap_update_logical()` 로 직접 쓰면 `heap_attrinfo_determine_disk_layout()` 의 OOS Demotion을 거치지 않는다. logical value는 유지될 수 있지만 새 record가 완전 inline 또는 `REC_BIGONE` 이 되고, SA mode는 기존 record가 소유한 OOS value chain을 정리한다. 따라서 별도 재현 없이 영구 logical value 손실로 단정하지 않고, OOS 배치 정책을 잃는 확정적인 연동 gap으로 본다.
 
-4a6805e37  #7093 [CBRD-26729] Re-enable OOS OID replacement without class repr
-            -> 펼침을 opt-in 으로 변경 (heap_oos.cpp: if (!context->expand_oos) return).
-            -> locator_sr.c 의 8개 호출자를 _expand_oos 로 전환 (xlocator_lock_and_fetch_all 포함).
-            [!] xlocator_fetch_all (unloaddb 대량 경로, heap_next) 는 전환에서 누락 -> 회귀 발생.
-```
+server phase 1의 `src/storage/compactdb_sr.c` 는 `heap_attrinfo_read_dbvalues()` 로 OOS-backed attribute를 Resolve하고, 갱신도 `locator_attribute_info_force()` 를 사용한다. record-level Expand는 중복이다. 더구나 `process_class()` 는 Expand된 `obj->length` 를 `space_to_process` 와 비교하므로, heap에는 작은 stub record로 저장된 큰 OOS value가 big object로 분류되어 처리 대상에서 빠질 수 있다.
 
-### 코드 흐름
+`heap_compact_pages()` 가 호출하는 `spage_compact()` 는 attribute 값을 해석하지 않고 page 안에서 physical record bytes만 재배치한다. 이 경로는 OOS file을 읽거나 갱신하지 않으며 OOS inline stub을 그대로 보존해야 한다.
 
-```
-[unloaddb 경로 = 값 해석: OOS 를 펼쳐야 하는데 #7093 이후 안 펼친다]
+## Specification Changes
 
- unload_object.c:1535  locator_fetch_all
-   -> 서버 xlocator_fetch_all (locator_sr.c:2775, 내부 heap_next at 2906)
-        [!] expand_oos=false 라 heap_record_replace_oos_oids 가 그냥 반환 -> 스텁이 recdes 에 그대로
-   -> 클라이언트 desc_disk_to_obj (load_object.c:914) -> get_desc_current
-        [!] OOS 를 모름 -> 스텁을 해석 못 하고 컬럼을 빈 값으로 떨어뜨림
+### `RECDES` 소비 정책
 
-[heap 압축 경로 = 물리 구조: 그대로 둬야 하고, 실제로 그대로 둔다 (정상)]
+| 소비자 | 정책 |
+|--------|------|
+| raw bytes를 `LC_COPYAREA` 로 보내거나 OOS-blind decoder로 parse | OOS Expand |
+| OOS-aware attribute 계층으로 논리 값을 읽음 | OOS Resolve |
+| page/slot의 물리 record bytes를 이동 | stored form과 OOS inline stub 보존 |
 
- xboot_heap_compact (boot_sr.c:5851) -> heap_compact_pages (heap_file.c:18339)
-        -> spage_compact (heap_file.c:18419)
-           [ok] 페이지 안에서 레코드 바이트를 통째로 옮김. 값 해석 안 함, OOS 파일 안 건드림
-```
+정책 enum type은 `HEAP_RECDES_CONSUMPTION_POLICY` 를 사용하고, 값은 호출 의도를 드러내는 `HEAP_RECDES_RAW_CONSUMER` / `HEAP_RECDES_ATTR_CONSUMER` 를 우선 검토한다. 실제 이름 확정은 `TBD - 합의 미확인` 이다.
 
-### Test Build
+OOS Demotion 기준은 고정 `DB_PAGESIZE/4` 가 아니다. `heap_oos_inline_target_size()` 가 계산하는 PG-style four-record heap target이며, 현재 16KB I/O page layout에서는 4,060B다. 이 값은 heap page와 네 개 slot의 물리 overhead를 반영하고 heap unfill은 제외한다.
 
-`feat/oos` 브랜치 (`origin/feat/oos`, debug 빌드). 출시 전 기능이라 정식 릴리스 버전은 없다. 회귀 도입 커밋은 `4a6805e37` (#7093).
+## Implementation
 
-### Repro
+### 수정 이력
 
-```sql
--- 1) 비-OOS 대조행(id=1)과 OOS 행(id=2) 삽입. id=2 는 demotion 임계치(heap_file.c:12206 의 DB_PAGESIZE/4, 기본 16K 페이지 기준 4096바이트)를 넘겨 OOS 로 분리된다.
-csql -S -c "CREATE TABLE t (id INT PRIMARY KEY, big BIT VARYING); INSERT INTO t VALUES (1, REPEAT(X'CD', 10)); INSERT INTO t VALUES (2, REPEAT(X'AB', 50000)); COMMIT;" testdb
+```text
+a8a192f33  CBRD-26458 / PR #6766
+  unloaddb를 위해 record-level Expand 도입
 
--- 2) 저장 크기 확인: id=2 의 DISK_SIZE 가 임계치를 크게 넘는다 (실측 50008바이트)
-csql -S -c "SELECT id, DISK_SIZE(big) FROM t ORDER BY id;" testdb
-```
+4a6805e37  CBRD-26729 / PR #7093
+  Expand를 opt-in으로 변경
 
-```bash
-# 3) 서버를 띄운 뒤 unloaddb (클라이언트가 네트워크로 recdes 를 받는 경로)
-cubrid server start testdb
-cubrid unloaddb testdb
-cubrid server stop testdb
+1561c3b9c  CBRD-26818 / PR #7337
+  xlocator_fetch_all() Expand 복구와 copyarea 처리 보강
 
-# 4) 생성된 데이터 파일 확인
-cat testdb_objects
+309753de6, f59e9b8b2  CBRD-27029 / PR #7416
+  explicit policy enum 적용, single-object client fetch 수정
 ```
 
-### Expected Result
+### unloaddb와 standalone Compactdb read
 
-`testdb_objects` 에서 id=2 의 `big` 값이 INSERT 한 `REPEAT(X'AB', 50000)` 전체로 나온다 (긴 `X'abab...'`).
-
-### Actual Result
-
-id=2 의 `big` 이 빈 값으로 나온다. 대조행 id=1(비-OOS)은 정상이라, OOS 컬럼만 손실된다.
-
-```
-%id [public].[t] 74
-%class [public].[t] ([id] [big])
-1 X'cdcdcdcdcdcdcdcdcdcd'   <- 비-OOS, 정상
-2 X''                       <- OOS, 값 손실
+```text
+xlocator_fetch_all()
+  -> heap_next(..., HEAP_WITH_OOS_EXPAND)
+  -> expanded RECDES를 LC_COPYAREA에 적재
+  -> desc_disk_to_obj()가 raw record parse
 ```
 
-CS 모드(서버 기동)와 SA 모드(`cubrid unloaddb --SA-mode`) 모두에서 동일하게 재현된다.
+### standalone Compactdb rewrite
 
-### Additional Information
+```text
+process_object()
+  -> disk_update_instance()
+     -> desc_obj_to_disk()
+     -> heap_update_logical()
+        ★ OOS-aware attribute transformation/Demotion을 거치지 않음
+```
 
-- **형제 경로는 #7093 에서 전환됐다.** `xlocator_lock_and_fetch_all` (`locator_sr.c:12125` 부근)은 `_expand_oos` 로 바뀌었지만 대량 인스턴스 경로 `xlocator_fetch_all` 만 누락됐다.
-- **compactdb 는 두 갈래다.** 오프라인 참조정리(`compactdb.c:442` 의 `desc_disk_to_obj`)는 `unloaddb` 와 같은 경로라 같은 회귀를 공유하며, `disk_update_instance` 로 다시 저장하므로 영구 손상 위험이 있다. 물리 페이지 압축(`spage_compact`)은 이 경로를 타지 않고 OOS 스텁을 그대로 옮기므로 정상이며, 건드리면 안 된다.
-- **단일 객체 fetch 경로**: `xlocator_fetch` -> 워크스페이스 디코드 `tf_disk_to_mem` 도 OOS 를 모를 가능성이 있다. SQL `SELECT` 는 안전(결과는 이미 펼쳐진 값 튜플). 확인 후 별도 처리 여부 결정.
-- **관련 이슈**: CBRD-26458(#6766, unloaddb expand 최초 도입), CBRD-26729(#7093, opt-in 전환 및 회귀 도입), CBRD-26847(opt-in 호출자 전수조사 후속), 부모 CBRD-26583(OOS M2).
+server Compactdb처럼 `HEAP_CACHE_ATTRINFO` 와 `locator_attribute_info_force()` 를 사용하거나, 동등한 정상 OOS transformation 경로를 사용하도록 맞춰야 한다.
+
+### server Compactdb
+
+```text
+xlocator_lock_and_fetch_all()
+  -> 현재 expanded RECDES 반환
+  -> obj->length로 space_to_process 판정
+     ★ logical expanded length가 processing budget을 왜곡할 수 있음
+  -> heap_attrinfo_read_dbvalues()
+  -> locator_attribute_info_force()
+```
+
+`xlocator_lock_and_fetch_all()` 의 다른 직접 caller도 OOS-aware attribute 계층을 사용하는지 확인한 뒤, stored-form fetch로 바꾸거나 `HEAP_RECDES_CONSUMPTION_POLICY` 를 인자로 받도록 한다.
+
+## Acceptance Criteria
+
+- [ ] CS와 SA mode `unloaddb` 에서 OOS-backed `BIT VARYING` 의 dump/reload 값이 원본과 byte-identical하다.
+- [ ] multi-chunk OOS value를 `unloaddb` 로 내보내도 빈 값 또는 truncated value가 생기지 않는다.
+- [ ] standalone Compactdb가 object를 갱신하지 않는 경우 logical value와 OOS 배치가 유지된다.
+- [ ] dangling OID 또는 old representation으로 standalone Compactdb rewrite를 유도한 뒤 logical value가 동일하고, 큰 가변 값이 정상 OOS Demotion을 다시 거친다.
+- [ ] server Compactdb가 expanded logical length만을 이유로 작은 stored OOS record를 big object로 건너뛰지 않는다.
+- [ ] `spage_compact()` 전후 OOS inline stub과 OOS value chain이 보존되고 logical value가 동일하다.
+- [ ] CBRD-27029 단건 client fetch에서 copyarea보다 큰 Expand가 `S_DOESNT_FIT` grow/retry로 정상 처리된다.
+
+## Definition of done
+
+- [ ] 위 A/C를 모두 충족한다.
+- [ ] SQL 및 관련 utility regression test를 통과한다.
+- [ ] fix ownership과 Compactdb mode 구분을 PR/commit/JIRA 중 최소 한 곳에 남긴다.
+- [ ] Compactdb 잔여 범위를 별도 이슈로 분리할 경우 상호 링크를 추가한다.
 
 ## Remarks
 
-후속 분리 검토: (A) `xlocator_fetch_all`/`compactdb` 오프라인 경로의 서버측 OOS expand 복구, (B) 물리 압축이 OOS 레코드를 보존하는지 검증 테스트 추가, (C) `xlocator_fetch` 단일 객체 경로의 OOS 노출 확인.
+- `BIT VARYING` 을 테스트 데이터로 사용한다. `VARCHAR` 는 압축되어 disk size가 예측과 달라질 수 있다.
+- release build에서는 attribute가 실제 OOS-backed 상태인지 SQL만으로 직접 확인하기 어렵다. debug `oos.log` 의 `oos_insert` 기록을 사용하고, CBRD-26871의 관측 기능이 제공되면 그 방식으로 교체한다.
+- live JIRA 유형은 Sub-task, 상태는 Open이다.

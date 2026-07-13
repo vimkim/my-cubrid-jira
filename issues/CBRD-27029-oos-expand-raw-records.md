@@ -1,146 +1,178 @@
-# [OOS] heap fetch API 에 OOS Expand 정책 인자를 추가해 raw record 계약 명시
+# [OOS] raw RECDES 소비 경로에서 실제 컬럼 값이 담긴 record 를 받도록 heap fetch 계약 명시
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS 적용 후 heap fetch 호출자가 record-level Expand 여부를 호출 지점에서 명시하도록 public API 계약을 바꾼다. 동작 변경은 없다 — 모든 call site 는 기존 동작을 그대로 유지한다.
-
-> **스코프 축소 (2026-07-07)**: 최초에는 develop merge 후 약 300건의 shell test 실패 회귀를 전수 조사·수정하는 이슈였으나, 해당 실패는 CI 환경 버그 (OOS unittestdb conf 미복원, #7427 hotfix 로 해결) 로 판명됐다. 이에 따라 본 이슈는 API 계약 명시화만 남기고, call site 재분류 (WITH↔WITHOUT flip) 는 CBRD-26847 audit 으로 이관한다.
+**이슈 수행 목적**: 주요 heap fetch API 와 locator getter 가 반환 record 의 소비 계약을 필수 인자로 받게 한다. raw bytes 를 직접 쓰는 호출자는 실제 컬럼 값이 담긴 record 를 받는다.
 
 **이슈 수행 이유**:
 
 | 항목 | 내용 |
 |------|------|
-| **AS-IS (현재 동작 / 배경)** | 근본 원인은 `heap_next()` 같은 public heap fetch API signature 를 유지한 데 있다. `*_expand_oos()` / `*_skip_oos_expand()` wrapper 를 나눠도 develop 에서 들어온 새 `heap_next()` 호출자는 OOS 정책을 고르지 않은 채 컴파일되므로, 누락된 call site 가 runtime 회귀로만 드러난다. |
-| **TO-BE (목표 상태 / 기대 동작)** | `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 호출 시 `HEAP_OOS_EXPAND_POLICY` 를 반드시 넘긴다. develop 에 OOS 관련 인자 처리 없이 새 호출자가 들어오면 무조건 빌드 실패가 나고, reviewer 가 `HEAP_WITH_OOS_EXPAND` / `HEAP_WITHOUT_OOS_EXPAND` 를 명시해야 한다. |
-| **영향** | QA 실패 및 데이터 정합성 위험 -- `unloaddb`/`compactdb`/`LC_COPYAREA` 처럼 `RECDES.data` 를 직접 직렬화하거나 `or_*` parser 로 읽는 경로가 16B OOS OID 슬롯을 컬럼 값으로 내보낼 수 있다. 반대로 query scan hot path 에서 중복 Expand/Resolve 가 발생하면 불필요한 OOS I/O 가 생긴다. |
+| **AS-IS (현재 동작 / 배경)** | 기존 API 를 호출할 때 반환 `RECDES` 의 소비 방식을 밝히지 않아도 컴파일되므로, develop 에서 추가된 호출부가 OOS 검토 없이 merge 될 수 있다. 단건 object fetch 도 OOS 값을 복원하지 않은 record 를 client 로 보냈다. |
+| **TO-BE (목표 상태 / 기대 동작)** | 정책 인자를 추가한 heap fetch API 5종과 locator getter 3종은 raw bytes 소비 여부를 반드시 받는다. 단건 object fetch 를 포함한 raw-byte 경로는 실제 컬럼 값이 담긴 record 를 반환하며, 정책을 빠뜨린 새 호출부는 compile error 로 드러난다. |
+| **영향** | 데이터 정합성 -- `unloaddb` 가 record 를 byte 단위로 client 에 전송할 때 OOS 저장 위치 정보가 컬럼 값처럼 노출되면 fetch 또는 parsing 이 실패할 수 있다. |
 
 **이슈 수행 방안**:
 
-- 기존 public heap fetch 함수 이름은 유지하되, `HEAP_OOS_EXPAND_POLICY` enum 인자를 추가한다.
-- `HEAP_GET_CONTEXT` 와 `heap_init_get_context()` 에 기본 OOS 정책을 두지 않고, 모든 호출자가 `HEAP_WITH_OOS_EXPAND` 또는 `HEAP_WITHOUT_OOS_EXPAND` 를 직접 넘기게 한다.
-- `*_expand_oos()` / `*_skip_oos_expand()` wrapper 는 제거한다. 의미를 함수 이름으로 우회하지 않고 기존 call site 의 인자에서 드러낸다.
-- 소비자가 혼합된 locator getter 3종 (`locator_lock_and_get_object()`, `locator_lock_and_get_object_with_evaluation()`, `locator_get_object()`) 도 정책 인자를 signature 로 스레딩해 caller 가 선언하게 한다. getter 내부에 정책을 고정하지 않는다.
-- 모든 call site 는 base (feat/oos) 동작을 1:1 로 보존한다: 기존 `*_expand_oos()` 호출부 → `HEAP_WITH_OOS_EXPAND`, 기존 일반 호출부 → `HEAP_WITHOUT_OOS_EXPAND`. 동작 변경 0건.
-- raw `RECDES` / attribute-layer 소비 경로 재분류 (WITH↔WITHOUT flip) 는 본 이슈에서 수행하지 않고 CBRD-26847 audit 으로 이관한다. flip 은 diff review 난도를 크게 올리는 반면, CI 로 필요성이 입증되지 않았다.
-- 정책을 내부에 고정한 소수 API (`heap_first()`/`heap_last()`, 기존 무확장 동작 유지)는 코드 주석으로 계약을 남긴다.
-- visible-version fast path 가 expanded raw record 요청을 우회하지 않도록, OOS 포함 record 에서 `HEAP_WITH_OOS_EXPAND` 가 필요하면 full path 로 내려간다 (base 에 이미 존재하는 동작 유지).
+- `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 와 locator getter 3종에 필수 enum 인자를 추가한다. 기본값은 두지 않는다.
+- raw bytes 를 직접 전송·복사·비교·파싱·재삽입하는 경로에서는 모든 OOS inline stub 을 실제 값으로 치환한 record 를 반환한다.
+- `heap_attrinfo_*` 로 컬럼을 읽거나 record body 를 사용하지 않는 경로에서는 inline stub 을 유지하고 attribute-level Resolve 를 사용한다.
+- `locator_lock_and_return_object()` 의 단건 client fetch 는 전송 전에 record 를 materialize 한다. 확장된 record 가 `LC_COPYAREA` 의 남은 공간보다 크면 기존 `S_DOESNT_FIT` 계약에 따라 필요한 크기를 알리고, 상위 호출자가 copy area 를 늘려 다시 시도한다.
+- 현재 enum 이름은 동작인 OOS Expand 를 강조한다. 호출자의 선택 기준이 코드에 드러나도록 소비 방식 중심 이름으로 바꾸는 안을 검토한다. 최종 이름은 `TBD - 리뷰 합의 미확인` 이다.
 
 ---
 
 ## AI-Generated Context
 
-> 아래는 AI 가 코드/맥락을 분석해 작성한 상세 자료다. 빠른 triage 에는 위 Issue Triage 블록만으로 충분하며, 본문은 구현/리뷰 단계에서 참고하면 된다.
+> 아래는 AI 가 코드와 변경 이력을 분석해 작성한 상세 자료다. 빠른 triage 에는 위 Issue Triage 블록만으로 충분하며, 본문은 구현과 리뷰 단계에서 참고하면 된다.
 
 ### Summary
 
-- **이슈 유형 / 범위**: JIRA metadata 는 CBRD-26835 의 Sub-task 이며, 내용상 storage heap public C/C++ API 계약 개선이다.
-- **변경 범위 / 영향**: `src/storage/heap_file.h`, `src/storage/heap_file.c`, `src/storage/heap_oos.cpp` 와 server-side heap fetch 호출부가 대상이다.
-- **호환성**: SQL 문법, catalog schema, OOS on-disk layout, WAL format, 사용자 노출 동작은 바꾸지 않는다. 내부 C/C++ API signature 만 바뀐다.
+- **이슈 유형 / 범위**: CBRD-26835 의 Sub-task 로, server-side heap fetch 내부 API 계약과 locator 전송 경로를 변경한다.
+- **변경 파일**: `src/storage/heap_file.h`, `src/storage/heap_file.c`, `src/storage/heap_oos.cpp`, `src/transaction/locator_sr.c` 및 heap fetch 호출부가 대상이다.
+- **호환성**: SQL 문법, catalog schema, OOS on-disk layout, WAL format 은 바뀌지 않는다. 내부 C/C++ API signature 와 반환 record 구성 시점만 달라진다.
 
 ---
 
 ## Description
 
-`OOS` (Out-of-row Storage -- heap 의 큰 가변 컬럼을 별도 OOS file 에 저장하고 heap record 에는 pointer 만 남기는 저장 방식) 는 읽기 경로에서 두 가지 의미를 가진다.
+`OOS` (Out-of-row Overflow Storage -- heap 의 큰 가변 컬럼을 별도 OOS file 에 저장하는 방식) 를 사용하는 record 는 컬럼 전체 값을 heap 에 두지 않는다. variable area 에는 16-byte `OOS inline stub` 만 남는다. `RECDES` (record descriptor) 는 record bytes 와 길이를 담는 내부 구조체다.
 
-`OOS Expand` 는 record-level eager 동작이다. heap record 의 variable area 에 들어 있는 inline OOS OID 슬롯을 실제 컬럼 bytes 로 모두 바꾼 뒤, 호출자에게 확장된 `RECDES` (record descriptor -- record bytes 와 길이를 담는 구조체) 를 돌려준다. `LC_COPYAREA` 로 client 에 record image 를 실어 보내거나 `or_class_name()` 같은 `or_*` parser 로 class record 를 직접 읽는 코드는 이 형태가 필요하다.
+```text
+heap 에 저장된 record
+[ id | name | OOS inline stub ]
+                    |
+                    +-- head OOS OID + 전체 값 길이
+                              |
+                              +-- OOS file 의 실제 컬럼 값
+```
 
-`OOS Resolve` 는 column-level lazy 동작이다. `heap_attrinfo_read_dbvalues()` 가 class representation 과 attribute 위치를 보고 필요한 column 을 읽을 때 `oos_read()` 로 OOS 값을 가져온다. query scan, index key generation, metadata lookup 처럼 record 를 받은 직후 attribute layer 로 들어가는 경로는 전체 record 를 먼저 Expand 하지 않아도 된다.
+이 record 를 읽는 방법은 소비자에 따라 다르다.
 
-처음에는 기존 `heap_next()` 같은 함수는 그대로 두고 `heap_next_expand_oos()` / `heap_next_skip_oos_expand()` 류 wrapper 로 의미를 나누는 접근을 썼다. 이 방식은 기존 call site 를 고칠 때는 읽기 쉬워 보이지만, develop merge 에 취약하다. 다른 팀 변경이 기존 `heap_next()` signature 로 들어오면 OOS branch 에서도 컴파일되므로, merge 하는 사람이 해당 호출자가 raw record 를 소비하는지 attribute layer 로 넘어가는지 보지 않고 지나칠 수 있다.
+`OOS Expand` 는 record-level eager 동작으로, 모든 OOS inline stub 을 실제 값으로 바꾸고 record 전체를 다시 만든다. `OOS Resolve` 는 attribute-level lazy 동작으로, 필요한 `OOS-backed attribute` (heap 에 실제 값 대신 OOS inline stub 이 저장된 속성 값) 하나만 읽는다.
 
-CBRD-27029 는 그 누락 가능성을 compile break 로 바꾼다. heap fetch API signature 에 `HEAP_OOS_EXPAND_POLICY` 를 넣으면 새 호출자는 정책을 선택하기 전까지 빌드되지 않는다. merge 작업자는 실패한 call site 를 보고, `RECDES.data` 를 직접 해석하는지 또는 `heap_attrinfo_*` 계층으로 넘기는지 확인한 뒤 enum 을 추가해야 한다.
+attribute layer 를 사용하는 query scan 은 `heap_attrinfo_read_dbvalues()` 로 필요한 컬럼만 Resolve 한다. record 전체를 먼저 Expand 할 필요가 없으므로, 읽지 않는 큰 컬럼에 대한 OOS I/O 도 피할 수 있다.
+
+반면 `LC_COPYAREA` 에 record image 를 복사해 client 로 보내거나 `or_*` 함수로 `RECDES.data` 를 직접 파싱하는 코드는 attribute layer 를 거치지 않는다. 이런 경로에 OOS inline stub 이 남아 있으면, OOS file 에 접근할 수 없는 client 또는 OOS 를 모르는 parser 가 stub 안의 head OOS OID 와 길이를 컬럼 값으로 해석한다.
+
+```text
+[raw-byte 소비 경로]
+heap fetch
+  -> 모든 OOS inline stub 을 실제 값으로 치환
+  -> LC_COPYAREA / raw parser / record 재삽입
+  -> 실제 컬럼 bytes 사용
+
+[attribute-layer 소비 경로]
+heap fetch
+  -> OOS inline stub 유지
+  -> heap_attrinfo_* 로 필요한 컬럼만 읽음
+  -> 해당 컬럼만 oos_read()
+```
 
 ## Specification Changes
 
-정책 enum 은 `src/storage/heap_file.h` 에 둔다.
+### 정책 인자 추가 API
 
-| Enum | 의미 | 사용할 때 |
-|------|------|-----------|
-| `HEAP_WITH_OOS_EXPAND` | inline OOS OID 슬롯을 실제 값으로 치환한 raw-record-safe `RECDES` 를 반환한다. | 호출자가 `RECDES.data` 를 직접 직렬화, 복사, 비교, `or_*` parsing, 재삽입에 사용한다. |
-| `HEAP_WITHOUT_OOS_EXPAND` | heap record 안의 inline OOS OID 슬롯을 그대로 둔다. | 호출자가 곧바로 `heap_attrinfo_read_dbvalues()` 또는 같은 attribute layer 로 값을 읽는다. |
-
-변경되는 public heap fetch API 는 다음과 같다.
-
-| 함수 | 변경 |
+| 구분 | 함수 |
 |------|------|
-| `heap_next()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `heap_next_sampling()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `heap_prev()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `heap_get_visible_version()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `heap_scan_get_visible_version()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `heap_init_get_context()` | `HEAP_GET_CONTEXT` 생성 시 enum 정책을 필수로 받음 |
-| `locator_lock_and_get_object()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 (소비자 혼합 → caller 선언) |
-| `locator_lock_and_get_object_with_evaluation()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
-| `locator_get_object()` | 기존 이름 유지, `HEAP_OOS_EXPAND_POLICY oos_expand_policy` 인자 추가 |
+| heap fetch | `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` |
+| locator getter | `locator_lock_and_get_object()`, `locator_lock_and_get_object_with_evaluation()`, `locator_get_object()` |
 
-아래 wrapper 이름은 제거 대상이다.
+### 호출자 분류 기준
 
-```text
-heap_next_expand_oos()
-heap_next_skip_oos_expand()
-heap_next_sampling_skip_oos_expand()
-heap_prev_skip_oos_expand()
-heap_get_visible_version_expand_oos()
-heap_get_visible_version_skip_oos_expand()
-heap_scan_get_visible_version_skip_oos_expand()
+| 소비 방식 | 필요한 반환 형태 | 대표 경로 |
+|-----------|------------------|-----------|
+| raw bytes 직접 소비 | OOS inline stub 을 실제 값으로 치환한 record | `LC_COPYAREA` client 전송, `unloaddb`, `compactdb`, `or_*` parsing, byte 단위 비교, record 재삽입 |
+| attribute layer 소비 | OOS inline stub 을 유지한 record | query scan, index key 생성, `heap_attrinfo_read_dbvalues()` 기반 metadata 조회 |
+| record body 미사용 | OOS inline stub 을 유지한 record | 존재 확인, 다음 OID 탐색, MVCC header 만 확인 |
+
+`COPY` 또는 `PEEK` 은 record buffer 의 소유권과 수명을 정하는 옵션이다. OOS 값을 materialize 할지 정하는 기준으로 사용하지 않는다.
+
+### Enum 이름 후보
+
+현재 이름은 `HEAP_WITH_OOS_EXPAND` / `HEAP_WITHOUT_OOS_EXPAND` 다. 아래 후보는 구현 동작보다 호출자가 반환 record 를 어떻게 소비하는지를 먼저 보여준다.
+
+| 순위 | enum type | 값 | 고려사항 |
+|------|-----------|----|----------|
+| 1 | `HEAP_RECDES_CONSUMPTION_POLICY` | `HEAP_RECDES_RAW_BYTES_CONSUMED`, `HEAP_RECDES_RAW_BYTES_NOT_CONSUMED` | 권장안. fetch 호출자가 `RECDES.data` 를 직접 쓰는지만 답하면 된다. 두 번째 값은 attribute layer 로 읽는 경로와 record body 를 쓰지 않는 경로를 모두 포함한다. |
+| 2 | `HEAP_RECDES_MATERIALIZATION_POLICY` | `HEAP_RECDES_MATERIALIZE_OOS`, `HEAP_RECDES_KEEP_OOS_STUBS` | 반환 형태가 정확하다. 다만 호출자가 OOS materialization 방식을 알아야 선택할 수 있다. |
+| 3 | `HEAP_RECORD_CONSUMPTION_MODE` | `HEAP_RECORD_FOR_RAW_CONSUMER`, `HEAP_RECORD_FOR_NON_RAW_CONSUMER` | 소비자 기준은 분명하지만 식별자가 길고, CUBRID 코드에서 쓰는 `RECDES` 용어가 빠진다. |
+| 4 | `HEAP_RAW_RECORD_POLICY` | `HEAP_RAW_RECORD_REQUIRED`, `HEAP_RAW_RECORD_NOT_REQUIRED` | 리뷰 제안의 방향은 좋다. 다만 `raw record` 가 on-disk 형태인지, 실제 값을 채운 논리 record 인지 혼동될 수 있다. |
+
+> **권장**: `HEAP_RECDES_CONSUMPTION_POLICY` 와 `HEAP_RECDES_RAW_BYTES_CONSUMED` / `HEAP_RECDES_RAW_BYTES_NOT_CONSUMED` 조합을 사용한다. enum 값은 fetch 호출자의 소비 계약을 말하고, 실제 OOS materialization 여부는 fetch 구현이 결정한다.
+
+최종 이름이 정해지면 invalid 값과 필드명도 같은 축으로 맞춘다.
+
+```c
+typedef enum
+{
+  HEAP_RECDES_CONSUMPTION_INVALID = 0,
+  HEAP_RECDES_RAW_BYTES_CONSUMED,
+  HEAP_RECDES_RAW_BYTES_NOT_CONSUMED
+} HEAP_RECDES_CONSUMPTION_POLICY;
 ```
 
 ## Implementation
 
-정책 전달 흐름은 하나로 수렴한다.
+정책은 public fetch 에서 실제 materialization 지점까지 한 번만 전달한다.
 
 ```text
 [caller]
-  -> heap_next(..., HEAP_WITH_OOS_EXPAND | HEAP_WITHOUT_OOS_EXPAND)
-     또는 heap_get_visible_version(..., HEAP_WITH_OOS_EXPAND | HEAP_WITHOUT_OOS_EXPAND)
-       -> heap_init_get_context(..., oos_expand_policy)
-          -> HEAP_GET_CONTEXT.oos_expand_policy
-             -> heap_record_replace_oos_oids()
+  -> heap_next() / heap_get_visible_version() / locator_get_object()
+       -> heap_init_get_context()
+            -> HEAP_GET_CONTEXT
+                 -> heap_record_replace_oos_oids()
 ```
 
-`heap_record_replace_oos_oids()` 는 `HEAP_WITHOUT_OOS_EXPAND` 일 때 바로 성공을 반환한다. `HEAP_WITH_OOS_EXPAND` 이고 record 에 OOS flag 가 있으면 OOS OID 를 따라 `oos_read()` 로 값을 읽고, variable offset table 을 다시 써서 OOS 를 쓰지 않은 것처럼 보이는 record image 를 만든다. invalid policy 는 assertion 과 `S_ERROR` 로 처리해 잘못된 내부 호출을 조기에 잡는다.
+`RAW_BYTES_CONSUMED` 정책이고 record-level `HAS_OOS` flag (record 안에 OOS inline stub 이 있음을 나타내는 표시) 가 설정돼 있으면 `heap_record_replace_oos_oids()` 가 variable offset table 을 순회한다. 각 OOS inline stub 의 head OOS OID 로 `oos_read()` 를 호출한 뒤, 실제 컬럼 값이 담긴 새 record image 를 만든다.
 
-visible-version scan 에는 기존 fast path 가 있다. `peeked_recdes` 가 `REC_HOME` 이고 MVCC visible 이면 `heap_get_visible_version_internal()` 을 건너뛰어 record 를 바로 반환한다. 이 fast path 는 inline OOS OID 슬롯을 그대로 돌려주므로, `HEAP_WITH_OOS_EXPAND` 요청이면서 `heap_recdes_contains_oos()` 가 참이면 fast path 를 쓰지 않고 full path 로 내려간다.
+`RAW_BYTES_NOT_CONSUMED` 정책이면 `heap_record_replace_oos_oids()` 는 record 를 바꾸지 않는다. 이후 attribute layer 가 접근한 OOS-backed attribute 만 Resolve 한다.
 
-caller 판정 기준은 아래와 같다. **본 이슈의 PR 은 이 분류를 적용하지 않는다** — 아래 표는 CBRD-26847 audit 에서 flip 을 검토할 때의 참고 기준이다.
+단건 client fetch 흐름은 다음과 같다.
 
-| caller 종류 | 정책 | 예 |
-|-------------|------|----|
-| raw record 소비자 | `HEAP_WITH_OOS_EXPAND` | `LC_COPYAREA` fetch-all/client 전송, class/root catalog 의 `or_*` parser, partition redistribution 재삽입 |
-| OOS-capable attribute-layer 소비자 | `HEAP_WITHOUT_OOS_EXPAND` | `scan_manager` (scanrange grouped scan 포함), `query_executor` LOB cleanup, `btree_load`, serial/SP code fetch, dblink/catalog metadata scan, foreign-key/index consistency check, parallel non-covering index scan, update/delete old-record fetch (`locator_update_force`, `locator_delete_lob_force`, compactdb — 소비가 `locator_update_index`/attr-layer 뿐) |
-| recdes 미소비 | `HEAP_WITHOUT_OOS_EXPAND` | 존재 확인 (recdes=NULL), lock dump 의 MVCC header 확인 (`or_mvcc_get_header` 는 variable area 밖) |
-| OID 전진용 scan 뒤 재조회 | `HEAP_WITHOUT_OOS_EXPAND` 후 필요한 지점에서 expanded fetch | locking branch 처럼 첫 scan 은 다음 OID 만 찾고, 실제 record 는 lock 획득 후 다시 읽는 경로 |
+```text
+xlocator_fetch() / xlocator_fetch_lockset()
+  -> locator_lock_and_return_object()
+       -> locator_get_object(..., RAW_BYTES_CONSUMED)
+            -> heap fetch + OOS materialization
+       -> LC_COPYAREA 에 record 복사
+       -> client 전송
+
+★ 확장된 record 가 현재 area 보다 큼
+  -> S_DOESNT_FIT + 필요한 크기 반환
+  -> 상위 호출자가 area 확장 후 재시도
+```
 
 ## Acceptance Criteria
 
-- [x] `heap_next()`, `heap_next_sampling()`, `heap_prev()`, `heap_get_visible_version()`, `heap_scan_get_visible_version()` 및 locator getter 3종의 직접 호출자가 모두 `HEAP_OOS_EXPAND_POLICY` 를 명시한다.
-- [x] 제거 대상 `*_expand_oos()` / `*_skip_oos_expand()` wrapper 이름이 source tree 에 남지 않는다.
-- [x] 모든 call site 가 base 동작을 보존한다 (기존 `*_expand_oos()` → WITH, 기존 일반 호출 → WITHOUT 의 1:1 기계적 매핑) — 스크립트 audit 으로 전수 검증.
-- [x] `HEAP_WITH_OOS_EXPAND` 요청에서 visible-version fast path 가 inline OOS OID 슬롯을 그대로 반환하지 않는다.
-- [x] develop merge 로 새 heap fetch 호출자가 들어오면, 정책 인자를 추가하기 전에는 빌드가 실패한다.
+- [x] heap fetch API 5종과 `locator_lock_and_get_object()`, `locator_lock_and_get_object_with_evaluation()`, `locator_get_object()` 호출자가 OOS record 처리 정책을 명시한다.
+- [x] 정책을 빠뜨린 새 호출자는 compile error 가 발생한다.
+- [x] `locator_lock_and_return_object()` 가 OOS-backed instance 를 client 로 보낼 때 inline stub 대신 실제 컬럼 값이 담긴 record 를 전송한다.
+- [x] materialization 으로 `LC_COPYAREA` 공간이 부족하면 `S_DOESNT_FIT` 크기 반환과 재시도 계약을 유지한다.
+- [x] attribute-layer 소비 경로는 record-level materialization 없이 필요한 OOS 컬럼만 Resolve 할 수 있다.
+- [ ] enum type 과 값의 최종 이름을 리뷰에서 합의하고 source, PR, JIRA 표현을 일치시킨다.
 
 ## Definition of done
 
 - [ ] 위 A/C 충족
-- [ ] debug build 통과
-- [ ] OOS 관련 SQL/medium 회귀 확인
-- [ ] 리뷰 시 caller classification table 재검토
+- [x] debug build 통과
+- [ ] OOS-backed row 의 단건 client fetch, fetch-all, `unloaddb`, `compactdb` 회귀 확인
+- [ ] PR 설명과 commit message 에 raw-byte 소비 경로의 실패 원인 및 enum 선택 기준 반영
 
 ## Verification
 
-PR #7416 HEAD `6496b4ba2` (squashed, 동작 변경 0건) 기준으로 아래 확인이 완료됐다.
+PR #7416 HEAD `f59e9b8b2` 기준으로 PR diff 정적 검사와 로컬 debug build 를 수행했다.
 
 ```sh
-git diff --check
-just build-test   # debug_gcc build + unit tests 23/23
+base=$(git merge-base origin/feat/oos HEAD)
+git diff "$base"...HEAD --check
+cmake --build build_preset_debug_gcc -j"$(nproc)"
 ```
 
-- **동작 보존 전수 audit** (스크립트, paren-matched call 추출): 변경된 19개 파일에서 정책 API 6종 + locator getter 3종의 모든 호출을 base(feat/oos `891c2c802`)와 순서대로 대조 — 기존 `*_expand_oos()` 호출은 전부 `HEAP_WITH_OOS_EXPAND`, 기존 일반 호출은 전부 `HEAP_WITHOUT_OOS_EXPAND` 로 1:1 매핑됨을 확인. 유일한 call-count 차이 1건은 wrapper 2개가 1개 함수로 병합되며 중복 `heap_init_get_context` 호출이 사라진 것 (수동 확인).
-- wrapper 잔존 0건, `POLICY_INVALID` 전달 0건, lefthook codestyle (`.github/workflows/codestyle.sh`) 통과.
-- **Follow-up (analysis needed)**: `locator_lock_and_return_object` 의 단건 client fetch 는 base 부터 OOS 를 확장하지 않는다 (`xlocator_fetch_all` 은 확장). CS-mode client 는 inline OOS OID 슬롯을 resolve 할 수 없으므로 잠재적 정합성 gap — 별도 이슈로 repro test 와 함께 분석 필요 (코드에 CBRD-26847 TODO 주석 표기).
+추가 확인이 필요한 핵심 시나리오는 OOS-backed instance 를 단건 fetch 해 client 가 원래 컬럼 값과 길이를 받는지 검증하는 것이다. fetch-all, `unloaddb`, `compactdb` 도 같은 raw-record 계약을 사용하므로 함께 회귀 확인한다.
 
-## References
+## Remarks
 
-- JIRA: <http://jira.cubrid.org/browse/CBRD-27029>
-- 설계 메모 (caller review table 포함): `/home/vimkim/gh/my-cubrid-docs/cbrd-27029/CBRD-27029-expand-raw-records.md`
+- PR: <https://github.com/CUBRID/cubrid/pull/7416>
+- 관련 caller audit: CBRD-26847
+- raw fetch 회귀: CBRD-26948

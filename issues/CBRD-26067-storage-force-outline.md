@@ -15,6 +15,7 @@
 **이슈 수행 방안**:
 
 - `CREATE TABLE` 과 `ALTER TABLE ... MODIFY/CHANGE` 의 컬럼 옵션으로 `STORAGE FORCE_OUTLINE` 을 추가한다. 가변 타입에만 허용한다. (사용자 인용: "FORCE_OUTLINE", "which sends the value to OOS no matter what (of course, if it is variable type).")
+- `FORCE_OUTLINE` 을 추가한 뒤에도 현재 기본값인 `PREFER_OUTLINE` 을 기본 storage 정책으로 유지한다. (사용자 인용: "PREFER_OUTLINE (current default) will be still the default")
 - PR #7334(CBRD-26912)의 파서 → 스키마 플래그 → 서버 attribute 표현 → heap layout → `SHOW CREATE TABLE`/unloaddb/`CREATE TABLE ... LIKE` 전달 경로를 확장한다.
 - ALTER는 schema flag만 변경한다. 이미 저장된 행을 즉시 재배치하지 않으며, 이후 INSERT/UPDATE로 다시 기록되는 값부터 `FORCE_OUTLINE` 을 적용한다.
 

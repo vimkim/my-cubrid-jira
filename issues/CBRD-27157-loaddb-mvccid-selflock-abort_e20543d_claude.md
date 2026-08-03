@@ -20,7 +20,7 @@
 
 ### Summary
 
-- **변경 범위 / 영향**: `src/transaction/lock_manager.c` 1개 파일 (+5/-1) — assert 한 줄 완화와 근거 주석 4줄. 동작 변화는 assert 가 살아 있는 debug/optdebug (assert 활성 최적화 빌드) 에 한정된다. release 빌드는 assert 가 컴파일 아웃되어 코드 변화가 없고, 버그 자체도 release 에서는 크래시하지 않을 것으로 보이나 검증하지는 않았다. `feat/oos` 전용 회귀로, develop 단독에서는 트리거 경로가 없어 재현되지 않는다. 수정 PR: https://github.com/CUBRID/cubrid/pull/7588 (base `feat/oos`, 커밋 `e20543df8`; 커밋 메시지의 티켓 번호는 진행 중인 CI 완료 후 CBRD-27157 로 교체 예정).
+- **변경 범위 / 영향**: `src/transaction/lock_manager.c` 1개 파일 (+5/-1) — assert 한 줄 완화와 근거 주석 4줄. 동작 변화는 assert 가 살아 있는 debug/optdebug (assert 활성 최적화 빌드) 에 한정된다. release 빌드는 assert 가 컴파일 아웃되어 코드 변화가 없고, 버그 자체도 release 에서는 크래시하지 않을 것으로 보이나 검증하지는 않았다. `feat/oos` 전용 회귀로, develop 단독에서는 트리거 경로가 없어 재현되지 않는다. 수정 PR: https://github.com/CUBRID/cubrid/pull/7588 (base `feat/oos`, 커밋 `8bcfd7dd2` — CI 는 내용 동일한 직전 head `e20543df8` 에서 수행).
 
 ---
 

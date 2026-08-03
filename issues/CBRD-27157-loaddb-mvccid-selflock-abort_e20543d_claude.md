@@ -85,7 +85,7 @@ assert (thread_p->type != TT_LOADDB || is_transaction_lock);
 
 - 크래시 재현: `11.5.0.2460-0ad6afc` 64-bit debug (Rocky Linux 9).
 - 수정 검증: 동일 워크트리에서 `feat/oos` 헤드(`d4e2ebb79`) 리베이스 후 커밋 `e20543df8` debug 재빌드.
-- CI: CircleCI optdebug — test_shell job 142161 (base, 실패) / job 142569 (1차 수정, 복구 확인).
+- CI: CircleCI optdebug — test_shell job 142161 (base, 실패) / job 142569 (1차 수정) / job 142939 (uniform, 복구 확인).
 
 ## Repro
 
@@ -141,7 +141,7 @@ ERROR: Your transaction has been aborted by the system due to server failure or 
 
 ## Additional Information
 
-- 수정 검증 (로컬 debug, CTP): 세 TC 모두 OK, 신규 core 0건. 리베이스 후 `itrack_10006` 1건 스모크 재실행 OK. uniform 방식(`e20543d`) CI 는 PR #7588 에서 진행 중.
+- 수정 검증 (로컬 debug, CTP): 세 TC 모두 OK, 신규 core 0건. 리베이스 후 `itrack_10006` 1건 스모크 재실행 OK. uniform 방식(`e20543d`) CI 완료 (test_shell job 142939, 실패 17건): 본 이슈의 3건 모두 실패 목록에서 제외 확인, 신규 실패 0건.
 - CI 교차 검증 (1차 수정 `c0a5e1e`, job 142569): test_shell 실패 19건 → 18건. 본 이슈의 3건이 모두 실패 목록에서 빠졌고, 남은 18건 중 16건은 base 와 동일한 상속 실패, 2건(`_01_cursor_functional` 신규, `log_enc_04` 재출현)은 loaddb 경로와 무관한 간헐 실패로 판단했다.
 - 회귀 테스트: 신규 TC 는 추가하지 않는다 — 세 TC 모두 CI 상주 테스트라 그 자체가 회귀 방어선이며, TC 와 answer 파일은 올바른 상태다.
 - 브랜치: PR 은 `feat/oos` 대상이다. 완화 대상 assert 와 CBRD-26942 는 develop 소유 코드지만, develop 단독에는 TT_LOADDB 스레드가 MVCCID 발급에 도달하는 경로가 없어 증상이 없다. feat/oos → develop 머지 시 본 수정이 함께 흘러간다.

@@ -39,7 +39,7 @@
 
 현재 OOS bestspace는 CBRD-26658에서 당시 heap 구조를 옮겨 만든 독립 구현이다. 기준 commit `725a32c` 의 호출 흐름은 다음과 같다.
 
-```text
+```
 oos_insert / oos_insert_many
   -> oos_find_best_page
        -> OOS header WRITE latch
@@ -59,7 +59,7 @@ oos_insert / oos_insert_many
 
 CBRD-26176은 heap bestspace를 lock-free L1/L2/L3 shard와 candidate queue로 바꿨다. 그러나 현재 `cubstorage::bestspace` 를 OOS에서 그대로 호출할 수는 없다.
 
-```text
+```
 cubstorage::bestspace (현재)
   search/concurrency policy
   + HFID validation
@@ -104,7 +104,7 @@ CBRD-26950은 모든 OOS data page의 slot 0에 `OOS_PAGE_HEADER` 를 두고 gen
 
 목표 호출 관계는 다음과 같다. 함수명은 구현 과정에서 조정할 수 있지만 책임 방향은 바꾸지 않는다.
 
-```text
+```
 heap_find_bestpage --------------------+
                                         |
                                         v
@@ -135,7 +135,7 @@ heap_find_bestpage --------------------+
 
 OOS 후보 page는 다음 순서로 검증한다.
 
-```text
+```
 candidate VPID
   -> OLD_PAGE_MAYBE_DEALLOCATED + ordered WRITE fix
   -> deallocated page면 stale hint로 제거

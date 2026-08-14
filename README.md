@@ -17,23 +17,30 @@ just --list      # see all recipes (upload-file, upload-dry, upload-yes, fetch, 
 `just upload` runs `cubrid-jira-upload-fzf.sh`, which:
 
 1. Lists all `issues/*.md` files in an `fzf` picker with a preview pane.
-2. Hands the choice to `cubrid-jira-upload-interactive.sh`, which detects the
-   issue key from the filename (e.g. `CBRD-25356-some-descriptive-name.md`) or
-   prompts for one.
-3. Shows the current Jira issue + a local preview and asks before uploading.
-4. Normalizes Korean spacing, then uploads (Markdown → Jira wiki markup).
+2. Hands the choice to `cubrid-jira-upload.sh --interactive`, which derives the
+   issue key from the filename (for example,
+   `CBRD-25356-some-descriptive-name.md`).
+3. Uses `cubrid-jira search` to show the current target and displays a local
+   preview.
+4. Validates the real converted dry-run payload, asks for confirmation, and
+   delegates the live update to `cubrid-jira update`.
 
-For non-interactive use (e.g. Claude Code, CI), there's a no-prompt worker,
-`cubrid-jira-upload-noninteractive.sh <file>`: it **dry-runs** by default
-(previews the overwrite, uploads nothing) and only uploads when given `--yes`.
-Recipes: `just upload-dry <file>` (preview) and `just upload-yes <file>` (upload).
+For non-interactive use, the same adapter dry-runs by default and performs a
+live update only with `--yes`. Recipes: `just upload-dry <file>` and
+`just upload-yes <file>`.
 
-Credentials (`JIRA_URL`/`JIRA_USER`/`JIRA_PASSWORD`) come from `.envrc` via
-direnv. Run `just doctor` to verify tools and credentials.
+`cubrid-jira` is the only publishing implementation. It owns Markdown → Jira
+conversion, Korean spacing normalization, formatter validation, credentials,
+HTTP behavior, and cache invalidation. The adapter does not modify source files.
+
+Credentials come from `CUBRID_JIRA_USER` / `CUBRID_JIRA_PASSWORD` or the
+`jira.cubrid.org` entry in `~/.netrc`. Run `just doctor` to verify tools and
+credentials.
 
 ### Requirements
 
-- [`jira-md-upload`](https://github.com/vimkim/md-to-jira-uploader) — must be installed and configured
+- [`cubrid-jira`](https://github.com/vimkim/cubrid-jira) — must be installed and configured
+- [`pandoc`](https://pandoc.org/) — used by `cubrid-jira` for Markdown conversion
 - [`fzf`](https://github.com/junegunn/fzf)
 - [`bat`](https://github.com/sharkdp/bat) (optional, for syntax-highlighted preview)
 - [`just`](https://github.com/casey/just)

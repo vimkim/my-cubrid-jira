@@ -40,7 +40,7 @@ OOS 컬럼을 포함한 UPDATE/DELETE 로그를 CDC 및 flashback이 비동기�
 - CircleCI shell job: <https://circleci.com/gh/CUBRID/cubrid/145308>
 - 전체 shell 결과: 3,238건 중 3,184 success, 24 failure, 30 skipped
 - 이 이슈의 범위: 24개 failure 중 CDC의 `cbrd_27064`, `cbrd_27075` 2건
-- 분석 방식: CircleCI artifact와 exact-commit source trace. 요청에 따라 추가 재현 및 vacuum timing isolation 실험은 수행하지 않았다.
+- 분석 방식: CircleCI artifact와 exact-commit source trace. 별도 local 실행 결과는 이 결론의 근거에 포함하지 않았으며, 요청 이후 추가 재현 및 vacuum timing isolation 실험을 수행하지 않았다.
 - 결론 신뢰도: 높음. crash stack, DML별 결과 차이, OOS record contract 및 vacuum cleanup 경로가 동일한 lifetime gap을 가리킨다.
 
 ## Description
@@ -75,7 +75,7 @@ a404cc564  [CBRD-27075] Fix CDC timestamp lookup on continuation-only log pages
 
 ## Repro
 
-CircleCI에서 다음 기존 CDC TC가 실패한다. 이 문서 작성 과정에서는 요청에 따라 별도의 추가 재현을 수행하지 않았다.
+CircleCI에서 다음 기존 CDC TC가 실패한다. 아래 내용은 CI에 실행된 기존 TC의 scenario를 정리한 것이며, 별도 local 실행 결과는 증거에 포함하지 않았다.
 
 ### `cbrd_27075`
 

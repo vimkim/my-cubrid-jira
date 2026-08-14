@@ -47,14 +47,14 @@ OOS 컬럼을 포함한 UPDATE/DELETE 로그를 CDC 및 flashback이 비동기�
 
 PR #6864의 OOS branch CircleCI에서 기존 CDC 회귀 TC 2건이 새롭게 실패했다.
 
-```text
+```
 shell/_37_elderberry/cbrd_23842_cdc/bug/cbrd_27075/cases/cbrd_27075.sh
 shell/_37_elderberry/cbrd_23842_cdc/bug/cbrd_27064/cases/cbrd_27064.sh
 ```
 
 두 TC가 원래 검증하던 CBRD-27064와 CBRD-27075의 CDC log-page boundary 수정은 분석 commit에 이미 포함되어 있다.
 
-```text
+```
 f771eb824  [CBRD-27064] Fix CDC log page references across page boundaries
 a404cc564  [CBRD-27075] Fix CDC timestamp lookup on continuation-only log pages
 ```
@@ -104,7 +104,7 @@ CircleCI에서 다음 기존 CDC TC가 실패한다. 아래 내용은 CI에 실�
 
 `cub_server` core가 발생했다.
 
-```text
+```
 Core dumped in oos_check_head_header at src/storage/oos_file.cpp:1679
 
 oos_check_head_header
@@ -146,7 +146,7 @@ CDC client log에는 실패 시 `cubrid_log_extract()`의 `rc=-10`이 기록된�
 
 다음 원인으로 판단한다.
 
-```text
+```
 UPDATE / DELETE commit
   -> supplemental WAL의 undo/redo RECDES에 16-byte OOS inline reference 저장
        [OOS head OID | full payload length]

@@ -1,4 +1,4 @@
-# [PGBUF] ordered fix 경로의 dealloc 보호 카운터 비대칭을 수정한다
+# [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다
 
 ## Issue Triage
 
@@ -8,7 +8,7 @@
 
 | 구분 | 내용 |
 |---|---|
-| **AS-IS (현재 동작 / 배경)** | `OLD_PAGE_PREVENT_DEALLOC` 의 유일한 진입로는 `pgbuf_ordered_fix` 인데, 요청 page 의 보호 등록은 내부 `pgbuf_fix` (`page_buffer.c:2425-2428`) 가 하고 해제는 진입 경로에 따라 `pgbuf_fix` (`:2513-2517`) 또는 `pgbuf_ordered_fix` (`:12699-12704`, `:12847-12852`) 가 한다. 이 분담이 코드에 명시되지 않아 진입 상황 5 가지 중 3 가지에서 짝이 깨진다. |
+| **AS-IS (현재 동작 / 배경)** | `pgbuf_fix` 의 lock-free 빠른 경로가 dealloc 보호 카운터 등록(`page_buffer.c:2425-2428`)을 건너뛴 채 해제(`:2513-2517`)만 실행한다. 이 경로에는 `pgbuf_ordered_fix` 의 1차 시도(`:12292-12296`)가 원본 fetch mode 를 그대로 넘기면서 도달한다. 요청 page 보호의 등록·해제가 두 함수에 흩어져 있어 같은 성질의 짝 깨짐이 오류 경로 2 곳에 더 있고, 결국 진입 상황 5 가지 중 3 가지에서 순증감이 0 이 아니다. |
 | **TO-BE (목표 상태 / 기대 동작)** | `OLD_PAGE_PREVENT_DEALLOC` 요청 한 건이 성공하든 실패하든, 어느 경로로 들어오든 `count_fix_and_avoid_dealloc` 하위 16 비트에 남기는 순증감이 0 이다. |
 | **영향** | 고객 장애 가능성 — 감소가 남으면 vacuum 이 보호 중인 empty heap page 를 회수하고(`vacuum.c:1850`, `heap_file.c:3383`), 그 page 를 다시 fix 하던 스레드가 `pgbuf_ordered_fix` 의 `page was deallocated an we told it not to!` 경로(`:12816-12819`, debug 빌드는 `assert (false)`) 로 떨어진다. 반대로 증가가 남으면 그 page 는 vacuum 의 회수 대상에서 영구히 빠진다. |
 
@@ -77,6 +77,8 @@
 세 번째 행이 이 코드의 유일한 안전판이다. 조건부 latch 실패로 반환할 때 `pgbuf_fix` 가 `:2427` 의 등록을 되돌리지 않고 남겨 두고(`:2440-2463`), `pgbuf_ordered_fix` 가 page 를 놓고 순서를 재정렬하는 동안 그 등록이 보호 역할을 하다가 재 fix 후 `:12702`/`:12850` 에서 풀린다. 의도된 handshake 로 보이지만 두 함수 어디에도 이 계약이 적혀 있지 않고, 그래서 나머지 세 조합이 조용히 깨져 있다.
 
 첫 번째 행은 진입 조건이 겹치기 때문에 생긴다. `pgbuf_fix` 의 lock-free 진입 조건(`:2311-2313`)은 READ latch + `OLD_PAGE`/`OLD_PAGE_PREVENT_DEALLOC`/`OLD_PAGE_MAYBE_DEALLOCATED` + 무조건 latch 인데, `pgbuf_ordered_fix` 의 1차 시도가 원본 fetch mode 를 그대로 넘기므로(`:12292`, `:12295`) 세 조건이 동시에 성립한다. `pgbuf_lockfree_fix_ro` (`:7671-7734`) 전체에 등록 호출이 없고, 성공 시 `goto fast_path` 로 `:2425-2428` 을 건너뛴 뒤 `:2513-2517` 의 해제만 실행한다. 실제로 성립하려면 그 순간 page 가 READ latch 상태이고 fix 수가 1 이상이며 대기자가 없어야 하므로(`:7689-7693`), 같은 page 를 읽는 스레드가 이미 있거나 내가 그 page 를 이미 READ 로 들고 있는 경우다. 후자는 `:12280-12284` 의 "요청 page 만 보유" 조건과 정확히 겹친다.
+
+네 번째와 다섯 번째 행은 오류 경로에서만 생긴다. 1차 시도가 `:2427` 에 닿기도 전에 실패했는데(예: `pgbuf_claim_bcb_for_fix` 의 read 오류) 그 오류가 `:12349` 의 `ER_PB_BAD_PAGEID`/`ER_INTERRUPTED` 필터에 걸리지 않으면, 등록이 없는 상태로 `:12392` 를 지나 해제만 실행된다. 반대로 재정렬 중 어느 page 의 재 fix 가 실패해 `:12829` 로 빠지면 요청 page 의 해제 지점에 닿지 못하는데, `exit` 정리 루프는 `ordered_holders_info[i].prevent_dealloc` 만 보고 `has_dealloc_prevent_flag` 는 보지 않으므로 `:2427` 의 +1 이 그대로 남는다. 그 page 는 이후 vacuum 의 회수 대상에서 영구히 빠진다.
 
 ### 0 방어가 막아 주지 못하는 부분
 

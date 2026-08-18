@@ -6,11 +6,11 @@
 
 **이슈 수행 이유**:
 
-  구분                                내용
-  ----------------------------------- ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  **AS-IS (현재 동작 / 배경)**        기존 본문은 commit `5cd4f860e` 분석의 결함 D1~D8만 반영하고 있었다. 이후 develop `e6ed61e87` 기준으로 `page_buffer.c` 전량(17,535줄)을 재분석한 결과 D1~D3가 그대로 잔존함을 재확인했고, 신규 결함 9건(N1~N9)을 추가로 확인했다. 자식 이슈는 4건뿐이며 그중 정확성 결함용은 CBRD-27194(D2) 하나로, 본문이 스크린샷 스텁 상태다.
-  **TO-BE (목표 상태 / 기대 동작)**   재검증·신규 결함이 EPIC 본문에 통합되고, 자식 이슈 구성이 확정된다 — 기존 4건 재사용(CBRD-27194 범위 확장, CBRD-27252 본문 구체화 포함) + 신규 필수 9건 + 선택(장기 조사) 3건. 확정 결함은 Correct Error로 먼저 완료한다.
-  **영향**                            고객 장애 가능성 — 신규 확인된 N1(dealloc 보호 카운터 조기 해제)은 vacuum이 보호 중인 페이지가 회수될 수 있는 정합성 결함이고, 기존 D1(flush 실패 후 BCB 미복구)은 대기 스레드가 깨어나지 못하는 hang으로 이어질 수 있는데, 두 결함 모두 이슈 미추적 상태다.
+| 구분 | 내용 |
+|---|---|
+| **AS-IS (현재 동작 / 배경)** | 기존 본문은 commit `5cd4f860e` 분석의 결함 D1~D8만 반영하고 있었다. 이후 develop `e6ed61e87` 기준으로 `page_buffer.c` 전량(17,535줄)을 재분석한 결과 D1~D3가 그대로 잔존함을 재확인했고, 신규 결함 9건(N1~N9)을 추가로 확인했다. 자식 이슈는 4건뿐이며 그중 정확성 결함용은 CBRD-27194(D2) 하나로, 본문이 스크린샷 스텁 상태다. |
+| **TO-BE (목표 상태 / 기대 동작)** | 재검증·신규 결함이 EPIC 본문에 통합되고, 자식 이슈 구성이 확정된다 — 기존 4건 재사용(CBRD-27194 범위 확장, CBRD-27252 본문 구체화 포함) + 신규 필수 9건 + 선택(장기 조사) 3건. 확정 결함은 Correct Error로 먼저 완료한다. |
+| **영향** | 고객 장애 가능성 — 신규 확인된 N1(dealloc 보호 카운터 조기 해제)은 vacuum이 보호 중인 페이지가 회수될 수 있는 정합성 결함이고, 기존 D1(flush 실패 후 BCB 미복구)은 대기 스레드가 깨어나지 못하는 hang으로 이어질 수 있는데, 두 결함 모두 이슈 미추적 상태다. |
 
 **이슈 수행 방안**: CBRD-27193은 page buffer 자식 이슈를 정확성·운영성·조사/설계 3범주로 묶어 완료까지 관리하는 EPIC으로 유지한다. 자식 이슈 구성은 아래 Implementation의 확정 표를 따른다. AOUT 강제 비활성(D7)은 기존 CBRD-20741과 연결되므로 중복 이슈를 만들지 않는다.
 
@@ -34,17 +34,17 @@
 
 ### 신규 확인 결함 (N1~N9, e6ed61e87 기준)
 
-  ID   위치 (page_buffer.c)              내용                                                                                                                                                                                                       분류
-  ---- --------------------------------- ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- ------------------------
-  N1   :2311-2330, :2513-2517            lock-free fix 빠른 경로의 진입 조건에 `OLD_PAGE_PREVENT_DEALLOC` 이 포함되는데, 성공 시 dealloc 보호 카운터 등록(:2425-2428)을 건너뛰고 해제(:2513-2517)만 실행한다. 같은 비대칭이 ordered fix의 `has_dealloc_prevent_flag` 경로(:12699-12704, :12847-12852)에도 있다. 다른 스레드(vacuum 등)가 등록한 보호를 훔쳐 감소시킬 수 있다.   정합성 (High)
-  N2   :8456-8461                        `pgbuf_claim_bcb_for_fix` 의 `dwb_read_page` 실패 경로가 인접 실패 경로와 달리 BCB mutex를 든 채 반환한다. release 빌드에서 해당 BCB 영구 잠금 + 같은 VPID 대기자의 무한 대기로 이어진다.                                                            가용성 (방어 경로)
-  N3   :9407 → :9497, :9577, :9586      direct victim 긴급 배정 경로 2곳이 실행되지 않는다. `pgbuf_panic_assign_direct_victims_from_lru` 는 호출부가 직전에 NULL이 된 `prev_BCB` 를 전달해 항상 0을 반환하고, `pgbuf_direct_victims_maintenance` 의 두 순회는 초기 조건 모순으로 본문이 한 번도 돌지 않는다 (D3와 동일 계열).   기존 D3의 범위 확장
-  N4   :11349, :11362-11363              `pgbuf_dump` 가 atomic latch/flags 개편 이전 필드(`bufptr->fcnt`, `bufptr->zone`)를 참조해 `CUBRID_DEBUG` 정의 시 컴파일이 실패한다. finalize 진단 경로가 사장된 상태다.                                                                          진단 도구
-  N5   :15255, :15271                    `pgbuf_rv_dealloc_undo_compensate` 가 대입된 적 없는 지역 `VPID vpid` 를 debug TDE 로그로 출력한다 (`pgbuf_rv_dealloc_undo` :15209-15210에서 복사된 코드로 보이며 초기화 누락).                                                                     debug 한정
-  N6   :5851 + :1980, :13949             `Aout_mutex` 가 초기화 실패 경로와 finalize에서 이중 `pthread_mutex_destroy` 되고(미정의 동작), quota 비활성 시 `malloc (0)` 반환값에 의존한다. D2(memset 크기 오류, :1626)와 같은 초기화/종료 위생 계열이다.                                              D2의 범위 확장
-  N7   :5497-5501                        `pgbuf_is_temporary_volume` 이 `LOG_ISRESTARTED ()` 이전(복구 수행 중)에는 항상 false를 반환해, 복구 중 temp page가 WAL 면제·LRU 승격 억제·DWB 우회 등 temp 특수 처리를 전혀 받지 못한다. 의도된 보수 동작인지 판정이 필요하다.                                조사
-  N8   :10828, :10833                    `Num_pages_written` 과 `PSTAT_PB_NUM_IOWRITES` 증가가 non-DWB 분기에만 있어, DWB(기본 활성) 경유 쓰기가 집계되지 않는다. `SHOW PAGE BUFFER STATUS` 의 write 지표가 사실상 0으로 보인다 (D6 통계 의미 정리와 같은 계열).                                     D6의 범위 확장
-  N9   :14446, :10585, :300, :771-774, :10772   죽은 코드·낡은 주석 — `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, "garbage LRU" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa` 는 레이블이 바로 다음 줄이라 무의미하다.   정리
+| ID | 위치 (page_buffer.c) | 내용 | 분류 |
+|---|---|---|---|
+| N1 | :2311-2330, :2513-2517 | lock-free fix 빠른 경로의 진입 조건에 `OLD_PAGE_PREVENT_DEALLOC` 이 포함되는데, 성공 시 dealloc 보호 카운터 등록(:2425-2428)을 건너뛰고 해제(:2513-2517)만 실행한다. 같은 비대칭이 ordered fix의 `has_dealloc_prevent_flag` 경로(:12699-12704, :12847-12852)에도 있다. 다른 스레드(vacuum 등)가 등록한 보호를 훔쳐 감소시킬 수 있다. | 정합성 (High) |
+| N2 | :8456-8461 | `pgbuf_claim_bcb_for_fix` 의 `dwb_read_page` 실패 경로가 인접 실패 경로와 달리 BCB mutex를 든 채 반환한다. release 빌드에서 해당 BCB 영구 잠금 + 같은 VPID 대기자의 무한 대기로 이어진다. | 가용성 (방어 경로) |
+| N3 | :9407, :9497, :9577, :9586 | direct victim 긴급 배정 경로 2곳이 실행되지 않는다. `pgbuf_panic_assign_direct_victims_from_lru` 는 호출부가 직전에 NULL이 된 `prev_BCB` 를 전달해 항상 0을 반환하고, `pgbuf_direct_victims_maintenance` 의 두 순회는 초기 조건 모순으로 본문이 한 번도 돌지 않는다 (D3와 동일 계열). | 기존 D3의 범위 확장 |
+| N4 | :11349, :11362-11363 | `pgbuf_dump` 가 atomic latch/flags 개편 이전 필드(`bufptr->fcnt`, `bufptr->zone`)를 참조해 `CUBRID_DEBUG` 정의 시 컴파일이 실패한다. finalize 진단 경로가 사장된 상태다. | 진단 도구 |
+| N5 | :15255, :15271 | `pgbuf_rv_dealloc_undo_compensate` 가 대입된 적 없는 지역 `VPID vpid` 를 debug TDE 로그로 출력한다 (`pgbuf_rv_dealloc_undo` :15209-15210에서 복사된 코드로 보이며 초기화 누락). | debug 한정 |
+| N6 | :5851 + :1980, :13949 | `Aout_mutex` 가 초기화 실패 경로와 finalize에서 이중 `pthread_mutex_destroy` 되고(미정의 동작), quota 비활성 시 `malloc (0)` 반환값에 의존한다. D2(memset 크기 오류, :1626)와 같은 초기화/종료 위생 계열이다. | D2의 범위 확장 |
+| N7 | :5497-5501 | `pgbuf_is_temporary_volume` 이 `LOG_ISRESTARTED ()` 이전(복구 수행 중)에는 항상 false를 반환해, 복구 중 temp page가 WAL 면제·LRU 승격 억제·DWB 우회 등 temp 특수 처리를 전혀 받지 못한다. 의도된 보수 동작인지 판정이 필요하다. | 조사 |
+| N8 | :10828, :10833 | `Num_pages_written` 과 `PSTAT_PB_NUM_IOWRITES` 증가가 non-DWB 분기에만 있어, DWB(기본 활성) 경유 쓰기가 집계되지 않는다. `SHOW PAGE BUFFER STATUS` 의 write 지표가 사실상 0으로 보인다 (D6 통계 의미 정리와 같은 계열). | D6의 범위 확장 |
+| N9 | :14446, :10585, :300, :771-774, :10772 | 죽은 코드·낡은 주석 — `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, "garbage LRU" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa` 는 레이블이 바로 다음 줄이라 무의미하다. | 정리 |
 
 > **요지**: 이전 분석의 상위 결함(D1~D3)은 develop 최신에서도 그대로 살아 있고, 이번 재분석은 그보다 심각도가 같거나 높은 정합성 결함(N1)과 가용성 결함(N2)을 새로 찾았다. 정확성 결함 5건(D1+N2, N1, D3+N3, D2+N6, N4+N5)을 자식 이슈로 먼저 처리한다.
 
@@ -61,24 +61,24 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
     ├─ B. 운영성 (Improve) ──────── 4건: 전부 신규
     └─ C. 조사/설계 (Survey) ────── 기존 3건 + 신규 1건 + 선택 3건
 
-  ID   제목 (안)                                                            이슈 번호            포함 결함            비고
-  ---- -------------------------------------------------------------------- -------------------- -------------------- ------------------------------------------------------------------------------------------------
-  A1   `[PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다`          **신규 필요**        D1 + N2              두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증.
-  A2   `[PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다`   **신규 필요**        N1                   빠른 경로 진입 조건에서 `OLD_PAGE_PREVENT_DEALLOC` 제외 또는 등록/해제 대칭 복원 중 택일. heap scan + vacuum 동시 수행 시나리오로 검증.
-  A3   `[PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다`   **신규 필요**        D3 + N3              순회 복구와 dead path 제거 중 목표 동작 선택은 `TBD - 합의 미확인`. 저활동 direct-victim workload로 검증.
-  A4   `[PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다`               **CBRD-27194 확장**   D2 + N6              memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함.
-  A5   `[PGBUF] debug 빌드 전용 결함 2건을 수정한다`                        **신규 필요**        N4 + N5              `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성, 미초기화 VPID는 `rcv->pgptr` 에서 채운다. `-DCUBRID_DEBUG` 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다.
-  B1   `[PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다`   **신규 필요**        D6 + N8              DWB 사용 시 논리 page flush와 물리 write를 구분하고 `Num_pages_written` 미집계를 수정. 기존 모니터링 컬럼 호환성은 별도 결정.
-  B2   `[PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다`   **신규 필요**        D4                   `big_private_lrus_with_victims` 를 실제로 seed할지 미사용 2단계를 제거할지 부하 시험으로 선택.
-  B3   `[PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다`        **신규 필요**        D5                   `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합.
-  B4   `[PGBUF] 죽은 코드와 낡은 주석을 정리한다`                           **신규 필요**        N9 + D8              동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다. D8(`pgbuf_peek_stats` 헤더 인자명)을 여기에 흡수한다.
-  C1   `[PGBUF] [Survey] SX page latch 도입 조사`                            **CBRD-27196 (기존)** —                    설계 논점은 해당 이슈 본문에 이관 완료.
-  C2   `[PGBUF] [Survey] direct victim 대기 큐 고정값 4 검증`                **CBRD-27211 (기존)** —                    유지.
-  C3   `[PGBUF] [Survey] pgbuf default / v2 병행 버전 도입`                  **CBRD-27252 (기존)** —                    본문이 placeholder 상태. 재구현 마일스톤(M0 자료구조 ~ M8 ordered fix/checkpoint)과 테스트 전략으로 구체화 예정.
-  C4   `[PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다`           **신규 필요**        N7                   복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 "문제 없음"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건.
-  C5   `[PGBUF] heap/B-tree scan prefetch와 비동기 read 경로 설계`           선택 (미생성)        —                    baseline과 목표 수치가 있는 조사로 시작, 이득 확인 시에만 구현 전환.
-  C6   `[PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정`             선택 (미생성)        —                    현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정.
-  C7   `[PGBUF] dirty page index와 checkpoint 비용 개선 검토`                선택 (미생성)        —                    복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환.
+| ID | 제목 (안) | 이슈 번호 | 포함 결함 | 비고 |
+|---|---|---|---|---|
+| A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | 신규 필요 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |
+| A2 | [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | 빠른 경로 진입 조건에서 `OLD_PAGE_PREVENT_DEALLOC` 제외 또는 등록/해제 대칭 복원 중 택일. heap scan + vacuum 동시 수행 시나리오로 검증. |
+| A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | 신규 필요 | D3 + N3 | 순회 복구와 dead path 제거 중 목표 동작 선택은 TBD - 합의 미확인. 저활동 direct-victim workload로 검증. |
+| A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 확장 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |
+| A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | 신규 필요 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성, 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |
+| B1 | [PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다 | 신규 필요 | D6 + N8 | DWB 사용 시 논리 page flush와 물리 write를 구분하고 `Num_pages_written` 미집계를 수정. 기존 모니터링 컬럼 호환성은 별도 결정. |
+| B2 | [PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다 | 신규 필요 | D4 | `big_private_lrus_with_victims` 를 실제로 seed할지 미사용 2단계를 제거할지 부하 시험으로 선택. |
+| B3 | [PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다 | 신규 필요 | D5 | `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합. |
+| B4 | [PGBUF] 죽은 코드와 낡은 주석을 정리한다 | 신규 필요 | N9 + D8 | 동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다. D8(`pgbuf_peek_stats` 헤더 인자명)을 여기에 흡수한다. |
+| C1 | [PGBUF] [Survey] SX page latch 도입 조사 | CBRD-27196 (기존) | — | 설계 논점은 해당 이슈 본문에 이관 완료. |
+| C2 | [PGBUF] [Survey] direct victim 대기 큐 고정값 4 검증 | CBRD-27211 (기존) | — | 유지. |
+| C3 | [PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 | CBRD-27252 (기존) | — | 본문이 placeholder 상태. 재구현 마일스톤(M0 자료구조 ~ M8 ordered fix/checkpoint)과 테스트 전략으로 구체화 예정. |
+| C4 | [PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다 | 신규 필요 | N7 | 복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 "문제 없음"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건. |
+| C5 | [PGBUF] heap/B-tree scan prefetch와 비동기 read 경로 설계 | 선택 (미생성) | — | baseline과 목표 수치가 있는 조사로 시작, 이득 확인 시에만 구현 전환. |
+| C6 | [PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정 | 선택 (미생성) | — | 현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정. |
+| C7 | [PGBUF] dirty page index와 checkpoint 비용 개선 검토 | 선택 (미생성) | — | 복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환. |
 
 > **요지**: 신규 생성이 필요한 자식 이슈는 필수 9건(A1, A2, A3, A5, B1, B2, B3, B4, C4)이고, 기존 4건(CBRD-27194 범위 확장, CBRD-27196, CBRD-27211, CBRD-27252 본문 구체화)을 재사용한다. 장기 조사 3건(C5~C7)은 선택이다. 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선.
 
@@ -111,10 +111,10 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 
 AOUT는 2Q 교체 정책에서 main queue에서 밀려난 page identifier의 이력을 보관하는 queue다.
 
-  항목                  처리 권장
-  --------------------- -------------------------------------------------------------------------------------------------------------------------
-  AOUT 강제 비활성 D7   근본 원인은 기존 `CBRD-20741` 과 연결돼 있으므로 중복 이슈를 만들지 않는다. 낡은 "LRU + Aout of 2Q" 주석 정리는 B4 범위에서 처리한다.
-  `pgbuf_peek_stats` 헤더 인자명 D8   외부 binary interface와 동작에 영향이 없는 stale parameter name이라 단독 JIRA를 만들지 않고 B4에 포함한다.
+| 항목 | 처리 권장 |
+|---|---|
+| AOUT 강제 비활성 D7 | 근본 원인은 기존 CBRD-20741 과 연결돼 있으므로 중복 이슈를 만들지 않는다. 낡은 "LRU + Aout of 2Q" 주석 정리는 B4 범위에서 처리한다. |
+| `pgbuf_peek_stats` 헤더 인자명 D8 | 외부 binary interface와 동작에 영향이 없는 stale parameter name이라 단독 JIRA를 만들지 않고 B4에 포함한다. |
 
 ## Acceptance Criteria
 
@@ -126,7 +126,7 @@ AOUT는 2Q 교체 정책에서 main queue에서 밀려난 page identifier의 이
 
 - [ ] C4~C7 조사 이슈는 baseline과 목표 수치를 명시하고, 이득이 확인된 경우에만 구현 이슈로 전환한다.
 
-- [ ] AOUT 항목은 `CBRD-20741` 의 범위와 상태를 확인해 중복 티켓을 만들지 않는다.
+- [ ] AOUT 항목은 CBRD-20741 의 범위와 상태를 확인해 중복 티켓을 만들지 않는다.
 
 ## Definition of done
 

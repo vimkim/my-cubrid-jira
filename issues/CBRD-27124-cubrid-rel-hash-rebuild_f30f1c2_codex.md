@@ -16,7 +16,7 @@
 1. 커밋 후 일반 CMake 빌드만 실행해도 `cubrid_rel`의 해시가 현재 `HEAD`와 일치한다.
 2. 커밋 수/해시만 바뀌면 버전 값을 실제로 사용하는 파일만 다시 컴파일한다.
 
-**이슈 수행 방안**: `TBD - 합의 미확인`. 검토 후보는 아래 AI-Generated Context에 정리한다.
+**이슈 수행 방안**: 구현 방식은 아직 합의되지 않았다. 세부 결정과 검증 계획은 [Wayfinder 계획 tracker](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/map.md)에서 현재 frontier를 따라 단계적으로 확정한다.
 
 ---
 
@@ -96,7 +96,6 @@ cmake --build --preset debug
 
 - `empty commit` 후 CMake 구성을 직접 실행하지 않아도 `cubrid_rel`의 해시가 `git rev-parse --short=7 HEAD`와 일치한다.
 - 커밋 수/해시만 바뀌면 버전 값 직접 소비자만 재컴파일하고, 관계없는 엔진 오브젝트는 재컴파일하지 않는다.
-- 같은 Git 커밋 위치에서 빌드를 다시 실행하면 C/C++ 컴파일이 0건이다.
 
 ## Actual Result
 
@@ -104,6 +103,13 @@ cmake --build --preset debug
 - CMake 구성 후 두 의존성 조회 명령은 각각 `1135`를 출력한다.
 
 ## Additional Information
+
+### Wayfinder 계획 tracker
+
+- **Canonical map**: [CBRD-27124 CMake build version refresh](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/map.md)
+- **목적지**: 구현자가 추가 설계 질문 없이 작업을 시작할 수 있는 구현 명세, 실행 순서, 검증 계약을 만든다. 실제 소스 구현은 map 범위 밖이다.
+- **현재 frontier**: [Git 커밋 갱신 계약 잠금](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/tickets/T1-lock-git-revision-refresh-contract.md)과 [변동 버전 의존성 경계 잠금](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/tickets/T2-lock-volatile-version-dependency-boundary.md)을 독립적으로 결정할 수 있다.
+- **후속 흐름**: 런타임·패키지 버전 정체성 계약, 최소 재빌드 예산, 검증 및 CI 행렬을 차례로 잠근 뒤 구현 가능한 명세와 JIRA handoff를 조립한다.
 
 ### 버전 생성 위치
 
@@ -127,15 +133,6 @@ cmake --build --preset debug
 | `VERSION_STRING` | `src/base/release_string.c`, `src/base/release_string.h` |
 | `BUILD_NUMBER` | `src/base/release_string.c`, broker 소스 7개 |
 
-### 검토 후보
-
-아래 항목은 합의된 구현안이 아니라 분석 단계에서 비교할 후보이다.
-
-| 검토 항목 | 후보 방안 |
-|-----------|-----------|
-| 커밋별 버전 의존성 격리 | `EXTRA_VERSION`, `BUILD_NUMBER`, `VERSION_STRING`을 별도 생성 헤더로 옮기고 실제 소비자만 포함한다. |
-| Git 커밋 위치 이동 감지 | `CMAKE_CONFIGURE_DEPENDS`에 실제 이동 파일을 등록하는 방식과 빌드 시점마다 현재 Git 커밋을 확인하는 방식을 비교한다. |
-
 ### Git 작업 트리 지원 이력
 
 커밋 `41e5be7ee8` (`[CBRD-25432] Add Support for Git Worktrees in CMake Configuration`)은 `.git/HEAD` 대신 현재 worktree의 `HEAD`를 찾도록 수정했다. linked worktree 경로 문제는 해결했지만 symbolic `HEAD`가 가리키는 실제 branch ref 이동은 여전히 감지하지 않는다.
@@ -143,8 +140,4 @@ cmake --build --preset debug
 ### 수락 조건
 
 - [ ] 최초 CMake 구성 이후 빌드만 실행해도 `cubrid_rel` 해시와 현재 `HEAD`가 일치한다.
-- [ ] `empty commit` 후 관계없는 C/C++ 오브젝트 재컴파일이 발생하지 않는다.
-- [ ] no-op 빌드(입력 변경이 없는 재빌드)의 C/C++ 컴파일은 0건이다.
-- [ ] 일반 clone, linked worktree, detached `HEAD`(브랜치 ref 없이 커밋을 직접 가리키는 Git 상태)에서 같은 결과를 얻는다.
-- [ ] `.git`이 없는 배포 소스와 `VERSION-DIST` 경로의 기존 동작을 유지한다.
-- [ ] `cubrid_rel`과 CPack(CMake 패키지 생성 기능)은 같은 커밋 수/해시를, broker 버전 출력은 같은 커밋 수를 사용한다.
+- [ ] revision-only 변경 후 버전 값 직접 소비자 밖의 C/C++ 오브젝트 재컴파일이 발생하지 않는다.

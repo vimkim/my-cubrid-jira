@@ -8,11 +8,11 @@
 
 | 구분 | 내용 |
 |---|---|
-| **AS-IS (현재 동작 / 배경)** | 정리 대상 8건이 남아 있다. 계산만 되고 읽는 곳이 없는 `monitor.victim_rich`(`page_buffer.c:14446`), 호출부 없는 static 함수 `pgbuf_remove_private_from_aout_list`(`:10585`), 미사용 매크로 `UINT16MAX`(`:300`), 제어 흐름에 영향을 주지 않는 `goto`(`:10772`), 그리고 현재 자료구조·동작과 어긋난 주석 3건과 헤더 인자명 1건이다. 빌드 옵션이 `-Wno-unused`(`CMakeLists.txt:613-617`)라 죽은 심볼은 경고로도 드러나지 않고, 주석과 인자명은 애초에 컴파일러가 검사하지 않는다. |
-| **TO-BE (목표 상태 / 기대 동작)** | 실행 동작, 통계 값, 시스템 파라미터, 디스크 형식을 그대로 둔 채 8건을 삭제하거나 현행 코드에 맞게 고친다. 정리 후 남는 주석은 실제 자료구조(shared LRU + private LRU 2구획)와 실제 victim 탐색 흐름만 서술한다. |
+| **AS-IS (현재 동작 / 배경)** | 정리 대상 9건이 남아 있다. 계산만 되고 읽는 곳이 없는 `monitor.victim_rich`(`page_buffer.c:14446`), 호출부 없는 static 함수 `pgbuf_remove_private_from_aout_list`(`:10585`), 정의 자체가 없는 선언 `pgbuf_fix_without_validation_release`(`page_buffer.h:324`), 미사용 매크로 2개(`UINT16MAX` `:300`, `pgbuf_fix_without_validation` `page_buffer.h:320`), 제어 흐름에 영향을 주지 않는 `goto`(`:10772`), 그리고 현재 자료구조·동작과 어긋난 주석 3건과 헤더 인자명 1건이다. 빌드 옵션이 `-Wno-unused`(`CMakeLists.txt:613-617`)라 죽은 심볼은 경고로도 드러나지 않고, 주석과 인자명은 애초에 컴파일러가 검사하지 않는다. |
+| **TO-BE (목표 상태 / 기대 동작)** | 실행 동작, 통계 값, 시스템 파라미터, 디스크 형식을 그대로 둔 채 9건을 삭제하거나 현행 코드에 맞게 고친다. 정리 후 남는 주석은 실제 자료구조(shared LRU + private LRU 2구획)와 실제 victim 탐색 흐름만 서술한다. |
 | **영향** | 기술 부채 — `pgbuf_get_victim` 주석(`:9048-9052`)은 코드에 존재하지 않는 victim 재시도 정책이 있다고 읽힌다. direct victim 긴급 배정 경로를 다루는 CBRD-27264 가 이 주석을 근거로 목표 동작을 잡으면 없는 정책을 전제로 판단하게 된다. |
 
-**이슈 수행 방안**: 아래 Implementation 표의 8건만 손대고 실행 동작은 바꾸지 않는다. AOUT 강제 비활성 자체는 기존 CBRD-20741 소관이므로 주석 문구만 현행 상태에 맞추고 `prm_tune_parameters`(`system_parameter.c:10078`)는 건드리지 않는다.
+**이슈 수행 방안**: 아래 Implementation 표의 9건만 손대고 실행 동작은 바꾸지 않는다. AOUT 강제 비활성 자체는 기존 CBRD-20741 소관이므로 주석 문구만 현행 상태에 맞추고 `prm_tune_parameters`(`system_parameter.c:10078`)는 건드리지 않는다.
 
 ------------------------------------------------------------------------
 
@@ -31,7 +31,7 @@
 
 `pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 오랜 기간 여러 차례 개편을 거쳤다. atomic latch 도입, private LRU 와 quota 도입, direct victim 도입이 그때마다 자료구조를 바꿨는데, 그 과정에서 쓰이지 않게 된 필드와 함수, 그리고 새 구조를 반영하지 못한 주석이 남았다. `LRU` (Least Recently Used — 최근 사용 시점 기준 page 교체 목록), `victim` (교체 대상으로 뽑힌 BCB), `direct victim` (빈 frame 을 못 찾아 대기하는 스레드에게 재사용 가능한 BCB 를 직접 넘기는 방식), `BCB` (Buffer Control Block — frame 에 올라온 page 의 fix 수와 latch, dirty 상태를 보관하는 제어 블록)가 이 정리에서 반복해 나오는 용어다.
 
-남은 것 중 대부분은 무해하다. 쓰이지 않는 매크로 하나, 호출부 없는 함수 하나가 바이너리에 미치는 영향은 사실상 없다. 문제가 되는 쪽은 주석이다. 코드를 처음 읽는 사람은 주석을 규격으로 읽으므로, 실제 코드와 다른 주석은 없는 기능을 있다고 믿게 만든다.
+남은 것 중 대부분은 무해하다. 쓰이지 않는 매크로, 호출부 없는 함수, 정의조차 없는 선언이 바이너리에 미치는 영향은 사실상 없다. 문제가 되는 쪽은 주석이다. 코드를 처음 읽는 사람은 주석을 규격으로 읽으므로, 실제 코드와 다른 주석은 없는 기능을 있다고 믿게 만든다.
 
 첫째로 `victim_rich` 주석이다. `pgbuf_get_victim` 은 자기 private LRU, 다른 private LRU, shared LRU 를 차례로 뒤지는데, 주석은 "세 탐색을 `victim_rich` 인 동안 반복한다"고 적혀 있다. 실제 재시도 루프(`:9148-9164`)는 shared 단계만 반복하고 그 조건도 flush 데몬 유무와 큐 상태다. `victim_rich` 는 `pgbuf_adjust_quotas` 가 quota 조정마다 값을 채우지만 읽는 코드가 없으니, 이 주석은 코드 어디에도 대응하지 않는다.
 
@@ -59,6 +59,7 @@
 | 6 | `:637-641` | "LRU + Aout of 2Q" 주석이 AOUT 을 상시 동작으로 서술 | AOUT 이 현재 강제 비활성이라는 사실과 CBRD-20741 참조를 덧붙임 |
 | 7 | `:10772` | `goto copy_unflushed_lsa` 의 레이블이 감싼 블록 바로 뒤(`:10776`)라 제어 흐름이 같다 | `goto` 삭제(직전 `iopage = NULL;` 은 유지) |
 | 8 | `page_buffer.h:449-454` | `pgbuf_peek_stats` 선언 인자명이 정의(`page_buffer.c:14686-14691`)와 불일치 | 정의를 기준으로 통일하고, 12번 인자는 실제 값에 맞춰 이름 정정 |
+| 9 | `page_buffer.h:320-326` | `pgbuf_fix_without_validation_release` 는 선언만 있고 정의가 소스 어디에도 없다. 감싸는 매크로 `pgbuf_fix_without_validation` 도 함께 죽어 있다 | 매크로와 선언 삭제 |
 
 ### 항목 2 - victim 탐색 주석과 실제 루프
 
@@ -88,7 +89,13 @@
 
 12번은 헤더와 정의가 일치하지만 둘 다 값과 맞지 않는다. 대기 우선순위는 high 와 low 두 단계뿐이고 11번이 `alloc_bcb_waiter_high` 이므로, 12번은 `alloc_bcb_waiter_low` 로 바꾸는 것이 실제 값과 카운터 이름 모두에 맞는다. 13번은 정의 쪽 이름이 옳으니 헤더를 정의에 맞춘다.
 
-> **요지**: 8건 중 실제로 사람을 헷갈리게 하는 것은 주석 3건(항목 2, 5, 6)과 헤더 인자명 1건(항목 8)이다. 나머지 4건은 삭제로 끝난다.
+### 항목 9 - 정의가 없는 `pgbuf_fix_without_validation`
+
+`grep -rn 'fix_without_validation' src/` 는 헤더 세 줄만 반환한다. 매크로 정의(`page_buffer.h:320-323`)와 그 매크로가 가리키는 함수 선언(`:324-326`)뿐이고, 함수 본체는 어디에도 없다.
+
+두 줄 모두 `#else /* NDEBUG */` 안, 즉 release 빌드에서만 보이는 구획에 있다. debug 빌드에는 짝이 되는 `_debug` 선언조차 없어서, 만약 누군가 `pgbuf_fix_without_validation` 을 쓰면 debug 빌드는 컴파일 단계에서, release 빌드는 링크 단계에서 서로 다르게 깨진다. 아무도 부르지 않은 덕에 지금까지 드러나지 않았다.
+
+> **요지**: 9건 중 실제로 사람을 헷갈리게 하는 것은 주석 3건(항목 2, 5, 6)과 헤더 인자명 1건(항목 8)이다. 나머지 5건은 삭제로 끝난다.
 
 ### 커밋 분리와 병합 순서
 
@@ -98,7 +105,7 @@
 
 ## Acceptance Criteria
 
-- [ ] 위 표 1~8 항목이 모두 반영되고, `page_buffer.c` 에서 `victim_rich`, `pgbuf_remove_private_from_aout_list`, `UINT16MAX`, `garbage` 검색 결과가 0건이다.
+- [ ] 위 표 1~9 항목이 모두 반영된다. `page_buffer.c` 와 `page_buffer.h` 에서 `victim_rich`, `pgbuf_remove_private_from_aout_list`, `UINT16MAX`, `garbage` 검색 결과가 0건이고, `src/` 전체에서 `fix_without_validation` 검색 결과가 0건이다.
 
 - [ ] `pgbuf_peek_stats` 의 헤더 선언과 정의 인자명이 완전히 일치하고, 12번 인자 이름이 실제로 채우는 low priority 대기 스레드 수와 맞다.
 
@@ -122,7 +129,7 @@
 
 이 이슈 범위에서 뺀 항목이 둘 있다.
 
-- `pgbuf_peek_stats` 의 `lfcq_big_prv_num` / `lfcq_prv_num` 은 해당 LFCQ 포인터가 `NULL` 이면 대입되지 않고(`:14771-14779`), 진입부 초기화 목록(`:14697-14705`)에도 빠져 있다. 호출부가 미리 채워진 통계 배열의 슬롯을 넘기므로 스택 쓰레기가 출력되는 상황은 아니지만, 값을 채우는 수정은 동작 변경이라 통계 의미를 정리하는 CBRD-27266 이나 별도 처리로 넘긴다.
+- `pgbuf_peek_stats` 의 `lfcq_big_prv_num` / `lfcq_prv_num` 은 해당 LFCQ 포인터가 `NULL` 이면 대입되지 않고(`:14771-14779`), 진입부 초기화 목록(`:14697-14705`)에도 빠져 있다. 호출부가 미리 채워진 통계 배열의 슬롯을 넘기므로 스택 쓰레기가 출력되는 상황은 아니지만, 값을 채우는 수정은 동작 변경이라 big private victim queue 를 다루는 CBRD-27267 로 넘긴다. 두 값 모두 그 queue(`big_private_lrus_with_victims`, `private_lrus_with_victims`)의 크기라 소유 범위가 맞다.
 - 소스에 남은 기존 TODO(`:599-601` victim hint 논리 의심, `:3368`, `:7050`, `:8692`, `:12107`)는 각각 판단이 필요한 항목이라 이 정리 대상이 아니다.
 
 ## 참고 코드

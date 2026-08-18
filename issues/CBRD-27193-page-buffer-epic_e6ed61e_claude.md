@@ -61,24 +61,24 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 
 | ID | 제목 (안) | 이슈 번호 | 포함 결함 | 비고 |
 |---|---|---|---|---|
-| A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | 신규 필요 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |
-| A2 | [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조. |
-| A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | 신규 필요 | D3 + N3 | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조. |
-| A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 확장 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |
-| A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | 신규 필요 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 — 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |
-| B1 | [PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다 | 신규 필요 | D6 + N8 | DWB 사용 시 논리 page flush 와 물리 write 를 구분하고 `Num_pages_written` 미집계를 수정. |
-| B2 | [PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다 | 신규 필요 | D4 | `big_private_lrus_with_victims` 의 생산/소비 지점 확정이 선행 작업. |
-| B3 | [PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다 | 신규 필요 | D5 | `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합. |
-| B4 | [PGBUF] 죽은 코드와 낡은 주석을 정리한다 | 신규 필요 | N9 + D8 | 동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다. |
-| C1 | [PGBUF] [Survey] SX page latch 도입 조사 | CBRD-27196 (기존) | — | 설계 논점은 해당 이슈 본문에 이관 완료. |
-| C2 | [PGBUF] [Survey] direct victim 대기 큐 고정값 4 검증 | CBRD-27211 (기존) | — | 유지. |
-| C3 | [PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 | CBRD-27252 (기존) | — | 본문이 placeholder 상태. 재구현 마일스톤(M0 자료구조 ~ M8 ordered fix/checkpoint)과 테스트 전략으로 구체화 예정. |
-| C4 | [PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다 | 신규 필요 | N7 | 복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 "문제 없음"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건. |
+| A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | CBRD-27262 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |
+| A2 | [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | CBRD-27263 | N1 | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조. |
+| A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | CBRD-27264 | D3 + N3 | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조. |
+| A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |
+| A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | CBRD-27265 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 — 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |
+| B1 | [PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다 | CBRD-27266 | D6 + N8 | DWB 사용 시 논리 page flush 와 물리 write 를 구분하고 `Num_pages_written` 미집계를 수정. |
+| B2 | [PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다 | CBRD-27267 | D4 | `big_private_lrus_with_victims` 의 생산/소비 지점 확정이 선행 작업. |
+| B3 | [PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다 | CBRD-27268 | D5 | `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합. |
+| B4 | [PGBUF] 죽은 코드와 낡은 주석을 정리한다 | CBRD-27269 | N9 + D8 | 동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다. |
+| C1 | [PGBUF] [Survey] SX page latch 도입 조사 | CBRD-27196 | — | 설계 논점은 해당 이슈 본문에 이관 완료. |
+| C2 | [PGBUF] [Survey] direct victim 대기 큐 고정값 4 검증 | CBRD-27211 | — | 유지. |
+| C3 | [PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 | CBRD-27252 | — | 조사 본문 게시 완료 (선택 메커니즘 후보 비교, 마일스톤 M0~M8, 검증 전략). |
+| C4 | [PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다 | CBRD-27270 | N7 | 복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 "문제 없음"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건. |
 | C5 | [PGBUF] heap/B-tree scan prefetch와 비동기 read 경로 설계 | 선택 (미생성) | — | baseline과 목표 수치가 있는 조사로 시작, 이득 확인 시에만 구현 전환. |
 | C6 | [PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정 | 선택 (미생성) | — | 현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정. |
 | C7 | [PGBUF] dirty page index와 checkpoint 비용 개선 검토 | 선택 (미생성) | — | 복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환. |
 
-> **요지**: 신규 필요 9건은 이 표의 포함 결함·비고를 그대로 각 자식 이슈 본문의 골격으로 쓸 수 있다. 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.
+> **요지**: 자식 이슈 13건이 전부 생성·본문 게시 완료됐다 (2026-08-18 기준, C5~C7 제외). 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.
 
 ### 1순위(A1) 오류 흐름
 
@@ -161,5 +161,15 @@ queue 생산자를 복구할지, 현재 동작에 맞춰 queue와 2단계 탐색
   - [CUBRID flush·WAL·DWB 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-flush-wal-dwb.md)
   - [PostgreSQL buffer manager 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/postgres-bufmgr.md)
   - [InnoDB buffer pool 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/innodb-bufpool.md)
-- 신규 분석 (commit `e6ed61e87` 기준): `page_buffer.c` 전량 정독 분석서 세트(총론 + 자료구조 / fix·unfix / LRU·victim·quota / flush·WAL·데몬 / ordered fix·dealloc / 관측성, 문답집·재구현 계획 포함 10편). my-cubrid-docs 게시 후 링크를 본 이슈에 추가한다.
+- 신규 분석 (commit `e6ed61e87` 기준) — `page_buffer.c` 전량 정독 분석서 세트:
+  - [00 총론 (아키텍처·불변식·결함 통합표)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/00-overview.md)
+  - [01 자료구조·초기화](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/01-structures.md)
+  - [02 fix/unfix·래치](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/02-fix-unfix-latch.md)
+  - [03 LRU·victim·quota](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/03-lru-victim-quota.md)
+  - [04 flush·WAL·데몬](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/04-flush-wal-daemons.md)
+  - [05 ordered fix·dealloc](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/05-ordered-fix-dealloc.md)
+  - [06 관측성·부가기능](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/06-misc-observability.md)
+  - [07 문답 워크북](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/07-qa-workbook.md)
+  - [08 재구현 계획 (M0~M8)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/08-page-buffer-new-plan.md)
+  - [09 이슈 제안 원본](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/09-issue-proposals.md)
 - 기준 소스: [`page_buffer.c`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.c), [`page_buffer.h`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.h)

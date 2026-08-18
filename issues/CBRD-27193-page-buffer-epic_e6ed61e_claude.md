@@ -62,7 +62,7 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 | ID | 제목 (안) | 이슈 번호 | 포함 결함 | 비고 |
 |---|---|---|---|---|
 | A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | 신규 필요 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |
-| A2 | [PGBUF] ordered fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조. |
+| A2 | [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조. |
 | A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | 신규 필요 | D3 + N3 | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조. |
 | A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 확장 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |
 | A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | 신규 필요 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 — 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |

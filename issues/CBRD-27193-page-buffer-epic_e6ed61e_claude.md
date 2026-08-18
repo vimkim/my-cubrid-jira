@@ -9,7 +9,7 @@
 | 구분 | 내용 |
 |---|---|
 | **AS-IS (현재 동작 / 배경)** | develop `e6ed61e87` 의 `page_buffer.c` 전량(17,535줄) 재분석 결과, 이전 분석(commit `5cd4f860e`)의 상위 결함 D1~D3가 그대로 잔존하고 신규 결함 9건(N1~N9)이 추가 확인됐다. 최고 심각도 N1은 `pgbuf_ordered_fix` 가 `OLD_PAGE_PREVENT_DEALLOC` 요청을 내부적으로 `OLD_PAGE` 로 재작성(:12392-12396)해 dealloc 보호 카운터가 등록되지 않는데 해제(:12702, :12850)는 무조건 실행되는 비대칭이다. |
-| **TO-BE (목표 상태 / 기대 동작)** | 자식 이슈 구성 확정 — 기존 4건 재사용(CBRD-27194 범위 확장, CBRD-27252 본문 구체화 포함) + 신규 필수 9건 + 선택(장기 조사) 3건. |
+| **TO-BE (목표 상태 / 기대 동작)** | 정확성 결함 5건(A1~A5)이 각각 추적 가능한 자식 이슈로 수정되고, 운영성 개선과 구조 변경은 측정 근거가 확보된 뒤에만 착수된다. 자식 이슈 구성 상세는 Implementation 표. |
 | **영향** | 고객 장애 가능성 — N1은 vacuum 이 dealloc 을 막으려고 보호해 둔 페이지가 조기 회수될 수 있는 정합성 결함이고, D1(flush 실패 후 BCB 미복구)은 대기 스레드가 깨어나지 못하는 hang 으로 이어질 수 있다. |
 
 **이슈 수행 방안**: CBRD-27193은 page buffer 자식 이슈를 정확성·운영성·조사/설계 3범주로 묶어 완료까지 관리하는 EPIC으로 유지한다. 자식 이슈 구성은 아래 Implementation의 확정 표를 따르고, 목표 동작이 미결정인 항목(A3·B1·B2)은 Open Questions 에 정리했다. EPIC 본문은 이번 재분석 결과로 갱신한다.
@@ -36,7 +36,7 @@
 
 | ID | 위치 (page_buffer.c) | 내용 | 분류 |
 |---|---|---|---|
-| N1 | :12392-12396, :12699-12704, :12847-12852 | `pgbuf_ordered_fix` 가 `fetch_mode == OLD_PAGE_PREVENT_DEALLOC` 이면 `has_dealloc_prevent_flag` 만 세우고 fetch_mode 를 `OLD_PAGE` 로 재작성한다(:12392-12396). 이후 내부 `pgbuf_fix`(:12695)는 등록 조건이 성립하지 않아 dealloc 보호 카운터를 등록하지 않는데, 요청 페이지 해제(:12702, :12850)는 무조건 실행된다 — 등록 없는 감소. :12639 의 등록은 "저장 후 unfix 되는 보유 페이지" 대상(해제 :12883, :12994, :13288, :13329)이라 이 해제와 짝이 아니다. 0-방어(:16226-16250)가 카운터 0 케이스를 막고 그 주석(:16232-16244)은 이를 예상된 상황으로 감수한다고 선언하지만, 주석이 다루는 것은 자기 마커가 사라진 0 케이스뿐이고 **다른 스레드(vacuum 등)가 등록해 둔 카운트를 훔쳐 감소시키는** 잔여 위험은 다루지 않는다. 부수: lockfree fast path 에도 같은 꼴의 비대칭(:2311-2330 진입 시 등록 :2425-2428 스킵, 해제 :2513-2517 실행)이 있으나 `pgbuf_fix` 에 이 fetch_mode 를 직접 넘기는 외부 호출부가 현재 0건이라 도달 불가한 잠재 함정이다. | 정합성 (High) |
+| N1 | :12392-12396, :12699-12704, :12847-12852 | `pgbuf_ordered_fix` 가 `fetch_mode == OLD_PAGE_PREVENT_DEALLOC` 을 `OLD_PAGE` 로 재작성해(:12392-12396) 내부 fix 가 dealloc 보호 카운터를 등록하지 못하는데, 요청 페이지 해제(:12702, :12850)는 무조건 실행된다 — 등록 없는 감소. 메커니즘 상세, 0-방어 반박, fast path 잠재 함정은 아래 "2순위(A2) 오류 흐름" 절 참조. | 정합성 (High) |
 | N2 | :8456-8461 | `pgbuf_claim_bcb_for_fix` 의 `dwb_read_page` 실패 경로가 인접 실패 경로와 달리 BCB mutex를 든 채 반환한다. release 빌드에서 해당 BCB 영구 잠금 + 같은 VPID 대기자의 무한 대기로 이어진다. | 가용성 (방어 경로) |
 | N3 | :9407, :9505-9508, :9577, :9586 | direct victim 긴급 배정 경로 2곳이 실행되지 않는다. `pgbuf_panic_assign_direct_victims_from_lru` 는 호출부(:9407)가 직전에 NULL이 된 `prev_BCB` 를 전달해 NULL 가드(:9505-9508)에서 즉시 0을 반환하고, `pgbuf_direct_victims_maintenance` 의 두 순회(:9577, :9586)는 초기 조건 모순으로 본문이 한 번도 돌지 않는다 (D3와 동일 계열). | 기존 D3의 범위 확장 |
 | N4 | :11349, :11369 | `pgbuf_dump` 가 atomic latch/flags 개편 이전 필드(`bufptr->fcnt` :11349, `bufptr->zone` :11369)를 참조해 `CUBRID_DEBUG` 정의 시 컴파일이 실패한다. 같은 함수 안에 신 접근자 사용 라인(:11361 `get_fcnt`)이 공존해 부분 개편의 잔재로 보인다. finalize 진단 경로가 사장된 상태다. | 진단 도구 |
@@ -44,9 +44,7 @@
 | N6 | :5851 + :1980, :13949 | `Aout_mutex` 가 초기화 실패 경로와 finalize에서 이중 `pthread_mutex_destroy` 되고(미정의 동작), quota 비활성 시 `malloc (0)` 반환값에 의존한다. D2(memset 크기 오류, :1626)와 같은 초기화/종료 위생 계열이다. | D2의 범위 확장 |
 | N7 | :5497-5501 | `pgbuf_is_temporary_volume` 이 `LOG_ISRESTARTED ()` 이전(복구 수행 중)에는 항상 false를 반환해, 복구 중 temp page가 WAL 면제·LRU 승격 억제·DWB 우회 등 temp 특수 처리를 전혀 받지 못한다. 의도된 보수 동작인지 판정이 필요하다. | 조사 |
 | N8 | :10828, :10833 | `Num_pages_written` 과 `PSTAT_PB_NUM_IOWRITES` 증가가 non-DWB 분기에만 있어, DWB(기본 활성) 경유 쓰기가 집계되지 않는다. `SHOW PAGE BUFFER STATUS` 의 write 지표가 사실상 0으로 보인다 (D6 통계 의미 정리와 같은 계열). | D6의 범위 확장 |
-| N9 | :14446, :10585, :300, :771-774, :10772 | 죽은 코드·낡은 주석 — `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, "garbage LRU" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa`(:10772)는 레이블(:10776)까지 닫는 중괄호만 건너뛰어 fall-through 와 도달 지점이 같아 무의미하다. | 정리 |
-
-> **요지**: 이전 분석의 상위 결함(D1~D3)은 develop 최신에서도 그대로 살아 있고, 이번 재분석은 그보다 심각도가 같거나 높은 정합성 결함(N1)과 가용성 결함(N2)을 새로 찾았다.
+| N9 | :14446, :10585, :300, :771-774, :10772, page_buffer.h:320-326 | 죽은 코드·낡은 주석 — `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, "garbage LRU" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa`(:10772)는 레이블(:10776)까지 닫는 중괄호만 건너뛰어 fall-through 와 도달 지점이 같아 무의미하다. `pgbuf_fix_without_validation_release` 는 헤더 선언과 release 전용 매크로(page_buffer.h:320-326)만 있고 정의·호출부가 소스 어디에도 없다. | 정리 |
 
 ## Specification Changes
 
@@ -64,7 +62,7 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 | ID | 제목 (안) | 이슈 번호 | 포함 결함 | 비고 |
 |---|---|---|---|---|
 | A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | 신규 필요 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |
-| A2 | [PGBUF] ordered fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | `pgbuf_ordered_fix` 의 등록/해제 대칭 복원(모드 재작성 시 등록 수행 또는 해제 제거) 택일. 도달 호출부 없는 lockfree fast path 의 같은 꼴 비대칭(:2311-2330, :2513-2517)도 함께 정리. heap scan + vacuum 동시 수행 시나리오로 검증. |
+| A2 | [PGBUF] ordered fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | 신규 필요 | N1 | 도달 호출부 없는 lockfree fast path 의 같은 꼴 비대칭(:2311-2330, :2513-2517)도 함께 정리. heap scan + vacuum 동시 수행 시나리오로 검증. 수정 방식 선택은 Open Questions 참조. |
 | A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | 신규 필요 | D3 + N3 | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조. |
 | A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 확장 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |
 | A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | 신규 필요 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 — 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |
@@ -80,7 +78,7 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 | C6 | [PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정 | 선택 (미생성) | — | 현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정. |
 | C7 | [PGBUF] dirty page index와 checkpoint 비용 개선 검토 | 선택 (미생성) | — | 복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환. |
 
-> **요지**: 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.
+> **요지**: 신규 필요 9건은 이 표의 포함 결함·비고를 그대로 각 자식 이슈 본문의 골격으로 쓸 수 있다. 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.
 
 ### 1순위(A1) 오류 흐름
 
@@ -107,6 +105,8 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
             → 등록된 적 없는 카운터를 감소.
               0-방어(:16226-16250)는 자기 마커가 사라진 0 케이스만 방어하고,
               타 스레드(vacuum 등)가 등록한 카운트가 있으면 그것을 감소시킨다.
+
+:12639 의 등록은 "저장 후 unfix 되는 보유 페이지" 대상(해제 :12883, :12994, :13288, :13329)이라 위 해제와 짝이 아니다. 0-방어 주석(:16232-16244)은 이 카운터 0 상황을 예상된 것으로 감수한다고 선언하지만, 주석이 다루는 것은 자기 마커가 사라진 케이스뿐이고 타 스레드의 카운트를 감소시키는 잔여 위험은 다루지 않는다.
 
 `OLD_PAGE_PREVENT_DEALLOC` 의 외부 호출부는 전부 이 경로로 들어온다 — `heap_file.c` 8곳(7572, 7726, 9375, 14366, 14780, 17478, 18923, 19022)은 non-NULL watcher 로 `heap_scan_pb_latch_and_fetch` 의 `pgbuf_ordered_fix` 분기(heap_file.c:961)를 타고, `heap_file.c:8979` 와 `locator_sr.c:12788` 은 직접 호출이다. `pgbuf_fix` 로 이 fetch_mode 를 직접 넘기는 호출부는 0건이므로, lockfree fast path 쪽 비대칭은 잠재 함정으로 함께 정리만 하면 된다.
 
@@ -138,6 +138,10 @@ EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 �
 - [ ] 통계 또는 설정 변경 시 운영 문서와 매뉴얼이 반영된다.
 
 ## Open Questions
+
+### A2의 수정 방식
+
+`pgbuf_ordered_fix` 의 등록/해제 대칭을 어느 쪽으로 복원할지 — 모드 재작성 시 등록을 수행할지, 요청 페이지 해제(:12702, :12850)를 제거할지 — 는 `TBD - 합의 미확인` 이다. vacuum 의 보호 기간 요구와 겹치는 쪽이 없는지 확인 후 결정한다.
 
 ### A3의 목표 동작
 

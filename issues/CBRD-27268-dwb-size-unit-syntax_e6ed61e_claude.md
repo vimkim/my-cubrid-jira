@@ -144,10 +144,19 @@ boot_restart_server ()                                        boot_sr.c:2029
 
 | 파일 / 라인 | 변경 |
 |---|---|
-| `system_parameter.c:4342` | `static_flag` 에 `PRM_SIZE_UNIT` 추가 → `(PRM_FOR_SERVER \| PRM_USER_CHANGE \| PRM_SIZE_UNIT)` |
+| `system_parameter.c:4342` | `static_flag` 에 `PRM_SIZE_UNIT` 를 추가한다. 최종 플래그 조합은 아래 코드 블록 참조 |
 | `system_parameter.c:4343` | `PRM_INTEGER` → `PRM_BIGINT` |
 | `system_parameter.c:4345-4348` | 기본값·상한·하한의 공용체 멤버를 `.i` 에서 `.bi` 로 변경. 값 자체는 유지 (2 MiB / 2 MiB / 32 MiB / 0) |
 | `double_write_buffer.cpp:775` | `prm_get_integer_value (PRM_ID_DWB_SIZE)` → `prm_get_bigint_value (PRM_ID_DWB_SIZE)`. 대상 변수가 `unsigned int *` 이므로 명시적 캐스팅을 붙인다. 상한이 32 MiB 라 `unsigned int` 범위를 넘지 않는다 |
+
+`system_parameter.c:4342-4343` 의 변경 후 모습이다.
+
+```c
+  {PRM_ID_DWB_SIZE,
+   PRM_NAME_DWB_SIZE,
+   (PRM_FOR_SERVER | PRM_USER_CHANGE | PRM_SIZE_UNIT),
+   PRM_BIGINT,
+```
 
 `prm_get_bigint_value` 는 `system_parameter.h:831`, `:949` 에 이미 선언되어 있으므로 새 접근자를 만들 필요는 없다. `PRM_ID_DWB_SIZE` 를 참조하는 다른 지점은 없다 — 전체 소스에서 이 파라미터를 읽는 곳은 `double_write_buffer.cpp:775` 한 곳이다.
 

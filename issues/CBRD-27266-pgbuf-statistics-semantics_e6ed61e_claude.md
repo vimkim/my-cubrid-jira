@@ -84,7 +84,7 @@ DWB 측 집계는 `double_write_buffer.cpp` 안에 따로 있다. `dwb_flush_blo
 | 2 | perfmon `Num_data_page_iowrites` | :10833 + `double_write_buffer.cpp:2115`, `:2150`, `:2339` | 물리 write 횟수. DWB on 이면 page 당 2회 | 물리 카운터로는 맞지만 DWB 설정에 따라 논리 page 수 대비 배율이 달라진다. `:10833` 은 `fileio_write` 실패 시에도 이미 증가한 상태 |
 | 3 | perfmon `Num_data_page_writes` (`PSTAT_PB_FLUSH_PAGE_FLUSHED`) | :10896, 게이트 :10894 | pgbuf 가 성공적으로 flush 한 논리 page 수 — 사실상 유일한 논리 지표 | `extended_statistics_activation` 기본값에 `PB_VICTIMIZATION`(0x10)이 없어 기본 0. 이름도 "writes" 라 물리 지표처럼 읽힌다 |
 | 4 | perfmon `Num_data_page_flushed` (`PSTAT_PB_NUM_FLUSHED`) | :4118 (`pgbuf_flush_victim_candidates` 종료 시 1회) | victim flush 데몬이 flush 한 page 수만 | checkpoint flush 와 개별 동기 flush 는 빠진다. 이름은 전체 flush 량을 시사 |
-| 5 | SHOW `Victim_candidate_pages` | :17312-17315, 컬럼 값 :17451 | LRU zone 3 이면서 **dirty** 인 BCB 수 | dirty BCB 는 victim 이 될 수 없다(`PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK`, :258-262, 주석 :254). 실제 후보 수는 `lru_list[i].count_vict_cand` 합계이고 perfmon `Num_data_page_victim_candidate` 로 별도 노출된다(:14756). 같은 이름의 두 지표가 정반대 집합을 센다 |
+| 5 | SHOW `Victim_candidate_pages` | :17312-17315, 컬럼 값 :17451 | LRU zone 3 이면서 **dirty** 인 BCB 수 | dirty BCB 는 victim 이 될 수 없다(`PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK`, :258-262, 주석 :254). 실제 후보 수는 각 LRU 리스트의 `count_vict_cand` 합계이고 perfmon `Num_data_page_victim_candidate` 로 별도 노출된다(:14756). 같은 이름의 두 지표가 정반대 집합을 센다 |
 | 6 | SHOW `Hit_rate`, `Num_hit` | :2327, :2348, :8577 | :8577 은 NEW_PAGE 생성 경로 — 디스크 read 가 없었던 신규 page 를 hit 으로 계산 | insert 중심 부하에서 hit rate 가 과대. `num_pages_created` 도 같은 지점(:8576)에서 오르므로 중복 계산 관계가 드러나지 않는다 |
 | 7 | SHOW `Num_pages_read`, perfmon `Num_data_page_ioreads` | :8444-8445 | `dwb_read_page`(:8456)와 `fileio_read`(:8466) **이전** 에 증가. DWB 버퍼에서 복사해 온 경우와 read 실패도 포함 | 물리 read 수가 아니라 read 시도 수 |
 | 8 | SHOW `Clean_pages`, `Dirty_pages` | :17297-17310 | invalid zone BCB 까지 포함해 합이 항상 `Pool_size` | `Free_pages`(:17308)와 중복 계산된다. `Clean_pages` 를 "재사용 가능한 깨끗한 page" 로 읽으면 틀린다 |
@@ -145,7 +145,7 @@ DWB 측 집계는 `double_write_buffer.cpp` 안에 따로 있다. `dwb_flush_blo
 
 - [ ] DWB 활성 기본 설정에서 쓰기 부하를 준 뒤 `SHOW PAGE BUFFER STATUS` 의 write 지표가 0 이 아니고, 같은 구간의 논리 flush 수와 일치한다.
 - [ ] DWB 비활성 설정에서 같은 부하를 주었을 때 논리 flush 지표가 DWB 활성 설정과 같은 규모로 나온다 (물리 write 지표는 약 절반이 되는 것이 정상).
-- [ ] victim 후보 지표가 `lru_list[i].count_vict_cand` 합계와 같은 집합을 세고, flush 필요량 지표가 별도로 조회된다.
+- [ ] victim 후보 지표가 각 LRU 리스트의 `count_vict_cand` 합계와 같은 집합을 세고, flush 필요량 지표가 별도로 조회된다.
 - [ ] `extended_statistics_activation` 을 기본값으로 둔 상태에서 논리 flush 지표가 수집된다.
 - [ ] 기존 컬럼 호환성 결정(재정의 또는 신규 컬럼 추가)이 본문에 기록되고 구현이 그 결정을 따른다.
 - [ ] SHOW 델타 컬럼의 파괴적 읽기 제약이 매뉴얼에 기술된다.

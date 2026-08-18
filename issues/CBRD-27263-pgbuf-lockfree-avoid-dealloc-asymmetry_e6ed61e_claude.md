@@ -107,74 +107,47 @@
 
 ### 1. 등록/해제 짝이 깨지는지 계측
 
-요청 page 의 등록 지점 1 곳과 해제 지점 3 곳에 로그를 넣어 vpid 별 순증감을 센다. 진단 전용 패치이므로 병합하지 않는다.
+등록·해제 함수 자체에 로그를 넣어 vpid 별 순증감을 세고, `pgbuf_fix` 의 해제 지점에는 lock-free 경로를 거쳤는지 함께 남긴다. 삽입 지점을 앵커 문자열로 찾으므로 들여쓰기 차이에 영향받지 않는다. 진단 전용이라 병합하지 않는다.
 
 ```bash
 cd <cubrid-source-root>
-cat > /tmp/probe-27263.patch <<'EOF'
---- a/src/storage/page_buffer.c
-+++ b/src/storage/page_buffer.c
-@@ -2226,6 +2226,7 @@
-   bool buf_lock_acquired = false;
-   bool is_latch_wait = false;
-   bool retry = false;
-+  bool lockfree_fast_path = false;	/* TEMP: CBRD-27263 instrumentation */
- #if !defined (NDEBUG)
-   bool had_holder = false;
- #endif /* !NDEBUG */
-@@ -2316,6 +2317,7 @@
-       if (pgptr != NULL)
- 	{
- 	  CAST_PGPTR_TO_BFPTR (bufptr, pgptr);
-+	  lockfree_fast_path = true;	/* TEMP: CBRD-27263 instrumentation */
- #if !defined (NDEBUG)
- 	  pgbuf_add_fixed_at (pgbuf_find_thrd_holder (thread_p, bufptr), caller_file, caller_line, !had_holder);
- #endif
-@@ -2424,6 +2426,9 @@
- 
-   if (fetch_mode == OLD_PAGE_PREVENT_DEALLOC)
-     {
-+      /* TEMP: CBRD-27263 instrumentation. never merge. */
-+      _er_log_debug (ARG_FILE_LINE, "CBRD-27263 register vpid=%d|%d avoid=%d\n",
-+                     VPID_AS_ARGS (&bufptr->vpid), bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);
-       pgbuf_bcb_register_avoid_deallocation (bufptr);
-     }
- 
-@@ -2513,6 +2518,10 @@
-   if (fetch_mode == OLD_PAGE_PREVENT_DEALLOC)
-     {
-       /* latch is obtained, no need for avoidance of dealloc */
-+      /* TEMP: CBRD-27263 instrumentation. never merge. */
-+      _er_log_debug (ARG_FILE_LINE, "CBRD-27263 unreg-fix lockfree=%d vpid=%d|%d avoid=%d\n",
-+                     (int) lockfree_fast_path, VPID_AS_ARGS (&bufptr->vpid),
-+                     bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);
-       pgbuf_bcb_unregister_avoid_deallocation (bufptr);
-     }
- 
-@@ -12699,6 +12708,9 @@
- 	  if (has_dealloc_prevent_flag == true)
- 	    {
- 	      CAST_PGPTR_TO_BFPTR (bufptr, pgptr);
-+	      /* TEMP: CBRD-27263 instrumentation. never merge. */
-+	      _er_log_debug (ARG_FILE_LINE, "CBRD-27263 unreg-ordered-nogroup vpid=%d|%d avoid=%d\n",
-+                             VPID_AS_ARGS (&bufptr->vpid), bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);
- 	      pgbuf_bcb_unregister_avoid_deallocation (bufptr);
- 	      has_dealloc_prevent_flag = false;
- 	    }
-@@ -12847,6 +12859,9 @@
- 	  if (has_dealloc_prevent_flag == true)
- 	    {
- 	      CAST_PGPTR_TO_BFPTR (bufptr, pgptr);
-+	      /* TEMP: CBRD-27263 instrumentation. never merge. */
-+	      _er_log_debug (ARG_FILE_LINE, "CBRD-27263 unreg-ordered-refix vpid=%d|%d avoid=%d\n",
-+                             VPID_AS_ARGS (&bufptr->vpid), bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);
- 	      pgbuf_bcb_unregister_avoid_deallocation (bufptr);
- 	      has_dealloc_prevent_flag = false;
- 	    }
-EOF
-git apply /tmp/probe-27263.patch
+python3 - <<'PY'
+path = "src/storage/page_buffer.c"
+src = open(path).read()
+
+def insert_before(anchor, text):
+    assert src.count(anchor) == 1, anchor
+    return src.replace(anchor, text + anchor, 1)
+
+def insert_after(anchor, text):
+    assert src.count(anchor) == 1, anchor
+    return src.replace(anchor, anchor + text, 1)
+
+src = insert_before("bool retry = false;", "bool lockfree_fast_path = false;\n  ")
+
+src = insert_after("pgptr = pgbuf_lockfree_fix_ro (thread_p, vpid, fetch_mode);",
+                   "\n      lockfree_fast_path = (pgptr != NULL);")
+
+src = insert_before("/* latch is obtained, no need for avoidance of dealloc */",
+                    "_er_log_debug (ARG_FILE_LINE, \"CBRD-27263 unreg-fix lockfree=%d vpid=%d|%d avoid=%d\\n\",\n"
+                    "                     (int) lockfree_fast_path, VPID_AS_ARGS (&bufptr->vpid),\n"
+                    "                     bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);\n      ")
+
+src = insert_before("(void) ATOMIC_INC_32 (&bcb->count_fix_and_avoid_dealloc, 1);",
+                    "_er_log_debug (ARG_FILE_LINE, \"CBRD-27263 register vpid=%d|%d avoid=%d\\n\",\n"
+                    "                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);\n  ")
+
+src = insert_after("int count_crt;",
+                   "\n  _er_log_debug (ARG_FILE_LINE, \"CBRD-27263 unregister vpid=%d|%d avoid=%d\\n\",\n"
+                   "                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);")
+
+open(path, "w").write(src)
+print("instrumented")
+PY
 ./build.sh -m debug
 ```
+
+`register` 와 `unregister` 로그는 보유 page 용 등록·해제(`:12639` 계열)까지 함께 잡지만, 그 쌍은 균형이 맞으므로 vpid 별 합계에는 영향을 주지 않는다. `unregister` 의 `avoid` 값은 감소 직전 값이라 0 이면 0 방어에 막힌 호출이다.
 
 ### 2. 순차 heap scan 부하
 
@@ -204,17 +177,19 @@ wait
 ### 3. vpid 별 순증감 집계
 
 ```bash
-grep 'CBRD-27263' $CUBRID/log/server/testdb_*.err \
-  | sed -E 's/.*CBRD-27263 ([a-z-]+).*vpid=([0-9]+\|[0-9]+).*/\1 \2/' \
-  | awk '{ if ($1 == "register") n[$2]++; else n[$2]--; }
+LOG=$(ls -t $CUBRID/log/server/testdb_*.err | head -1)
+
+# register 는 +1, unregister 는 감소 직전 값이 1 이상일 때만 -1 로 센다
+sed -nE 's/.*CBRD-27263 (register|unregister) vpid=([0-9]+\|[0-9]+) avoid=([0-9]+).*/\1 \2 \3/p' "$LOG" \
+  | awk '{ if ($1 == "register") n[$2]++; else if ($3 > 0) n[$2]--; }
          END { for (v in n) if (n[v] != 0) printf "vpid %s net %+d\n", v, n[v] }'
 
-# 어느 해제 지점이 짝 없이 실행됐는지 분류
-grep -c 'CBRD-27263 unreg-fix lockfree=1' $CUBRID/log/server/testdb_*.err
-grep -c 'CBRD-27263 unreg-ordered' $CUBRID/log/server/testdb_*.err
+# 등록 없이 실행된 해제의 출처 분류
+grep -c 'CBRD-27263 unreg-fix lockfree=1' "$LOG"          # 회계 표 1 행
+grep -c 'CBRD-27263 unregister .* avoid=0' "$LOG"         # 0 방어에 막힌 해제
 ```
 
-`unreg-fix lockfree=1` 은 회계 표 첫 번째 행(등록 없는 해제)이 실제로 실행된 횟수다. `unreg-ordered-*` 는 세 번째 행(정상 handshake)과 네 번째 행(등록 없는 해제)이 섞여 있으므로, 같은 vpid 의 앞선 `register` 로그 유무로 갈라 본다.
+`unreg-fix lockfree=1` 은 회계 표 첫 번째 행이 실제로 실행된 횟수다. 순증감이 음수로 남은 vpid 는 1 행 또는 4 행, 양수로 남은 vpid 는 5 행에 해당한다.
 
 ### 4. 보호가 지워졌을 때의 결과 확인
 

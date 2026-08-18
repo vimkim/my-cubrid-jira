@@ -98,36 +98,35 @@ checkpoint 는 주기 데몬(`checkpoint_interval` 기본 360 초)뿐 아니라 
 
 ## Repro
 
-DWB 슬롯 확보 실패는 정상 운영에서 관측하기 어려우므로 오류를 한 번만 주입한다. 아래 패치는 진단 전용이라 절대 병합하지 않는다.
+DWB 슬롯 확보 실패는 정상 운영에서 관측하기 어려우므로 오류를 한 번만 주입한다. 아래 삽입 코드는 진단 전용이라 절대 병합하지 않는다.
 
-**1. 오류 주입 패치 작성과 적용** (`git apply` 사용, `patch` 미설치 환경 대비)
+**1. 오류 주입** — `dwb_set_data_on_next_slot` 호출 직전에 한 번만 실패를 만드는 임시 코드를 넣는다. 삽입 지점을 앵커 문자열로 찾으므로 들여쓰기 차이에 영향받지 않는다.
 
 ```bash
 cd <cubrid-source-root>
-cat > /tmp/inject-27262.patch <<'EOF'
---- a/src/storage/page_buffer.c
-+++ b/src/storage/page_buffer.c
-@@ -10761,6 +10761,18 @@
-     }
-   if (uses_dwb)
-     {
-+      /* TEMP: CBRD-27262 fault injection. never merge this block. */
-+      {
-+	static bool injected = false;
-+	if (!injected && bufptr->vpid.volid == 0 && bufptr->vpid.pageid > 1000
-+	    && bufptr->iopage_buffer->iopage.prv.ptype == PAGE_HEAP)
-+	  {
-+	    injected = true;
-+	    _er_log_debug (ARG_FILE_LINE, "CBRD-27262 inject: fail dwb slot for %d|%d\n",
-+			   VPID_AS_ARGS (&bufptr->vpid));
-+	    return ER_FAILED;
-+	  }
-+      }
-       error = dwb_set_data_on_next_slot (thread_p, iopage, false, false, &dwb_slot);
-       if (error != NO_ERROR)
- 	{
-EOF
-git apply /tmp/inject-27262.patch
+python3 - <<'PY'
+path = "src/storage/page_buffer.c"
+src = open(path).read()
+anchor = "error = dwb_set_data_on_next_slot (thread_p, iopage, false, false, &dwb_slot);"
+assert src.count(anchor) == 1
+inject = (
+    "/* TEMP: CBRD-27262 fault injection. never merge. */\n"
+    "      {\n"
+    "        static bool injected = false;\n"
+    "        if (!injected && bufptr->vpid.volid == 0 && bufptr->vpid.pageid > 1000\n"
+    "            && bufptr->iopage_buffer->iopage.prv.ptype == PAGE_HEAP)\n"
+    "          {\n"
+    "            injected = true;\n"
+    "            _er_log_debug (ARG_FILE_LINE, \"CBRD-27262 inject vpid=%d|%d\\n\",\n"
+    "                           VPID_AS_ARGS (&bufptr->vpid));\n"
+    "            return ER_FAILED;\n"
+    "          }\n"
+    "      }\n"
+    "      "
+)
+open(path, "w").write(src.replace(anchor, inject + anchor, 1))
+print("injected")
+PY
 ./build.sh -m debug
 ```
 

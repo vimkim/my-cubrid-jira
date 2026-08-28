@@ -195,6 +195,7 @@ baseline에서는 5개 함수가 링크 순서대로 약 441KB 구간에 흩어�
 ## Remarks
 
 - PoC 구현 draft PR: [CUBRID/cubrid#7823](https://github.com/CUBRID/cubrid/pull/7823) (branch `CBRD-27335-pgo-build`, `-DPGO` 옵션)
+- PGO 입문 자료(개념·원리·타 시스템 소프트웨어 도입 사례: Chrome, Firefox, Linux kernel, CPython, Clang/GCC, rustc, Go, ClickHouse 등): [CBRD-27335-pgo-primer_claude.md](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27335/CBRD-27335-pgo-primer_claude.md)
 - 발단: [CBRD-26382](http://jira.cubrid.org/browse/CBRD-26382) 및 [comment 4776011](http://jira.cubrid.org/browse/CBRD-26382?focusedCommentId=4776011&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776011)
 - 실험 전체 보고서: [CBRD-26382-pgo-experiment_95b79e7ed_claude.md](https://github.com/vimkim/my-cubrid-docs/blob/c07802c210e19fd65c5085cb64cdf2b73cd413c6/cbrd-26382/CBRD-26382-pgo-experiment_95b79e7ed_claude.md)
 - 재현 harness / 원시 데이터: [artifacts/pgo-gcc11](https://github.com/vimkim/my-cubrid-docs/tree/c07802c210e19fd65c5085cb64cdf2b73cd413c6/cbrd-26382/artifacts/pgo-gcc11) (timing CSV, perf stat 원문, 측정 스크립트)

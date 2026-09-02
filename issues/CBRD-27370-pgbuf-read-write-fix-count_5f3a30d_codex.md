@@ -41,9 +41,9 @@ pgbuf_fix(READ) 반복            global fcnt == holder fix_count
       └ 공통 성공 처리           holder fix_count++
 ```
 
-`pgbuf_latch_bcb_upon_fix`는 `old_impl.impl.fcnt == holder->fix_count`이면 즉시 승격 가능한 단독 holder로 판단한다. 이때 `new_impl.impl.fcnt = 1`을 저장한 뒤, 공통 성공 처리에서 `holder->fix_count++`를 수행한다. 서로 같아야 할 두 회계가 한 번의 성공 경로 안에서 어긋난다.
+`pgbuf_latch_bcb_upon_fix`는 `old_impl.impl.fcnt == holder->fix_count`이면 즉시 승격 가능한 단독 holder로 판단한다. 이때 `new_impl.impl.fcnt = 1`을 저장한 뒤, 공통 성공 처리에서 `holder->fix_count`를 1 증가시킨다. 서로 같아야 할 두 회계가 한 번의 성공 경로 안에서 어긋난다.
 
-회귀는 CBRD-26425 atomic latch 개편 커밋 `58cef8e01fcf121acbe3a35b7249deda54217532`에서 들어왔다. 개편 전 release 빌드는 이 경로에서 `bufptr->fcnt++`와 `holder->fix_count++`를 함께 수행했다. 반면 debug 빌드는 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae`가 추가한 검사로 일반 중첩 WRITE 요청을 `ER_FAILED`로 거부했다. 개편 후에는 두 빌드 모두 요청을 성공시키면서 전역 값만 초기화한다. 2026-09-02 기준 develop HEAD `5f3a30d0998beafcc3932ed8cf65e66020a53c4c`에도 이 대입이 남아 있다.
+회귀는 CBRD-26425 atomic latch 개편 커밋 `58cef8e01fcf121acbe3a35b7249deda54217532`에서 들어왔다. 개편 전 release 빌드는 이 경로에서 `bufptr->fcnt`와 `holder->fix_count`를 각각 1 증가시켰다. 반면 debug 빌드는 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae`가 추가한 검사로 일반 중첩 WRITE 요청을 `ER_FAILED`로 거부했다. 개편 후에는 두 빌드 모두 요청을 성공시키면서 전역 값만 초기화한다. 2026-09-02 기준 develop HEAD `5f3a30d0998beafcc3932ed8cf65e66020a53c4c`에도 이 대입이 남아 있다.
 
 ## Test Build
 

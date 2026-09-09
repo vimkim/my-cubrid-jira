@@ -16,7 +16,9 @@
 
 - 이 실패는 OOS/CDC (change data capture — 로그에서 변경 내역을 뽑아내는 기능) 와 무관한 기존 결함으로 분류하고, CBRD-26939 와 PR #6864 의 판정에서 분리한다 (사용자 인용: "I think this is not related to oos cdc and cbrd-26939").
 - `log_Gl.hdr.append_lsa` 를 8바이트 원자 값으로 발행·소비하는 방향을 제안한다. 후보 비교는 Remarks 에 둔다.
-- 최종 수정 방식: `TBD - 합의 미확인`.
+- 최종 수정 방식 (합의됨): `append_lsa` 를 8바이트 원자 값으로 발행·소비한다. `logpb_next_append_page` 가 새 위치를 지역 변수에 만들어 원자 store 하나로 발행하고, 락 없이 읽는 세 곳(`log_get_undo_record`, `heap_get_visible_version_from_log`, `logpb_fetch_page`)이 원자 load 하나로 지역 복사본을 만들어 비교한다. `assert` 는 유지한다 (Remarks 표의 1순위 후보).
+- 회귀 아님: 원인 코드는 2016년(blame `63378ed15c`)부터 있던 기존 결함이라 제목의 `[Regression]` 태그를 뗀다.
+- PR: <https://github.com/CUBRID/cubrid/pull/7904> (base `develop`, draft). 검증: 고친 optdebug 빌드에서 읽기/쓰기가 각각 8바이트 접근 하나로 바뀐 것을 디스어셈블로 확인했고, GDB 프로브로 옛 코드였다면 죽었을 페이지 전환을 잡아 고친 서버가 모두 견디는 것(core 0, assert 도달 0회)을 확인했다.
 
 ---
 

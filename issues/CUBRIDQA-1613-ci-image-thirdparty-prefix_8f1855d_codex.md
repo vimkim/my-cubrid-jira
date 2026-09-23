@@ -39,7 +39,7 @@
 
 CUBRID의 3rdparty CMake는 외부 dependency의 다운로드부터 설치까지 `ExternalProject`로 관리한다. 다운로드한 파일, 압축 해제한 source, 중간 object, 설치된 library와 각 단계의 완료 stamp가 CUBRID build directory 아래에 놓인다.
 
-CI entrypoint가 호출하는 `build.sh clean`은 이 build directory를 비운다. 완료 stamp까지 사라지므로 이어지는 `build`는 동일한 dependency가 이미 준비됐는지 알 수 없고, ExternalProject 단계를 처음부터 수행한다. `ccache`가 일부 C/C++ compile을 단축할 수는 있지만 dependency 다운로드, configure, install 상태와 완성된 library 전체를 보존하지는 않는다.
+CI entrypoint가 호출하는 `build.sh clean`은 이 build directory를 비운다. 완료 stamp까지 사라지므로 이어지는 `build`는 동일한 dependency가 이미 준비됐는지 알 수 없고, ExternalProject 단계를 처음부터 수행한다. `ccache`가 compiler object 생성을 단축할 수는 있지만 dependency 다운로드, configure, install 상태와 완성된 library 전체를 보존하지는 않는다.
 
 이번 설계는 ExternalProject의 작업 tree 자체를 pod 간에 옮기지 않는다. 대신 cubridci image build stage에서 소비에 필요한 header와 library만 정규화된 prefix로 만들고, 그 결과를 final image layer에 저장한다. Docker image layer가 CI node에 남아 있으면 Kubernetes pod는 같은 prefix를 다시 전송하거나 해제하지 않고 바로 사용한다.
 

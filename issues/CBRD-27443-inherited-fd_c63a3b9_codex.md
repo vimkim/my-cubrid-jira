@@ -31,7 +31,120 @@ Unix 계열의 서비스 실행부, master, 서버 및 PL(저장 프로시저 �
 
 셸이 `a.out | cat`을 실행하면 `a.out`의 표준 출력이 파이프에 연결된다. `a.out`이 자식을 만들면 같은 통로를 가리키는 FD(열린 파일이나 통신 통로를 가리키는 번호)가 자식에게도 전달된다. 부모가 종료해 자기 FD를 닫아도, 살아 있는 자식의 복사본은 남는다.
 
-파이프를 읽는 쪽은 모든 쓰기 FD가 닫히고 남은 데이터를 읽어야 EOF(출력 종료)를 받는다. 출력이 전혀 없어도 쓰기 FD가 남아 있으면 기다린다. 종료 코드를 확인하는 작업과 출력 수집을 끝내는 작업은 별개다. [pipe(7)](https://man7.org/linux/man-pages/man7/pipe.7.html), [wait(2)](https://man7.org/linux/man-pages/man2/wait.2.html)
+파이프를 읽는 쪽은 모든 쓰기 끝이 닫히고 남은 데이터를 읽어야 EOF(입력의 끝)를 받는다. 출력이 전혀 없어도 쓰기 끝을 보유한 참조가 남아 있으면 기다린다. 종료 코드를 확인하는 작업과 출력 수집을 끝내는 작업은 별개다. [pipe(7)](https://man7.org/linux/man-pages/man7/pipe.7.html), [wait(2)](https://man7.org/linux/man-pages/man2/wait.2.html)
+
+### FD를 복사해도 파이프 자체가 복제되지는 않는다
+
+FD는 프로세스마다 관리하는 작은 정수다. 보통 0은 표준 입력, 1은 표준 출력, 2는 표준 오류다. 커널은 각 프로세스의 FD 테이블에서 해당 번호가 가리키는 열린 파일 객체를 찾는다. 여기서 파일 객체는 디스크 파일뿐 아니라 파이프나 소켓의 열린 연결도 나타낸다. FD와 `flock`은 다른 개념이다. `flock`은 파일 잠금 기능이며, 그 기능을 사용할 때도 FD로 대상 파일을 지정한다.
+
+`a.out | cat`에서 셸은 `a.out`의 표준 출력과 `cat`의 표준 입력을 파이프로 연결한다. 이후 `a.out`이 `fork()`하면 자식의 FD 테이블에도 같은 열린 파일 객체를 가리키는 참조가 생긴다. 파이프나 버퍼를 하나 더 만드는 것이 아니다.
+
+```text
+부모의 FD 테이블                  커널 내부
+  1 (stdout) ────┐
+                 ├── 같은 쓰기 파일 객체 ──→ 파이프 버퍼
+자식의 FD 테이블 │                              │
+  1 (stdout) ────┘                              ↓
+                                          읽기 파일 객체
+                                                ↑
+                                         cat의 0 (stdin)
+```
+
+부모가 종료해도 자식의 참조는 남을 수 있다. 반대로 자식이 자기 쓰기 FD를 닫으면, 자식 프로세스 자체는 계속 살아 있어도 된다. `cat`은 부모나 자식의 생존을 감시하는 것이 아니라 자신의 표준 입력에서 `read()`를 실행한다.
+
+### close는 시그널이 아니라 커널에 참조 해제를 요청하는 호출이다
+
+`close(1)`은 다른 프로세스에 종료 시그널을 보내는 동작이 아니다. 호출한 프로세스의 FD 테이블에서 1번 연결을 제거하고, 그 연결이 보유하던 파일 객체의 참조를 해제하도록 커널에 요청한다. 다른 프로세스의 FD나 같은 프로세스에서 `dup()`으로 만든 별도 FD는 함께 닫히지 않는다.
+
+프로세스가 종료되면 커널이 남아 있는 FD를 정리한다. `SIGKILL`(`kill -9`)로 종료되어 프로그램의 종료 처리 코드가 실행되지 않아도 이 정리는 수행된다. 다만 부모 하나를 죽인다고 자식까지 자동으로 종료되는 것은 아니다. 손자나 다른 프로세스에 쓰기 끝의 참조가 남았다면 EOF는 아직 오지 않는다.
+
+파이프를 읽는 `cat`의 관점에서는 다음 세 상태를 구분한다. 아래는 읽을 크기가 0보다 큰 일반적인 blocking `read()` 기준이다.
+
+| 파이프 상태 | read의 동작 |
+|---|---|
+| 버퍼에 데이터가 있음 | 데이터를 복사하고 읽은 바이트 수를 반환한다. |
+| 버퍼가 비었지만 쓰기 끝이 열려 있음 | 데이터나 상태 변화가 생길 때까지 기다린다. 출력이 없다는 사실만으로 끝났다고 판단하지 않는다. |
+| 버퍼가 비었고 모든 쓰기 끝이 닫힘 | 0을 반환한다. 이것이 EOF다. |
+
+EOF라는 문자나 메시지가 파이프에 추가되는 것은 아니다. 커널이 더 읽을 데이터도, 앞으로 쓸 연결도 없음을 판단해 `read()`의 반환값으로 알린다. `cat`은 그 0을 보고 입력 수집을 끝낸다. 따라서 마지막 쓰기 끝이 닫혀도 버퍼에 남은 데이터는 먼저 읽는다.
+
+### 커널은 두 종류의 카운트로 수명을 관리한다
+
+다음은 Linux v6.12 소스에서 확인한 구현 설명이다. CUBRID가 특정 커널 버전이나 내부 자료형에 의존한다는 뜻은 아니며, 이번 실행 호스트의 커널 내부 카운트를 직접 측정한 결과도 아니다.
+
+| 위치 | 자료형과 동기화 | 의미 |
+|---|---|---|
+| 열린 파일 객체 `struct file`의 `f_count` | `atomic_long_t` | 해당 파일 객체에 대한 참조 수다. `shared_ptr`의 참조 카운트와 비슷한 역할을 한다. |
+| 파이프 `struct pipe_inode_info`의 `writers` | `unsigned int`, 변경 시 파이프 mutex로 보호 | 파이프의 열린 쓰기 끝 수다. FD 번호나 프로세스 수를 직접 세는 값이 아니다. |
+
+부모와 자식이 하나의 쓰기 파일 객체를 공유하고, 그 외의 FD나 일시적인 커널 참조는 없다고 단순화하면 다음과 같다. 각 행은 해당 정리가 완료된 뒤의 상태다.
+
+| 사건 | 쓰기 파일 객체의 f_count | 파이프의 writers |
+|---|---:|---:|
+| 부모만 쓰기 FD 보유 | 1 | 1 |
+| fork 후 부모와 자식이 보유 | 2 | 1 |
+| 부모가 자기 FD를 닫음 | 1 | 1 |
+| 자식도 자기 FD를 닫아 마지막 참조 해제 | 0, 파일 객체 정리 | 0 |
+
+`fork()`나 `dup()`은 같은 파일 객체의 참조를 늘리므로 `writers`가 FD 수만큼 증가하지 않는다. 파일 참조 해제 경로는 atomic 연산으로 마지막 참조인지 확인하고, 최종 정리에서 파이프의 `pipe_release()`를 호출한다. 이 함수가 mutex를 잡고 `writers`를 감소시킨다. 마지막 writer가 없어지면 읽기 대기자를 깨워 상태를 다시 확인하게 한다. 버퍼까지 비어 있으면 읽기 경로가 EOF를 반환한다. 읽기 쪽이 남아 있는 동안 파이프 객체 자체는 계속 존재할 수 있다.
+
+즉 참조 카운트로 관리한다는 이해는 맞다. 다만 파일 객체의 atomic 참조 카운트와, 잠금으로 보호하는 파이프 writer 카운트가 서로 다른 계층에 있다.
+
+근거: Linux v6.12의 [파일 객체 정의](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/include/linux/fs.h), [파일 참조 해제](https://kernel.googlesource.com/pub/scm/linux/kernel/git/torvalds/linux/+/refs/tags/v6.12/fs/file_table.c), [파이프 구조체](https://github.com/torvalds/linux/blob/v6.12/include/linux/pipe_fs_i.h), [파이프 읽기와 해제](https://github.com/torvalds/linux/blob/v6.12/fs/pipe.c).
+
+### 자식의 생존과 cat의 종료를 분리해서 보는 작은 예제
+
+아래 프로그램을 `fork_demo.c`로 저장한다. 부모는 바로 종료하고 자식은 두 모드 모두 3초 동안 살아 있다. `close` 모드에서만 자식의 stdout을 닫는다. 자식의 상태 안내는 stderr로 출력하므로, 아래 명령에서는 `cat`으로 보내는 파이프에 들어가지 않는다.
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int main(int argc, char **argv)
+{
+    int release = argc > 1 && strcmp(argv[1], "close") == 0;
+    pid_t child = fork();
+    if (child < 0) {
+        perror("fork");
+        return 1;
+    }
+    if (child == 0) {
+        if (release) {
+            close(STDOUT_FILENO);
+        }
+        fprintf(stderr, "child: %s stdout; staying alive for 3 seconds\n",
+                release ? "closed" : "keeping");
+        sleep(3);
+        fprintf(stderr, "child: exiting now\n");
+        _exit(0);
+    }
+    printf("parent: exiting; child PID = %ld\n", (long)child);
+    return 0;
+}
+```
+
+대화형 Bash에서 다음을 실행한다.
+
+```bash
+cc -Wall -Wextra -o a.out fork_demo.c
+time ./a.out keep | cat
+time ./a.out close | cat
+```
+
+`keep`에서는 자식이 종료하는 약 3초 뒤 파이프라인이 끝난다. `close`에서는 파이프라인이 먼저 끝나고, 자식의 `exiting now` 안내가 약 3초 뒤 터미널에 나타난다. 비교 조건을 유지하려면 `2>&1`이나 `|&`를 붙이지 않는다. stderr까지 같은 파이프로 연결하면, 자식이 stdout만 닫아도 stderr의 쓰기 참조가 남기 때문이다. 자동화 도구가 stderr를 별도 파이프로 수집하고 있다면 도구 자체의 완료 시점도 그 EOF에 영향을 받을 수 있다.
+
+2026-10-02 Linux `5.14.0-570.30.1.el9_6.x86_64`에서 같은 로직의 프로그램을 실행하고, Python으로 부모와 `cat`을 각각 기다려 시간을 측정했다. 자식 stderr는 `cat`의 입력에 연결하지 않았다. 아래는 각 조건의 최초 1회 실행 결과이며 성능 통계가 아니다.
+
+| 모드 | 부모 종료 | cat 종료 | 자식의 동작 |
+|---|---:|---:|---|
+| keep | 0.002초 | 3.001초 | stdout을 유지한 채 3초 생존 후 종료 |
+| close | 0.002초 | 0.003초 | stdout을 먼저 닫고 3초 생존 후 종료 |
+
+이 예제는 Linux 파이프의 수명 규칙을 보여 주며, CUBRID 수정본의 검증 결과는 아니다. 이슈에서 필요한 것은 서버를 종료시켜 EOF를 얻는 것이 아니라, 서버가 계속 실행되는 동안에도 호출자의 불필요한 쓰기 참조를 놓도록 하는 것이다. 시작 결과와 필요한 진단은 별도로 보존해야 한다.
+
+### CUBRID의 시작과 재기동 경로에 적용하면
 
 ```text
 호출 도구

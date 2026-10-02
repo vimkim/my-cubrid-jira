@@ -276,3 +276,43 @@ Test database deleted; evidence files retained.
 - [master 초기 FD 정리](https://github.com/vimkim/cubrid/blob/38093ea859a8a08e20405b72b0cb395205bedb2f/src/executables/master.c#L1677)
 - [broker 관리 명령의 프로세스 생성](https://github.com/vimkim/cubrid/blob/38093ea859a8a08e20405b72b0cb395205bedb2f/src/broker/broker_admin_pub.c#L3158), [broker 내부 생성 시 FD 정리](https://github.com/vimkim/cubrid/blob/38093ea859a8a08e20405b72b0cb395205bedb2f/src/broker/broker.c#L1552)
 - [HA 재시작](https://github.com/vimkim/cubrid/blob/38093ea859a8a08e20405b72b0cb395205bedb2f/src/executables/master_heartbeat.c#L3137), [일반 서버 재기동](https://github.com/vimkim/cubrid/blob/38093ea859a8a08e20405b72b0cb395205bedb2f/src/executables/master_server_monitor.cpp#L266)
+
+## Q&A
+
+> 논의에서 나올 법한 질문을 자문자답 형식으로 정리한 보충 자료다. 근거는 본문 각 절과 인용한 man page를 따른다.
+
+### Q1. 재현에 쓴 flock은 애초에 왜 존재하나? CUBRID의 잠금인가?
+
+CUBRID가 만든 잠금이 아니다. 호출하는 쪽 도구가 자기 작업의 동시 실행을 막으려고 건 잠금이다. 이전 조사 기록의 사례에서는 대화형 래퍼가 같은 DB에 대한 start/stop을 직렬화하려고 잠금 파일에 `flock -w 300`을 걸었다. 재현 스크립트의 FD 9도 "호출자가 어떤 목적으로든 열어 둔 전용 FD"를 대표하는 임의 번호다. 요점은 잠금의 정당성이 아니라, 호출자의 전용 FD가 백그라운드 서버로 새어 들어가 호출자 쪽 자원 수명 관리가 깨진다는 사실이다. 잠금 파일은 증상이 가장 선명하게 드러나는 예일 뿐이고, 파이프처럼 모든 쓰기 끝이 닫혀야 의미가 생기는 FD도 같은 위험에 놓인다.
+
+### Q2. exec 하면 FD가 알아서 정리되지 않나? fork/exec 뒤 수동 정리가 Unix/C 관례인가?
+
+정리되지 않으며, 수동 정리가 오래된 관례다. 기본 규칙이 반대이기 때문이다. `fork()`는 부모의 FD를 전부 복사해 자식에게 넘기고, `exec()`는 `FD_CLOEXEC` 표시가 없는 FD를 그대로 유지한다. 즉 기본값이 "물려주기"다. 그래서 daemon(7)은 전통적 데몬화의 첫 단계로 상속받은 불필요한 FD를 모두 닫으라고 명시한다. 현대적 보완책은 파일을 열 때 `O_CLOEXEC`를 붙이는 것이지만, 이는 자기 프로세스가 여는 FD에만 적용된다. 호출자가 물려준 FD는 데몬이 되는 쪽이 직접 닫는 수밖에 없다. CUBRID 내부에도 이 관례는 이미 구현되어 있다(`master.c:1678`의 초기 FD 정리). Linux 5.9 이상에는 [close_range(2)](https://man7.org/linux/man-pages/man2/close_range.2.html) 같은 전용 API도 있다.
+
+### Q3. 사람이 터미널에서 start → stop 하는 평범한 워크플로에서는 왜 문제가 재현되지 않나?
+
+증상이 나타나려면 두 조건이 동시에 필요하기 때문이다. (1) 호출자가 "닫혀야 의미가 있는" FD(잠금 파일, 파이프 쓰기 끝)를 들고 있어야 하고, (2) 그 FD가 닫히기를 기다리는 쪽이 있어야 한다. 사람이 터미널에서 직접 실행하는 경우 셸이 물려주는 FD는 대체로 터미널(표준 입출력) 정도이고, 그 해제를 기다리는 프로세스가 없어 증상이 생기지 않는다. 재현 시나리오는 새로운 결함 조건을 만든 것이 아니라, 잠금이라는 "해제를 기다리는 관찰자"를 세워 이미 존재하는 상속을 관찰 가능하게 만든 것이다. 자동화 도구와 AI agent는 잠금으로 직렬화하거나 파이프로 출력을 수집(EOF 대기)하는 방식이 일상이라 이 관찰자 역할을 상시 수행하며, 그래서 같은 누수가 이 환경에서 유독 대기로 드러난다. 파이프 EOF 대기는 원리상 성립하지만 CUBRID에서의 독립 재현은 미완이다(Description의 원인 후보 표 참조).
+
+### Q4. start와 stop이 같은 실행 도우미를 공유하는데 왜 start만 문제가 되나?
+
+누수의 지속 시간이 FD를 물려받은 프로세스의 수명과 같기 때문이다. start는 오래 사는 백그라운드 프로세스(cub_server, cub_pl)를 만들어 상속 FD가 서버 수명만큼 유지된다. 반면 stop 경로는 종료 요청 도구를 동기 실행(`util_service.c:1835`)하고 곧 끝나므로 상속 FD도 함께 닫힌다. 사용자 경험에서 stop 호출이 멈춘 사례는 stop 자체의 유출이 아니라 이전 start가 남긴 잠금을 호출 래퍼가 기다린 결과일 수 있으며, 사례별 분류는 추가 검증 항목에 남겨 두었다.
+
+### Q5. 잠금을 건 셸은 이미 종료됐는데 왜 잠금이 풀리지 않나?
+
+`flock` 잠금은 프로세스가 아니라 열린 파일 기술(open file description)에 붙기 때문이다. fork로 복사된 FD들은 같은 열린 파일 기술을 참조하므로, 잠금을 건 프로세스가 종료돼도 복사본 FD를 가진 프로세스(cub_server·cub_pl)가 살아 있는 한 잠금은 유지된다. 모든 참조 FD가 닫혀야 풀린다. [flock(2)](https://man7.org/linux/man-pages/man2/flock.2.html)
+
+### Q6. 서버가 `setsid()`를 호출하는데 그것으로 부족한가?
+
+부족하다. `setsid()`는 세션과 제어 터미널 관계만 끊고 FD 테이블은 건드리지 않는다. 데몬화에서 세션 분리와 FD 정리는 별개 단계이며, 일반 서버 경로는 앞 단계만 수행한다(본문 "FD가 유지되는 동작 원리" 참조).
+
+### Q7. 공통 fork/exec 도우미에서 FD를 전부 닫으면 끝나는 문제 아닌가?
+
+아니다. 의도적으로 전달하는 FD가 있다. master→서버 클라이언트 소켓 전달(`SCM_RIGHTS`), broker→CAS/proxy 연결 인계, 동기 유틸리티의 표준 입출력 리다이렉션이 그 예다. 같은 도우미를 동기 명령들도 공유하므로 무차별 정리는 이런 계약을 깨뜨린다. 백그라운드 실행에만 적용되는 보존 목록 기반 정리가 필요하며, 이것이 "수정 후보와 호환성 검토"에서 적용 위치를 나눠 검토하는 이유다.
+
+### Q8. 호출하는 쪽이 조심하면 되는 문제 아닌가? 왜 CUBRID를 고쳐야 하나?
+
+호출자 쪽 방어도 실제로 존재한다. 예를 들어 [flock(1)](https://man7.org/linux/man-pages/man1/flock.1.html)의 `-o` 옵션은 명령 실행 전에 잠금 FD를 닫는다. 그럼에도 CUBRID 쪽 수정이 필요한 이유는 다음과 같다. (1) 모든 호출자(사람의 스크립트, CI, 대화형 도구, AI agent)를 수정할 수는 없다. (2) 출력 수집용 파이프처럼 호출자가 끊기 어려운 FD도 있다. (3) 관례상 데몬이 되는 쪽이 자기 FD 위생을 책임진다(daemon(7)). (4) CUBRID 내부 기준으로도 master는 이미 수행하는 정리를 서버·PL 경로만 빠뜨린 상태다.
+
+### Q9. OS 버그는 아닌가?
+
+아니다. fork/exec/flock의 문서화된 정상 동작이다(본문에 인용한 man page 참조). 결함은 CUBRID가 백그라운드 실행 경계에서 자원 수명 관리를 누락한 것이며, 그래서 이슈 유형도 `Correct Error`로 유지한다.

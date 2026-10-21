@@ -1,14 +1,14 @@
-# [BUILD] cubrid_rel 커밋 버전 갱신 누락과 버전 헤더 변경에 따른 광범위한 재빌드
+# [BUILD] 커밋 후 버전 표시가 갱신되지 않거나 불필요한 재빌드가 발생하는 문제
 
 ## Issue Triage
 
-**이슈 수행 목적**: 일반 CMake 빌드에서 현재 소스 커밋을 정확히 표시하고, 커밋 수·해시만 바뀔 때 버전 값을 사용하지 않는 오브젝트까지 재빌드하는 비용을 줄인다.
+**이슈 수행 목적**: 커밋 후 빌드하면 현재 커밋이 버전에 표시되고, 커밋 정보만 바뀌었을 때 관계없는 소스를 다시 빌드하지 않게 한다.
 
-**이슈 수행 이유**: 기존 재현에서는 빈 커밋 후 빌드만 실행하면 `cubrid_rel`에 이전 해시가 남았고, CMake를 재구성하면 `version.h` 의존성이 엔진 전반으로 전파되었다. CBRD-25560의 후속 CI hit 40% 이상 보고와 관련하여 제공된 PR #8217 로그의 59.82%는 해당 빌드의 측정값이 아닌 공유 캐시 누적 통계임을 확인하였다. 버전 변경에 따른 실제 캐시 효과와 시간 비용은 실행별로 측정해야 한다.
+**이슈 수행 이유**: 지금은 커밋 후 빌드해도 이전 버전이 표시될 수 있다. 버전을 갱신하려고 CMake 설정을 다시 실행하면 버전과 관계없는 소스까지 다시 빌드하게 된다.
 
-**영향**: 개발자는 바이너리의 소스 커밋을 잘못 식별하거나 소스 변경이 없는 커밋 뒤에도 광범위한 빌드 작업을 기다릴 수 있다. 기존 Debug/Ninja 기록에서 `version.h`에 의존하는 오브젝트는 1,135개였다. 이 수는 실제 컴파일러 실행 횟수나 소요 시간을 뜻하지 않으며, 현재 CI의 커밋 변경별 hit와 시간 영향은 미확인이다.
+**영향**: 개발자는 실행 파일이 어느 커밋에서 만들어졌는지 잘못 판단할 수 있고, 소스를 바꾸지 않은 커밋 뒤에도 빌드를 기다릴 수 있다. 실제 대기 시간이 얼마나 늘어나는지는 추가 측정이 필요하다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: 커밋 변경을 빌드에서 감지하고, 커밋 정보를 사용하는 코드만 갱신하는 방향을 검토한다. 구체적인 구현 방식은 ANALYSIS 단계에서 결정한다.
 
 ---
 
@@ -18,25 +18,38 @@
 
 ## Description
 
-### 무엇이 문제인가
+### 현재 문제
 
-CMake는 구성 단계에서 Git 커밋 수와 해시를 계산하여 `version.h`를 생성한다. 일반 브랜치의 `HEAD` 파일에는 커밋 ID 대신 `ref: refs/heads/<branch>`가 들어 있다. 현재 규칙은 일반 clone 또는 linked worktree의 이 `HEAD` 파일을 구성 입력으로 등록하므로, 해당 파일이 그대로인 채 branch ref만 이동하는 새 커밋을 놓칠 수 있다. 기존 재현에서는 빈 커밋 뒤 빌드가 `ninja: no work to do.`로 끝나고 `cubrid_rel`이 이전 해시를 출력하였다.
+커밋 후 빌드할 때 두 가지 문제가 있다.
 
-반대로 명시적인 재구성 등으로 새 커밋 값이 `version.h`에 반영되면 광범위한 재빌드가 발생한다. `config.h`가 `version.h`를 포함하고 엔진 전반이 `config.h`를 사용하기 때문이다. 버전 값을 직접 사용하는 파일이 아니어도 헤더 의존성 때문에 빌드 대상이 된다. 커밋 감지의 정확성과 버전 변경의 의존성 범위를 함께 개선해야 한다.
+1. 빌드만 실행하면 `cubrid_rel`에 이전 커밋이 표시될 수 있다. 개발자는 방금 만든 실행 파일의 버전을 보고도 어떤 소스로 빌드했는지 정확히 알기 어렵다.
+2. 버전을 맞추려고 CMake 설정을 다시 실행하면, 버전 정보만 바뀌어도 엔진 대부분이 다시 빌드할 대상으로 잡힌다. 실제 소스 변경이 없는 빈 커밋에서도 같은 일이 발생한다.
 
-빌드 시스템이 오브젝트를 다시 만들도록 예약하는 것, ccache가 결과를 재사용하는 것, 실제 컴파일러가 컴파일하는 것은 구분해야 한다. ccache hit가 있더라도 넓은 헤더 의존성 자체가 사라지는 것은 아니다. 다만 hit가 많으면 실제 재컴파일과 시간 비용이 줄어들므로 의존 오브젝트 수만으로 성능 저하의 크기를 단정할 수 없다.
+필요한 동작은 명확하다. 평소처럼 빌드하면 현재 커밋이 표시되어야 하고, 커밋 정보만 바뀌었을 때는 그 정보를 사용하는 코드만 갱신해야 한다.
 
-### 왜 문제인가
+### 문제 원인
 
-버전 표시가 뒤처지면 개발·검증 중인 바이너리가 어느 커밋에서 만들어졌는지 확인하기 어렵다. 출력된 버전을 기준으로 소스와 실행 결과를 대응시키는 작업도 부정확해질 수 있다. 실제 오배포나 장애 사례는 확인되지 않았다.
+첫 번째 원인은 커밋 정보를 읽는 시점과 변경 감지 방식이다. 지금은 CMake 설정을 실행할 때 커밋 정보를 읽는다. 이후 빌드에서 감시하는 Git 파일은 새 커밋이 생겨도 내용이 그대로일 수 있어, 커밋 변경을 놓친다. 기존 재현에서도 빈 커밋 후 빌드는 할 일이 없다고 끝났고 이전 버전이 남았다.
 
-버전을 맞추려고 매번 재구성하면 갱신 누락은 우회할 수 있으나 넓은 의존성 때문에 재빌드가 발생한다. 캐시가 없는 환경에서는 재컴파일 비용을 부담하고, 캐시가 있는 환경에서도 조회·전처리·miss 비용이 남을 수 있다. 발생 빈도와 현재 CI에서의 순수 시간 손실은 추가 측정이 필요하다.
+두 번째 원인은 커밋 정보를 너무 넓게 공유하는 헤더 구조이다. 커밋 정보가 들어 있는 `version.h`를 공통 설정 헤더인 `config.h`가 포함한다. 거의 모든 엔진 코드가 이 공통 헤더를 사용하므로, 버전 문자열을 출력하지 않는 코드도 커밋 정보가 바뀌면 다시 빌드할 대상이 된다.
 
-### 왜 해결해야 하는가
+ccache는 이전 컴파일 결과를 재사용하여 이 비용을 줄일 수 있다. 다만 빌드 대상이 넓게 잡히는 구조는 그대로이며, 캐시를 재사용하지 못하면 실제 컴파일이 발생한다. 따라서 재빌드 대상 수와 실제 소요 시간은 따로 확인해야 한다.
 
-정확한 커밋 표시를 얻기 위해 광범위한 재빌드를 감수하거나, 이를 피하려고 오래된 버전 정보를 사용하는 상태는 개발 흐름의 정상 동작으로 삼기 어렵다. 두 문제를 함께 개선하면 개발자가 별도의 재구성 절차를 기억하지 않아도 바이너리를 식별하고 작은 변경의 검증을 이어갈 수 있다.
+### 해결 방향
 
-CBRD-25560의 ccache 사용 개선만으로 Git 커밋 감지 누락이나 헤더 의존성 전파가 해결되지는 않는다. 제공된 CI 통계는 이번 확인에서 빌드별 hit율의 근거로 사용할 수 없는 것으로 드러났다. 그렇다고 현재 CI의 CUBRID 소스가 모두 miss라고 확정된 것도 아니다. 측정 범위를 맞춘 뒤 비용을 평가해야 한다. 긴급성은 입증되지 않았으며 기존 이슈의 낮은 중요도 의견을 뒤집을 근거도 아직 없다.
+빌드할 때 커밋 변경을 감지하여 버전을 갱신하고, 자주 바뀌는 커밋 정보는 필요한 코드에서만 사용하도록 분리하는 방향을 검토한다.
+
+공통으로 필요한 릴리스 정보는 계속 제공하고, 커밋마다 바뀌는 값의 전달 범위를 좁힌다.
+
+이렇게 하면 개발자는 별도의 CMake 설정 명령을 기억할 필요가 없고, 커밋 정보만 바뀌었을 때 관계없는 소스의 재빌드를 줄일 수 있다. 현재 제공하는 버전 표시와 디버깅 기능은 유지한다. 파일을 어떻게 나누고 갱신할지는 ANALYSIS에서 결정한다.
+
+### 해결이 문제가 되지 않는 근거
+
+커밋 정보를 실제로 사용하는 코드의 범위가 제한적이라는 근거가 있다. 기존 분석에서 버전 문자열은 주로 `release_string` 코드가 제공하고, 빌드 번호는 일부 broker 코드가 직접 사용하였다. 현재 확인한 직접 사용 범위는 엔진 전체보다 훨씬 좁다.
+
+따라서 필요한 코드에 새 커밋 정보가 전달되도록 연결을 유지하면서, 관계없는 코드로 변경이 퍼지는 범위를 줄일 수 있다. 버전 표시와 디버깅 기능을 유지하면서 빌드 범위를 줄이는 방향이다.
+
+다만 실제 수정의 안전성은 구현 후 확인해야 한다. `cubrid_rel`, broker, 패키지가 올바른 버전을 사용하는지, 커밋 정보만 바뀌면 필요한 코드만 갱신되는지, 아무 변경 없이 다시 빌드하면 불필요한 작업이 없는지를 검증한다.
 
 ## Test Build
 
@@ -138,56 +151,40 @@ done
 | `-ggdb3 -ggdb` | 남는다 | 달라진다 | hit 0, miss 1 |
 | `-ggdb` | 남지 않는다 | 같다 | preprocessed hit 1, miss 0 |
 
-따라서 버전 매크로 변경이 `-ggdb3`의 캐시 재사용을 방해할 수 있다는 설명은 이번 최소 실험에서도 성립한다. GCC 8.5.0·ccache 3.7.7의 전체 CUBRID 결과, OptDebug의 전체 빌드 결과, 현재 CI 전체 hit가 0이라는 주장을 검증한 것은 아니다.
+작은 예제에서는 버전 매크로 변경 때문에 `-ggdb3`의 캐시를 재사용하지 못하는 현상이 재현되었다. 실제 CUBRID 전체 빌드의 hit율과 시간은 별도로 측정해야 한다.
 
 ## Additional Information
 
-### CBRD-25560의 상충해 보이는 보고
+### CI의 캐시 hit율은 어떻게 해석해야 하는가
 
-[CBRD-25560](http://jira.cubrid.org/browse/CBRD-25560)과 본 이슈는 `relates to` 관계이다. 관련 댓글은 서로 다른 측정 범위일 수 있으므로 다음과 같이 구분한다.
+[CBRD-25560의 실험 댓글](http://jira.cubrid.org/browse/CBRD-25560?focusedCommentId=4777097&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-4777097)은 버전 헤더를 바꾼 Debug 빌드에서 CUBRID 소스의 hit가 `0/1170`이었다고 보고하였다. 캐시 없음 52.3초, ccache 사용 58.8초였다. OptDebug는 작은 예제만 확인했다고 명시하였다. 전체 빌드에는 외부 라이브러리의 캐시 효과도 있으므로 측정 범위를 구분해야 한다.
 
-| 근거 | 보고 내용 | 해석의 한계 |
+[후속 댓글](http://jira.cubrid.org/browse/CBRD-25560?focusedCommentId=4777107&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-4777107)에는 실제 CI hit가 40% 이상이라는 보고가 있다. 이번 요청에서 제공된 PR #8217 로그의 59.82%를 확인한 결과, 이 수치는 공유 캐시에 쌓인 과거 통계였다.
+
+| 확인한 OptDebug 작업 | direct hit / preprocessed hit / miss | 표시된 hit율 |
 |---|---|---|
-| [실험 댓글 4777097](http://jira.cubrid.org/browse/CBRD-25560?focusedCommentId=4777097&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-4777097), 2026-10-20 | 생성된 `version.h`의 커밋 수·해시만 바꾼 Debug에서 hit `0/1170`, 캐시 없음 52.3초 / ccache 58.8초. RelWithDebInfo는 preprocessed hit `1154/1170`, 66.0초 / 17.4초라고 보고하였다. | CUBRID 소스 구간의 특정 조건 실험이다. OptDebug 전체 빌드는 같은 조건으로 검증하지 않았다고 명시한다. |
-| 같은 댓글의 전체 빌드 설명 | third-party를 포함한 `build.sh -m debug`에서는 third-party hit가 miss 비용을 상쇄하여 캐시 유무의 전체 시간이 비슷했다고 보고하였다. | 해당 댓글 자체도 모든 컴파일 호출의 hit가 0이라고 주장한 것은 아니다. |
-| [후속 댓글 4777107](http://jira.cubrid.org/browse/CBRD-25560?focusedCommentId=4777107&page=com.atlassian.jira.plugin.system.issuetabpanels%3Acomment-tabpanel#comment-4777107), 2026-10-20 및 이번 요청 | 담당자 문의 결과 실제 CI에서 ccache hit ratio가 40% 이상이라는 보고가 있다. 이번 요청에서 PR #8217의 59.82% 출력이 추가로 제공되었다. | 해당 출력과 일치하는 실제 작업 로그를 확인한 결과, PR 빌드 중 통계를 갱신하지 않은 공유 캐시 누적 통계였다. 댓글이 근거로 삼은 다른 실행이 있는지는 미확인이다. |
+| [PR #8217 첫 번째 빌드](https://github.com/CUBRID/cubrid/actions/runs/39377825558/job/118479884072) | `100948 / 1296 / 68689` | `59.82%` |
+| [PR #8217 두 번째 빌드](https://github.com/CUBRID/cubrid/actions/runs/39383918389/job/118499169707) | `100948 / 1296 / 68689` | `59.82%` |
 
-### PR #8217의 59.82%는 빌드별 hit율이 아니다
+서로 다른 커밋을 빌드했지만 카운터와 통계 갱신 시각(`Tue Oct 20 12:58:24 2026`)이 같았다. [해당 CI 설정](https://github.com/CUBRID/cubrid/blob/c966fabc6b4c8ac86aa4b5abb0a4cbefae01bf5b/.github/workflows/gha-ci.yml#L481-L562)과 두 로그에서, 이 PR 빌드들은 캐시를 읽기만 하고 통계 기록을 끄는 `CCACHE_READONLY=1 CCACHE_NOSTATS=1` 설정으로 실행된 것을 확인하였다.
 
-다음 두 `build (debug)` 작업의 로그에서 실제 소스 SHA가 다르지만 같은 통계가 출력됨을 확인하였다. 두 작업 모두 OptDebug 빌드를 수행하였다.
+따라서 59.82%만으로는 이 두 빌드에서 캐시가 얼마나 재사용되었는지 알 수 없다. 기존 실험이 틀렸다고 판단할 근거도 되지 않는다. 실제 빌드별 hit율과 시간은 통계가 기록되는 별도 검증 환경에서 확인해야 한다.
 
-| 작업 | 실제 소스 SHA | direct hit / preprocessed hit / miss | hit율과 통계 갱신 시각 |
-|---|---|---|---|
-| [run 39377825558, job 118479884072](https://github.com/CUBRID/cubrid/actions/runs/39377825558/job/118479884072) | `be5e8fc50a745215ec65a80e2ce6e57bf1972c9f` | `100948 / 1296 / 68689` | `59.82%`, `Tue Oct 20 12:58:24 2026` |
-| [run 39383918389, job 118499169707](https://github.com/CUBRID/cubrid/actions/runs/39383918389/job/118499169707) | `5c2586fef889f2ab504a1fe82eb073f10ee7f7a1` | `100948 / 1296 / 68689` | `59.82%`, `Tue Oct 20 12:58:24 2026` |
+### 원인과 해결 방향을 뒷받침하는 자료
 
-[해당 workflow 커밋의 설정](https://github.com/CUBRID/cubrid/blob/c966fabc6b4c8ac86aa4b5abb0a4cbefae01bf5b/.github/workflows/gha-ci.yml#L481-L562)은 `/home/ci/cache/ccache/develop-debug`를 공유하고 debug 작업에 `-m optdebug`를 전달한다. 빌드 뒤 `ccache -s`를 실행하며, `CACHE_WRITE`가 true가 아니면 `CCACHE_READONLY=1 CCACHE_NOSTATS=1`을 설정한다. 두 작업 로그에서 `CACHE_WRITE: false`와 이 조건문 실행을 확인하였다. 따라서 캐시 조회는 가능하지만 해당 PR 빌드의 hit·miss는 이 통계에 기록되지 않는다.
+- [커밋 정보를 읽고 변경을 감시하는 코드](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/CMakeLists.txt#L102-L183): CMake 설정을 실행할 때 Git 정보를 읽고 `HEAD` 파일을 감시한다.
+- [공통 헤더의 version.h 포함](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/cmake/config.h.cmake#L95): 커밋 정보 변경이 엔진 전반에 퍼지는 경로이다.
+- [기존 소비 코드 분석과 계획](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/map.md): `VERSION_STRING`은 주로 `release_string` 코드가 사용하고, `BUILD_NUMBER`는 `release_string.c`와 broker 소스 7개가 직접 사용한 것으로 정리되어 있다. 구현 전 최종 사용 범위를 재확인한다.
+- [GCC 문서](https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html)와 [ccache 3.7.7 문서](https://ccache.dev/manual/3.7.7.html): 디버그 정보에 매크로가 포함되는 조건과 캐시 통계의 의미를 설명한다.
 
-표시된 59.82%는 `(100948 + 1296) / (100948 + 1296 + 68689)`로 계산되는 기존 카운터의 비율이다. 이 값으로 두 PR 빌드 중 실제 hit가 몇 건이었는지 알 수 없다. 제공된 출력이 기존 조건부 실험을 반증한다는 해석은 성립하지 않는다. 다만 기존 댓글의 전체 CUBRID 측정과 OptDebug 추정까지 이번 확인으로 입증된 것은 아니다.
-
-현재 CI의 실제 결과는 별도 측정이 필요하다. CUBRID 소스와 third-party, 같은 커밋 재실행과 커밋 변경, 빌드 모드를 구분해야 한다. 공유 통계가 비활성화되었거나 다른 작업도 갱신하는 상태에서 빌드 전후 카운터만 빼는 방법으로는 실행별 hit를 얻을 수 없다.
-
-### 소스와 도구 근거
-
-- [버전 계산과 HEAD 감시](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/CMakeLists.txt#L102-L183): configure 시점의 Git 조회와 `HEAD_FILE` 등록이다.
-- [version.h 포함](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/cmake/config.h.cmake#L95)과 [버전 매크로](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/cmake/version.h.cmake#L25-L35): 변동 버전 값이 넓은 범위로 전파되는 경로이다.
-- [GNU 빌드 옵션](https://github.com/CUBRID/cubrid/blob/f30f1c26003e5aa8e93182648e06cad76fc77064/CMakeLists.txt#L219-L246): Debug와 OptDebug의 `-ggdb3` 및 공통 `-ggdb` 설정이다. 실제 CI의 최종 컴파일 명령도 별도로 확인해야 한다.
-- `cubrid_rel`은 `cubridsa`의 `release_string.c`가 제공하는 버전을 출력한다. 기존 분석에서 `VERSION_STRING`의 직접 소비 위치는 `release_string.c`·`release_string.h`, `BUILD_NUMBER`는 `release_string.c`와 broker 소스 7개였다. 최종 소비 범위는 ANALYSIS에서 재확인한다.
-- [GCC 디버그 정보 문서](https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html)는 디버그 레벨 3이 매크로 정의를 포함함을 설명한다. 이번 실험은 `-ggdb3 -ggdb` 조합도 직접 확인하였다.
-- [ccache 3.7.7 문서](https://ccache.dev/manual/3.7.7.html#_troubleshooting)는 빌드 전후 통계 카운터를 비교하는 방법을 안내한다. `--zero-stats`는 통계 초기화이며 캐시 내용 삭제와 다르다.
-
-### 기존 계획과 분석 경계
-
-[기존 계획 map](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27124/wayfinder/map.md)은 버전 갱신, 의존성 경계, 런타임·패키지 버전 정합성, 검증 범위를 정리한 미완료 계획이다. 이 문서를 구현 방식의 확정 근거로 삼지 않는다.
-
-본 이슈는 버전 정보의 정확성과 불필요한 재빌드 범위를 다룬다. ccache 자동 도입 여부, 중첩 wrapper, 도구 선택과 사용 문서화는 CBRD-25560에서 다루되, 실제 캐시 동작과 측정 근거는 함께 확인한다.
+본 이슈는 버전 갱신과 불필요한 재빌드를 다룬다. 캐시 도구의 도입·설정·사용 안내는 CBRD-25560에서 다룬다. 두 이슈에는 `relates to` 링크를 추가하고 양쪽에서 확인하였다.
 
 ## Triage Request
 
-커밋 버전 갱신 누락과 변동 버전 헤더의 넓은 의존성 문제를 확인하고, 작성자 측에 ANALYSIS를 배정할 것을 요청한다. 우선순위와 담당자 확정은 triage에서 결정한다. 분석에서는 다음을 확인한다.
+두 문제를 확인하고, 작성자 측에 ANALYSIS를 배정할 것을 요청한다. 분석에서는 커밋 변경 감지와 버전 정보 분리 방법을 정하고, 아래 결과를 확인할 검증 계획을 마련한다.
 
-1. 일반 clone과 linked worktree에서 커밋 후 빌드만으로 버전이 갱신되는 계약과, 관련 런타임·패키지 버전의 정합성 범위를 정한다.
-2. 버전 값의 직접 소비자와 필요한 재빌드 대상을 식별하고, 버전만 바뀐 경우의 작업량을 캐시 유무와 별개로 검증한다.
-3. PR #8217의 누적 통계와 실제 실행별 통계를 구분한 상태에서, 최종 컴파일 명령과 ccache 버전·설정을 확보한다. CUBRID 소스와 third-party, 동일 커밋 재실행과 커밋 변경, direct/preprocessed hit·miss를 나누어 기존 실험과 비교한다. 후속 댓글에 다른 실행별 근거가 있는지도 확인한다.
-4. 캐시 없는 빌드와 동일 조건의 warm-cache 빌드를 비교하여 실제 시간 비용을 평가한다. 통계가 활성화된 격리 검증 캐시나 해당 도구 버전이 지원하는 실행별 로그를 사용한다. 공유 CI 통계는 초기화하지 않으며, Debug·OptDebug 전체 결과를 최소 예제의 결과와 구분한다.
-5. 확인된 차이와 결론을 CBRD-25560에도 연결하여 캐시 도입 효과와 본 이슈의 개선 효과를 각각 판단할 수 있게 한다. 구현 방식과 최종 검증 행렬은 ANALYSIS에서 결정한다.
+1. 평소처럼 빌드하면 현재 커밋이 표시되고, broker와 패키지의 버전도 올바르게 유지된다.
+2. 커밋 정보만 바뀌면 필요한 코드만 갱신되고, 아무 변경 없이 다시 빌드하면 불필요한 작업이 없다.
+3. Debug·OptDebug의 실제 빌드별 캐시 hit와 소요 시간을 측정하여 개선 효과를 설명할 수 있다.
+
+우선순위와 담당자는 triage에서 결정한다.

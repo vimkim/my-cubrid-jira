@@ -30,7 +30,7 @@
 
 이 오류는 실행 중 특정 모니터 기능을 선택했을 때 발생하는 문제가 아니다. 소스를 컴파일하는 단계에서 헤더를 찾지 못하므로, 해당 빌드 대상이 포함된 빌드는 결과물을 만들기 전에 중단된다. 그 환경에서 CUBRID를 개발하거나 패키징하려는 사용자는 소스를 별도로 수정하거나 다른 빌드 환경을 마련해야 한다.
 
-`broker/CMakeLists.txt:78-99,113-125`에서는 `broker_monitor.c`를 공통 소스 목록에 넣고 `C++`로 컴파일하며, 이 목록으로 `broker_monitor`와 `gateway_monitor`를 생성한다. 따라서 파일명만 보고 브로커 모니터 한 대상에만 영향이 있다고 한정할 수 없다. 두 대상의 실제 실패 로그와 전체 빌드에 미치는 결과는 ANALYSIS에서 확인한다.
+`broker/CMakeLists.txt:78-99,113-125`에서는 `broker_monitor.c`를 공통 소스 목록에 넣고 `LANGUAGE CXX`로 지정하여 컴파일하며, 이 목록으로 `broker_monitor`와 `gateway_monitor`를 생성한다. 따라서 파일명만 보고 브로커 모니터 한 대상에만 영향이 있다고 한정할 수 없다. 두 대상의 실제 실패 로그와 전체 빌드에 미치는 결과는 ANALYSIS에서 확인한다.
 
 기존 이슈는 여러 배포판과 musl 환경을 실패 환경으로 나열했으나, 정확한 패키지 버전과 CUBRID 빌드 로그를 제시하지 않았다. 따라서 모든 해당 환경의 실패를 검증된 결과로 보지 않는다. 소스와 glibc 변경 기록으로 확인한 것은 `<termio.h>` 미제공 환경에서 발생하는 빌드 장애 조건이다. 운영 중인 DB의 장애나 데이터 손실을 보여주는 근거는 없다.
 
@@ -68,7 +68,7 @@ Ubuntu 26.04와 Fedora 등 최신 glibc를 사용하는 개발 환경에서도, 
 | 구분 | 환경 또는 기준 | 확인 결과와 한계 |
 |---|---|---|
 | 소스 확인 | develop `f6cac312310f39f46711693da157a08f0e725693` | `<termio.h>` 의존과 공통 빌드 대상 구성을 확인하였다. 이 커밋의 전체 빌드는 미실행이다. |
-| 이번 확인 환경 | Rocky Linux 9.6, glibc 2.34, `GCC/G++` 11.5.0 | `<termio.h>`만 포함한 코드와 `<termios.h>`로 사용 API를 선언한 코드의 구문 검사가 각각 성공한다. CUBRID 전체 빌드나 수정 후 검증 결과가 아니다. |
+| 이번 확인 환경 | Rocky Linux 9.6, glibc 2.34, GCC 11.5.0 | `<termio.h>`만 포함한 코드와 `<termios.h>`로 사용 API를 선언한 코드의 구문 검사가 각각 성공한다. CUBRID 전체 빌드나 수정 후 검증 결과가 아니다. |
 | 기존 실패 보고 | glibc 2.42 이상 및 일부 배포판, musl 환경 | 기존 이슈에 실패 주장이 있다. 전체 빌드 버전, 커밋, OS와 개발 헤더 패키지 버전, 원본 로그는 TBD다. 이번 작성에서는 독립 재현하지 않았다. |
 | 릴리스 영향 | 이전에 릴리스된 CUBRID 버전 | TBD - 소스 기준만으로 영향을 확정하지 않고 버전별로 확인한다. |
 
@@ -150,7 +150,7 @@ src/broker/broker_monitor.c:52:10: fatal error: termio.h: No such file or direct
 - [확인한 CUBRID 소스](https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/broker/broker_monitor.c#L45-L54), [공통 빌드 대상](https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/broker/CMakeLists.txt#L78-L125)을 근거로 한다. `src`에서 `<termio.h>`를 직접 포함하는 위치는 이 파일 한 곳으로 확인한다.
 - 기존 본문이 제안한 `<termios.h>` 직접 포함은 실제 사용 인터페이스와 부합하는 해결 후보다. 필요한 선언의 누락 여부와 기존 환경의 호환성을 확인한 뒤 ANALYSIS에서 방안을 결정한다. 동작이나 ABI에 영향이 없다는 결론도 검증 전에 확정하지 않는다.
 - 배포판 이름만으로 영향 여부를 판정하지 않는다. 기존 본문의 Fedora 42 이상, Debian trixie 이상, Arch Linux 및 Alpine/musl에 대한 일괄 실패 주장과 공식 CI 통과 주장은 환경별 기록이 없어 확인 대상으로 남긴다.
-- [CBRD-26809](https://jira.cubrid.org/browse/CBRD-26809)는 별도 파일의 `C++` 표준 헤더 의존 문제다. 기존 본문은 리뷰 의견에 따라 이 이슈를 분리했다고 설명한다. 본 이슈는 `broker_monitor.c`의 터미널 헤더 의존 문제로 범위를 한정한다.
+- [CBRD-26809](https://jira.cubrid.org/browse/CBRD-26809)는 별도 파일의 표준 라이브러리 헤더 의존 문제다. 기존 본문은 리뷰 의견에 따라 이 이슈를 분리했다고 설명한다. 본 이슈는 `broker_monitor.c`의 터미널 헤더 의존 문제로 범위를 한정한다.
 
 ## Triage Request
 

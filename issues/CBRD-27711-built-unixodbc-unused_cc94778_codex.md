@@ -2,31 +2,55 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: Gateway를 빌드할 때 준비한 unixODBC와 설치 후 사용하는 unixODBC의 선택이 달라지는 문제를 해결한다.
+**이슈 수행 목적**: 설치된 Linux Gateway가 지원 대상으로 정한 unixODBC를 사용하도록, 빌드 입력과 설치 후 실행 의존성의 공급원·버전 선택 및 설치 요구사항을 일관되게 관리한다.
 
-**이슈 수행 이유**: 일반 Linux 빌드는 unixODBC 2.3.14를 다운로드·컴파일하여 Gateway에 연결하지만, 확인한 CMake 설치와 CPack TGZ에는 `libodbc.so*`가 포함되지 않는다. 그 결과 확인한 설치 환경에서는 직접 빌드한 2.3.14 대신 시스템 unixODBC 2.3.9가 선택된다.
+**이슈 수행 이유**: 같은 소스의 일반 Linux 빌드에서 build-tree Gateway는 직접 준비한 unixODBC 2.3.14를 선택하지만, 설치본은 시스템 2.3.9를 선택하는 현상을 확인했다. 확인한 CMake 설치와 CPack TGZ에는 `libodbc.so*`가 없어, 빌드에서 준비한 버전만으로 설치 후 사용할 의존성을 보장할 수 없다.
 
-**영향**: 빌드에서 선택한 버전만으로 설치된 Gateway가 사용할 버전을 보장할 수 없으며, 실행용 의존성 공급이 설치 환경에 의존한다. Gateway/DBLINK를 실행하지 않는 엔진 빌드도 현재 공통 의존성 그래프 때문에 unixODBC를 준비한다. 반복 준비 비용이 CI 병목이라는 요청자의 보고가 있으나, CI 단독 소요 시간과 실제 절감량은 아직 검증하지 않았다.
+**영향**: Gateway/DBLINK의 빌드 검증과 설치 후 실행이 서로 다른 unixODBC를 대상으로 할 수 있어, 설치·QA 담당자는 실제 사용 버전과 공급 여부를 별도로 확인해야 한다. Gateway를 실행하지 않는 엔진 빌드에도 현재 unixODBC 준비가 연결된다. 외부 DB 기능 장애, 영향받는 배포 환경 수, CI의 unixODBC 단독 비용과 실제 절감량은 미확인이다.
 
-**이슈 수행 방안**: 버그 수정의 범위는 빌드 입력과 설치 후 런타임 의존성의 공급·버전 선택을 일관되게 관리하는 것이다. 가능한 경우 unixODBC 자동 준비를 메인 엔진 빌드에서 제거·분리하는 방안을 우선 검토한다. Gateway에 필요한 헤더·링크 입력·실행 라이브러리의 별도 공급 또는 동봉 방식, 선택 기능과 지원 버전은 TBD - ANALYSIS 단계에서 결정한다. 동봉 여부만으로 빌드 비용 문제가 해결되었다고 판단하지 않는다.
+**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 
 ---
 
 ## AI-Generated Context
 
-> 아래는 AI가 코드와 맥락을 분석해 작성한 상세 자료다.
+> 아래는 제공된 자료와 확인한 근거를 바탕으로 작성한 상세 맥락이다. 미확인 사항은 본문에 구분한다.
 
 ## Description
 
-unixODBC는 Gateway가 외부 DB의 ODBC 드라이버를 사용하도록 중개하는 라이브러리이다. unixODBC 자체와 각 외부 DB용 ODBC 드라이버는 구분해야 한다. Gateway 소스에는 `SQLAllocHandle`, `SQLDriverConnectW` 등 실제 ODBC API 호출이 있으며, 생성된 실행 파일도 `libodbc.so.2`를 필요로 한다.
+### 무엇이 문제인가
 
-관측한 문제는 unixODBC 전체가 미사용이라는 것이 아니다. 일반 Linux 빌드에서 직접 준비하고 링크한 unixODBC가 최종 설치에 포함되지 않아, 설치된 Gateway가 다른 공급원의 라이브러리를 선택한다는 점이다. 기준 소스를 새로 빌드한 결과 build-tree의 Gateway는 빌드한 2.3.14를 선택했고, 같은 빌드의 설치 Gateway는 시스템 2.3.9를 선택했다. ELF의 라이브러리 검색 경로가 설치 단계에서 달라지는 것과 최종 설치에 해당 DSO가 없는 것이 이 결과를 설명한다.
+Gateway는 외부 DB의 ODBC 드라이버를 통해 연결·조회 기능을 제공하며, unixODBC는 Gateway와 해당 드라이버 사이의 ODBC 호출을 중개한다. Gateway 소스의 `SQLAllocHandle`, `SQLDriverConnectW` 호출과 생성 ELF의 `NEEDED libodbc.so.2`에서 unixODBC 의존성을 확인했다. 빌드 시 헤더·링크 입력뿐 아니라 설치 후 실행에도 unixODBC 공유 라이브러리가 필요하다.
 
-현재 `ExternalProject`는 unixODBC를 빌드하고 `<BUILD>/3rdparty`에 설치한다. 이 작업 prefix에는 헤더·공유 라이브러리와 도구들이 생기지만, 이 단계는 CUBRID의 최종 설치가 아니다. CUBRID 설치는 Gateway와 unixODBC 라이선스 파일을 포함하고 `libodbc.so*`는 복사하지 않는다. 따라서 직접 빌드한 파일을 링크했다는 사실만으로 그 파일이 설치 후에도 사용된다고 보장할 수 없다.
+기준 소스의 일반 Linux 빌드는 unixODBC 2.3.14를 다운로드·컴파일하고 `<BUILD>/3rdparty`에 준비하여 Gateway의 빌드 입력으로 사용한다. 그러나 이 경로는 외부 프로젝트의 작업 디렉터리이며 CUBRID 최종 설치 경로가 아니다. 확인한 CMake 설치와 실제 CPack TGZ에는 Gateway와 unixODBC 라이선스 파일이 있지만 `libodbc.so*`는 없다.
 
-이 차이를 버그 현상으로 추적하되, 해결 방법을 미리 동봉으로 한정하지 않는다. 시스템 라이브러리를 사용하기로 한다면 지원 버전과 설치 요구사항을 명확히 하고 불필요한 자동 준비를 제거·분리하는 방향을 검토할 수 있다. 선택한 라이브러리를 동봉하기로 한다면 실제 로드 경로와 업데이트·라이선스 책임까지 검증해야 한다. 빌드 준비를 외부로 분리하면서 최종 설치에는 동봉하는 조합도 가능하므로, 준비 위치와 런타임 공급 방식은 별도로 결정한다.
+2026-10-21 독립 검증에서는 같은 빌드의 build-tree Gateway가 준비한 2.3.14를 선택하고, 설치된 Gateway는 호스트의 시스템 2.3.9를 선택했다. 설치 전후 ELF의 라이브러리 검색 경로도 `<BUILD>/3rdparty/lib`를 포함하는 경로에서 `<INSTALL>/lib`로 달라졌다. 확인된 현상은 빌드에서 준비한 unixODBC와 설치 후 선택되는 unixODBC 사이의 불일치이다. 필요한 결과는 지원 대상으로 정한 공급원·버전과 설치 후 실제 선택이 일치하는 것이다. 시스템 라이브러리를 사용하는 것이 지원 정책상 허용되는지, 어떤 버전을 보장해야 하는지는 ANALYSIS에서 확인한다.
+
+### 왜 문제인가
+
+개발·QA가 build-tree에서 확인한 실행 의존성과 설치 환경의 실행 의존성이 달라질 수 있다. 따라서 build-tree에서 Gateway가 라이브러리를 찾았다는 결과만으로 설치본의 의존성 공급과 지원 버전을 확인했다고 판단할 수 없다. Gateway/DBLINK의 설치 검증과 장애 재현에서는 CUBRID 빌드 버전 외에 실제 로드한 unixODBC의 공급원·버전까지 별도로 확인해야 한다.
+
+확인한 호스트에는 시스템 unixODBC가 있어 로더 검사가 성공했다. 이는 외부 DB 연결·조회가 두 버전에서 동일하게 동작한다는 증거는 아니다. unixODBC가 없는 호스트의 실행 실패, 실제 기능 장애, 운영 영향 빈도는 아직 검증하지 않았다. 현재 확인된 범위는 의존성 선택의 차이와 설치·TGZ의 라이브러리 미포함이며, 모든 공식 배포물에 같은 문제가 있다고 단정하지 않는다.
+
+빌드 측면에서도 준비 비용과 최종 사용의 관계를 점검할 필요가 있다. unixODBC 준비는 공통 외부 프로젝트 의존성에 포함되어 Gateway를 실행하지 않는 엔진 빌드에도 연결된다. 요청자는 반복 준비가 CI 병목 중 하나라고 보고했다. 기존 CI에서 준비 단계는 확인했지만, unixODBC 단독 소요 시간과 전체 빌드의 실제 절감 가능량은 미확인이다.
+
+### 왜 해결해야 하는가
+
+이 상태를 유지하면 unixODBC를 직접 빌드해도 설치본이 어떤 공급원의 어떤 버전을 사용하는지 별도 확인해야 하는 상태가 남는다. 빌드·설치 검증이 지원 대상으로 정한 의존성 구성을 일관되게 확인하도록 해야, Gateway/DBLINK의 배포 요구사항을 설명하고 같은 조건에서 문제를 재현할 수 있다. 이미 같은 빌드의 설치 전후 차이가 확인되었으므로, 실제 기능 장애나 CI 절감량이 확정되기 전에도 공급·버전 정책과 검증 범위를 분석할 근거가 있다. 운영 장애에 따른 긴급성은 현재 자료로 판단할 수 없다.
+
+확인한 환경에서는 시스템 unixODBC로 로더 검사가 통과하며, `LD_LIBRARY_PATH`로 별도 라이브러리를 지정하면 설치 ELF가 선택하는 파일을 바꿀 수 있다. 다만 이 결과만으로 지원 버전·설치 요구사항·외부 DB 기능 호환성을 확정할 수는 없다. 기준 소스에는 지원되는 `WITH_LIBUNIXODBC=SYSTEM` 구성도 없어, 빌드 옵션 변경만으로 공급 방식을 선택할 수 없다.
+
+공통 3rdparty 분리 빌드와 경로 지정 재사용은 [CBRD-27712](https://jira.cubrid.org/browse/CBRD-27712)의 기능 범위다. 그 기능으로 준비 결과를 재사용하더라도 설치된 Gateway의 실제 라이브러리 선택과 지원 정책이 자동으로 일치하는 것은 아니다. 본 이슈는 unixODBC의 빌드 입력·설치·실행 사이의 공급과 버전 선택을 일관되게 관리하는 문제를 다룬다. 자동 준비의 필요성과 엔진 빌드와의 결합도 이 정책에 맞추어 검토하되, 구체적인 공급 방식과 구현은 분석에서 결정한다.
+
+## Triage Request
+
+동일 빌드에서 확인한 unixODBC 선택 불일치를 결함으로 확인하고, 작성자 측에 ANALYSIS를 배정할 것을 요청한다.
+
+ANALYSIS에서는 지원할 unixODBC 공급원·버전, 설치·패키지별 의존성 보장, 준비 경로가 없는 환경의 동작, 실제 외부 DB 연결·조회 결과를 확인한다. 메인 엔진 빌드에서 unixODBC 자동 준비가 필요한 조건과 CBRD-27712와의 경계도 정리한다. 구현 선택과 최종 검증 기준은 분석에서 확정하며, 담당자와 우선순위는 triage에서 결정한다.
 
 ## Test Build
+
+아래는 2026-10-21 독립 검증 기록의 환경과 결과다. 소스 기준과 실제 실행·패키지 검증 범위를 구분한다.
 
 - 독립 검증 기준 소스: `cc947788d3b7dc402f46192d0f3299ddcc8563ba`, CUBRID `11.5.0.2704-cc94778`.
 - 새 실험 구성: Linux x86_64 Debug, GCC 11.5.0, CMake 3.26.5, Ninja 1.10.2, Rocky Linux 9.6, kernel `5.14.0-570.30.1.el9_6.x86_64`.
@@ -37,12 +61,13 @@ unixODBC는 Gateway가 외부 DB의 ODBC 드라이버를 사용하도록 중개�
 - 기존 설치본도 별도로 재검사했다: `11.5.0.2683-4adcd40`, Linux 64bit debug. 네 관련 소스 파일은 `4adcd409072b189f5d965bde5750c53176d90de0`와 새 기준 커밋에서 내용이 동일했다. 기존 바이너리 전체의 빌드 출처를 현재 checkout으로 간주하지 않는다.
 - 기존 PoC 기준은 `ad2182f08d2cb5e1c7b56f1b6b47cef704171aa9`이며, PoC prefix 로드 결과와 일반 빌드의 시스템 로드 결과를 구분했다.
 - 검증일: 2026-10-21. 새 전체 빌드·설치·TGZ 생성과 로더 검사를 수행했으며 외부 DB 연결·조회 시험은 수행하지 않았다.
+- Release 설치본의 로더 선택, 다른 지원 릴리스와 Windows는 미검증이다. 기준 커밋의 존재만으로 해당 릴리스의 영향을 확정하지 않는다.
 
 ## Repro
 
 ### 확인 조건
 
-CUBRID Linux 빌드 요구사항과 시스템 unixODBC 런타임이 준비된 개발 VM을 사용한다. 아래 명령은 기존 설치나 작업 디렉터리를 지우지 않고 별도 worktree와 설치 위치를 사용한다. 디렉터리 이름이 이미 사용 중이면 다른 새 이름을 선택한다. `ccache` 등 개인 빌드 도구는 재현의 필수 조건이 아니다.
+CUBRID Linux 빌드 요구사항, Ninja, `readelf`, `ldd`, RPM 조회 도구와 시스템 unixODBC 런타임이 준비된 개발 VM을 사용한다. 소스와 외부 의존성을 내려받을 수 있어야 한다. 아래 명령은 기존 검증을 표준 도구로 재구성한 재현 절차 제안이며, 이 명령 블록 그대로 실행한 기록은 없다. 기존 설치나 작업 디렉터리를 지우지 않고 별도 worktree와 설치 위치를 사용한다. 디렉터리 이름이 이미 사용 중이면 다른 새 이름을 선택한다. `ccache` 등 개인 빌드 도구는 필수 조건이 아니다.
 
 ### 일반 빌드와 설치의 비교
 
@@ -98,15 +123,15 @@ env -u LD_PRELOAD LD_LIBRARY_PATH="$odbc_check_override" \
 
 ## Expected Result
 
-Gateway의 개발용 입력과 설치 후 실행용 의존성에 대해 지원하는 공급원·버전과 설치 요구사항이 명시되고, 그 선택을 빌드·패키지·실행 검증이 일관되게 확인해야 한다. 빌드에서 특정 unixODBC를 준비했다는 이유만으로 설치 후 그 버전을 사용한다고 간주해서는 안 된다.
+Gateway의 개발용 입력과 설치 후 실행용 의존성에 대해 지원하는 unixODBC 공급원·버전과 설치 요구사항을 명시하고, 설치된 Gateway가 그 정책에 맞는 라이브러리를 선택함을 확인해야 한다. 빌드·패키지·실행 검증에서 같은 지원 정책을 확인할 수 있어야 한다.
 
-자동 준비가 최종 실행에 필요하지 않은 공급 방식을 채택한다면 메인 엔진의 불필요한 준비를 제거·분리하는 방향을 우선 검토한다. Gateway에 필요한 입력을 대신 공급하거나 Gateway 제외 구성을 갖추는 변경과 함께 검증한다. 동봉 또는 시스템 공급 중 최종 구현, 지원 버전, 패키지별 책임은 TBD - ANALYSIS 단계에서 결정한다.
+자동 준비의 필요성과 엔진 빌드 의존성도 확정한 공급 정책에 맞게 정리해야 한다. 라이브러리 동봉 여부, 시스템 공급 지원, Gateway 선택 구성과 상세 구현은 TBD - ANALYSIS 단계에서 결정한다. 빌드와 실행이 반드시 동일한 파일을 사용하도록 할지, 지원되는 서로 다른 버전을 허용할지도 분석에서 정한다.
 
 ## Actual Result
 
 새 일반 빌드의 실제 헤더 의존성에는 `3rdparty/include/sqltypes.h`, `sql.h`, `sqlext.h`, `sqlucode.h`가 있다. Gateway 링크 명령은 해당 빌드의 `3rdparty/lib`에 대한 `-L`과 `-lodbc`를 포함한다. 생성 ELF에는 ODBC 미해결 심볼 23개와 `NEEDED libodbc.so.2`가 있다. unixODBC를 빌드 입력이나 코드에서 사용하지 않는다는 해석은 맞지 않는다.
 
-반면 최종 설치 목록 198개 중 관련 항목은 `bin/cub_cas_cgw`와 `3rdparty/libodbc_license.txt`였다. 설치 디렉터리 전체에도 `libodbc.so*`는 없었다. 실제 CPack TGZ에서도 같은 제외를 확인했다.
+반면 보존된 최종 설치 목록에서 관련 항목은 `bin/cub_cas_cgw`와 `3rdparty/libodbc_license.txt`였다. 설치 디렉터리 전체에도 `libodbc.so*`는 없었다. 실제 CPack TGZ에서도 같은 제외를 확인했다.
 
 ```text
 일반 build-tree:
@@ -166,18 +191,11 @@ unixODBC는 공통 `EP_TARGETS`에 포함되어 엔진 라이브러리의 선행
 - Gateway를 제외하는 구성을 지원할 경우 소스·타깃·공통 외부 의존성·설치 항목의 선택 범위.
 - 설치 후 로드 경로, 준비 prefix가 없는 환경의 동작과 의존성 누락 진단.
 - ODBC 드라이버 설정 및 실제 외부 DB 연결·조회 시험.
-- 자동 준비의 제거·분리 후 실제 빌드 시간과 패키지별 설치 검증.
-
-### 실제 artifact의 라이선스 식별
-
-고정 SHA256의 unixODBC 2.3.14 원본 README는 라이브러리를 LGPL 2.1, 프로그램을 GPL 2.0으로 구분한다. 루트 `COPYING`은 LGPL 2.1, `exe/COPYING`은 GPL 2.0, `libltdl/COPYING.LIB`는 LGPL 2.1이다. [공식 다운로드](https://www.unixodbc.org/download.html)의 [2.3.14 tarball](https://www.unixodbc.org/unixODBC-2.3.14.tar.gz)을 별도로 받아 CMake 고정 hash와 동일함을 확인했다. 움직이는 master README만으로 버전별 근거를 대신하지 않는다.
-
-개별 소스에는 `or later` 문구, libltdl 특별 예외, Patrick Powell snprintf의 별도 고지도 있다. 실제 libodbc에도 해당 내부 구성요소가 연결되므로 전체 tarball을 동일한 단일 라이선스 조건으로 취급하지 않는다. upstream 작업 prefix에는 `isql`, `iusql`, `odbcinst`, `odbc_config`, `dltest`, `slencheck`가 설치되지만, 확인한 최종 CUBRID 설치·TGZ에는 그 도구들이 없었다.
-
-[LGPL 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)과 [GPL 2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)의 식별과 실제 배포 의무 이행은 별도 검증 대상이다. 최종 배포 파일·수정 여부·고지·대응 소스 제공·라이브러리 교체/재링크 조건 등을 검토해야 한다. 라이선스 파일이 설치된다는 사실만으로 준수 완료 또는 위반을 판정하지 않는다.
+- 자동 준비 변경의 필요성과 실제 빌드 비용, 패키지별 설치 검증.
 
 ### 소스 근거
 
+- [독립 검증 보고서](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27711/independent-unixodbc-review_cc94778_codex.md): 일반 빌드·설치·TGZ·ELF·CI의 검증 결과와 한계를 기록한다. 기존 PoC 및 라이선스 식별 자료도 이 기록에 보존한다.
 - [unixODBC 기본값·고정 archive 식별](https://github.com/CUBRID/cubrid/blob/cc947788d3b7dc402f46192d0f3299ddcc8563ba/3rdparty/CMakeLists.txt#L23-L93)
 - [다운로드·빌드·작업 prefix 설치와 미지원 옵션 처리](https://github.com/CUBRID/cubrid/blob/cc947788d3b7dc402f46192d0f3299ddcc8563ba/3rdparty/CMakeLists.txt#L430-L460)
 - [Gateway 소스·unixODBC 링크](https://github.com/CUBRID/cubrid/blob/cc947788d3b7dc402f46192d0f3299ddcc8563ba/broker/CMakeLists.txt#L282-L302)

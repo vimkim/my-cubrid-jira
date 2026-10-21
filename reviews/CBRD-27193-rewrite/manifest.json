@@ -48,9 +48,9 @@
       "live_status": "Open",
       "writer": "writer_27193",
       "report_path": "issues/CBRD-27193-page-buffer-program_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27193-evidence.txt",
       "writer_agent": "/root/writer_27193",
       "categories": [
@@ -67,18 +67,20 @@
       ],
       "report_sha256": "7f27a70777b4da23c2cfdcd3a17e160998722f0b8cf3de69f31e2f03260eed23",
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:39.351568+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:39.561709+00:00",
+        "description_updated": "2026-10-21T08:31:40.701526+00:00",
+        "live_readback": "2026-10-21T08:31:41.693121+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:41.694176+00:00",
+        "final_batch_readback": "passed"
       },
       "recommended_type": "Development Subject (umbrella development scope; retain live type)",
       "major_changes": "All 19 child outcomes reconciled; unsupported gates, priorities and adopted-design claims removed.",
-      "uncertainties": "Actual engine/release exposure, policy choices, duplicate ownership and overlay budget decision."
+      "uncertainties": "Actual engine/release exposure, policy choices, duplicate ownership and overlay budget decision.",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27193"
     },
     {
       "key": "CBRD-27194",
@@ -89,9 +91,9 @@
       "live_status": "Confirmed",
       "writer": "writer_27194",
       "report_path": "issues/CBRD-27194-initialization-finalization_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27194-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "major_changes": "Initialization lifetime and zero-private behavior verified; AOUT recipe corrected.",
@@ -108,15 +110,17 @@
         "Transaction-table cleanup"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:29:10.487314+00:00",
+        "fresh_dry_run": "2026-10-21T08:29:10.665697+00:00",
+        "description_updated": "2026-10-21T08:29:37.881924+00:00",
+        "live_readback": "2026-10-21T08:29:37.881924+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:37.881924+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27194"
     },
     {
       "key": "CBRD-27196",
@@ -127,9 +131,9 @@
       "live_status": "Open",
       "writer": "writer_27196",
       "report_path": "issues/CBRD-27196-sx-latch-survey_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27196-evidence.txt",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
       "major_changes": "SX case rebuilt around current B-tree split/merge; stale OID and experimental counter claims corrected.",
@@ -145,15 +149,17 @@
         "B-tree"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:29:39.156731+00:00",
+        "fresh_dry_run": "2026-10-21T08:29:39.336352+00:00",
+        "description_updated": "2026-10-21T08:29:39.966402+00:00",
+        "live_readback": "2026-10-21T08:29:41.210659+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:41.210881+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27196"
     },
     {
       "key": "CBRD-27211",
@@ -164,9 +170,9 @@
       "live_status": "Open",
       "writer": "writer_27211",
       "report_path": "issues/CBRD-27211-direct-victim-wait-policy_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27211-evidence.txt",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
       "major_changes": "Global selector cadence and fallback verified; invented thresholds removed.",
@@ -181,15 +187,17 @@
         "Page buffer direct-victim waiting-thread selection"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:29:41.810019+00:00",
+        "fresh_dry_run": "2026-10-21T08:29:41.978505+00:00",
+        "description_updated": "2026-10-21T08:29:42.353110+00:00",
+        "live_readback": "2026-10-21T08:29:47.966895+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:47.967190+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27211"
     },
     {
       "key": "CBRD-27252",
@@ -200,9 +208,9 @@
       "live_status": "Open",
       "writer": "writer_27252",
       "report_path": "issues/CBRD-27252-parallel-v2-strategy_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27252-evidence.txt",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
       "major_changes": "Requested parallel default/v2 strategy separated from learning-plan implementation.",
@@ -220,15 +228,17 @@
         "Build/test integration"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:29:53.891495+00:00",
+        "fresh_dry_run": "2026-10-21T08:29:54.070849+00:00",
+        "description_updated": "2026-10-21T08:29:54.454275+00:00",
+        "live_readback": "2026-10-21T08:29:55.387441+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:55.387687+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27252"
     },
     {
       "key": "CBRD-27262",
@@ -239,9 +249,9 @@
       "live_status": "Confirmed",
       "writer": "writer_27262",
       "report_path": "issues/CBRD-27262-flush-error-recovery_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27262-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "categories": [
@@ -257,15 +267,17 @@
         "TDE/DWB interfaces"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:06.385694+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:06.581467+00:00",
+        "description_updated": "2026-10-21T08:30:07.296502+00:00",
+        "live_readback": "2026-10-21T08:30:07.978147+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:07.978471+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27262"
     },
     {
       "key": "CBRD-27263",
@@ -276,9 +288,9 @@
       "live_status": "Confirmed",
       "writer": "writer_27263",
       "report_path": "issues/CBRD-27263-deallocation-protection-accounting_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27263-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "major_changes": "Request-owned protection and BCB residency; historical counts and permanent-loss claims corrected.",
@@ -296,15 +308,17 @@
         "Vacuum"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:09.031683+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:09.234701+00:00",
+        "description_updated": "2026-10-21T08:30:15.905680+00:00",
+        "live_readback": "2026-10-21T08:30:16.698263+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:16.698586+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27263"
     },
     {
       "key": "CBRD-27264",
@@ -315,9 +329,9 @@
       "live_status": "Open",
       "writer": "writer_27264",
       "report_path": "issues/CBRD-27264-direct-victim-emergency-path_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27264-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "major_changes": "Unreachable backup supply verified; duplicate CBRD-24029 owner/result reconciliation preserved.",
@@ -333,15 +347,17 @@
         "SM"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:28.166330+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:28.358746+00:00",
+        "description_updated": "2026-10-21T08:30:30.567718+00:00",
+        "live_readback": "2026-10-21T08:30:31.483835+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:31.484204+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27264"
     },
     {
       "key": "CBRD-27265",
@@ -352,9 +368,9 @@
       "live_status": "Open",
       "writer": "writer_27265",
       "report_path": "issues/CBRD-27265-debug-build-defects_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27265-evidence.txt",
       "writer_agent": "/root/writer_27265",
       "recommended_type": "Sub-task (Correct Error technical category)",
@@ -370,15 +386,17 @@
         "Storage / Page buffer diagnostics"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:32.799023+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:33.013333+00:00",
+        "description_updated": "2026-10-21T08:30:33.499430+00:00",
+        "live_readback": "2026-10-21T08:30:34.169790+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:34.170194+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27265"
     },
     {
       "key": "CBRD-27266",
@@ -389,9 +407,9 @@
       "live_status": "Open",
       "writer": "writer_27266",
       "report_path": "issues/CBRD-27266-statistics-semantics_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27266-evidence.txt",
       "recommended_type": "Sub-task (Improve Function/Performance technical category)",
       "major_changes": "SHOW deprecation and page-unit DWB/statdump semantics verified.",
@@ -409,15 +427,17 @@
         "SHOW"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:35.002153+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:35.193025+00:00",
+        "description_updated": "2026-10-21T08:30:35.637345+00:00",
+        "live_readback": "2026-10-21T08:30:36.347883+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:36.348303+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27266"
     },
     {
       "key": "CBRD-27267",
@@ -428,9 +448,9 @@
       "live_status": "Open",
       "writer": "writer_27267",
       "report_path": "issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-evidence.txt",
       "writer_agent": "/root/writer_27267",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
@@ -446,15 +466,17 @@
         "Page buffer private-LRU index queues"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:37.200660+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:37.401637+00:00",
+        "description_updated": "2026-10-21T08:30:43.001316+00:00",
+        "live_readback": "2026-10-21T08:30:48.976040+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:48.976502+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27267"
     },
     {
       "key": "CBRD-27268",
@@ -465,9 +487,9 @@
       "live_status": "Open",
       "writer": "writer_27268",
       "report_path": "issues/CBRD-27268-dwb-size-unit-syntax_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27268-evidence.txt",
       "writer_agent": "/root/writer_27268",
       "recommended_type": "Sub-task (Improve Function/Performance technical category)",
@@ -486,15 +508,17 @@
         "Server initialization"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:49.946655+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:50.141484+00:00",
+        "description_updated": "2026-10-21T08:30:50.586525+00:00",
+        "live_readback": "2026-10-21T08:30:52.605544+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:52.605985+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27268"
     },
     {
       "key": "CBRD-27269",
@@ -505,9 +529,9 @@
       "live_status": "Open",
       "writer": "writer_27269",
       "report_path": "issues/CBRD-27269-dead-code-comments_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27269-evidence.txt",
       "writer_agent": "/root/writer_27269",
       "recommended_type": "Sub-task (Refactoring technical category)",
@@ -522,15 +546,17 @@
         "Page buffer"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:53.855885+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:54.097467+00:00",
+        "description_updated": "2026-10-21T08:30:54.755759+00:00",
+        "live_readback": "2026-10-21T08:30:55.726235+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:55.726728+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27269"
     },
     {
       "key": "CBRD-27270",
@@ -541,9 +567,9 @@
       "live_status": "Open",
       "writer": "writer_27270",
       "report_path": "issues/CBRD-27270-recovery-temp-volume-survey_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27270-evidence.txt",
       "writer_agent": "/root/writer_27270",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
@@ -562,15 +588,17 @@
         "TDE/DWB"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:30:56.707838+00:00",
+        "fresh_dry_run": "2026-10-21T08:30:56.955460+00:00",
+        "description_updated": "2026-10-21T08:30:57.491876+00:00",
+        "live_readback": "2026-10-21T08:30:58.327331+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:58.327823+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27270"
     },
     {
       "key": "CBRD-27316",
@@ -581,9 +609,9 @@
       "live_status": "Open",
       "writer": "writer_27316",
       "report_path": "issues/CBRD-27316-parallel-fix-private-lru-survey_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316-evidence.txt",
       "writer_agent": "/root/writer_27316",
       "recommended_type": "Sub-task (Investigation / feasibility technical category)",
@@ -598,15 +626,17 @@
         "Storage / Page buffer"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:12.571167+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:12.828035+00:00",
+        "description_updated": "2026-10-21T08:31:13.283543+00:00",
+        "live_readback": "2026-10-21T08:31:19.496008+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:19.496447+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27316"
     },
     {
       "key": "CBRD-27356",
@@ -617,9 +647,9 @@
       "live_status": "Open",
       "writer": "writer_27356",
       "report_path": "issues/CBRD-27356-page-latch-timeout-policy_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27356-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "major_changes": "Current override/error contract and attributed debug-abort evidence rebuilt.",
@@ -638,15 +668,17 @@
         "Vacuum/postpone validation"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:20.320268+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:20.539068+00:00",
+        "description_updated": "2026-10-21T08:31:21.361395+00:00",
+        "live_readback": "2026-10-21T08:31:22.240575+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:22.241104+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27356"
     },
     {
       "key": "CBRD-27370",
@@ -657,9 +689,9 @@
       "live_status": "Confirmed",
       "writer": "writer_27370",
       "report_path": "issues/CBRD-27370-nested-read-write-accounting_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27370-evidence.txt",
       "recommended_type": "Sub-task (Correct Error technical category)",
       "major_changes": "BCB/holder accounting and historical raw logs verified; API policy left open.",
@@ -676,15 +708,17 @@
         "Page buffer"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:23.007541+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:23.216571+00:00",
+        "description_updated": "2026-10-21T08:31:23.712732+00:00",
+        "live_readback": "2026-10-21T08:31:24.989726+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:24.990252+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27370"
     },
     {
       "key": "CBRD-27398",
@@ -695,9 +729,9 @@
       "live_status": "Open",
       "writer": "writer_27398",
       "report_path": "issues/CBRD-27398-page-buffer-overlay_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27398-evidence.txt",
       "recommended_type": "Sub-task (Development Subject technical category)",
       "major_changes": "Actual subsequent overlay decisions recovered; Draft and baseline separated.",
@@ -714,15 +748,17 @@
         "Server lifecycle"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:25.657382+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:25.884508+00:00",
+        "description_updated": "2026-10-21T08:31:26.402762+00:00",
+        "live_readback": "2026-10-21T08:31:27.336385+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:27.337303+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27398"
     },
     {
       "key": "CBRD-27423",
@@ -733,9 +769,9 @@
       "live_status": "Open",
       "writer": "writer_27423",
       "report_path": "issues/CBRD-27423-performance-analysis-framework_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27423-evidence.txt",
       "recommended_type": "Sub-task (Development Subject technical category)",
       "major_changes": "Real-engine comparison requirement preserved; proposals/measurements/gates separated.",
@@ -753,15 +789,17 @@
         "Test/benchmark tooling"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:28.238286+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:28.442221+00:00",
+        "description_updated": "2026-10-21T08:31:33.865552+00:00",
+        "live_readback": "2026-10-21T08:31:35.484344+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:35.485112+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27423"
     },
     {
       "key": "CBRD-27630",
@@ -772,9 +810,9 @@
       "live_status": "Confirmed",
       "writer": "writer_27630",
       "report_path": "issues/CBRD-27630-simple-fix-loading-cleanup_f6cac31_codex.md",
-      "progress": "writer complete; orchestrator reviewed",
+      "progress": "writer complete; orchestrator reviewed; published and verified",
       "review": "passed",
-      "publication": "not authorized",
+      "publication": "published; exact live read-back and protected metadata verified",
       "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27630-evidence.txt",
       "writer_agent": "/root/writer_27630",
       "recommended_type": "Sub-task (Correct Error technical category)",
@@ -790,15 +828,17 @@
         "Loading-record management"
       ],
       "publication_stages": {
-        "approval": "pending",
-        "integrated": "pending",
-        "pushed": "pending",
-        "target_verified": "pending",
-        "fresh_dry_run": "pending",
-        "description_updated": "pending",
-        "live_readback": "pending",
-        "protected_metadata_verified": "pending"
-      }
+        "approval": "granted",
+        "integrated": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "pushed": "eb49303a8fc63cf57f680acf922211da945b6800",
+        "target_verified": "2026-10-21T08:31:36.401265+00:00",
+        "fresh_dry_run": "2026-10-21T08:31:36.596315+00:00",
+        "description_updated": "2026-10-21T08:31:37.407998+00:00",
+        "live_readback": "2026-10-21T08:31:38.380748+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:38.381352+00:00",
+        "final_batch_readback": "passed"
+      },
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27630"
     }
   ],
   "docs_evidence_commit": "fd2e244e585de7a78dfccbbdfde722eef1b49210",
@@ -846,7 +886,19 @@
     "children": 19,
     "reviewed_in_full_by": "/root",
     "dedicated_fresh_context_writers": 20,
-    "approval": "pending",
-    "description_publication_allowlist_only": true
+    "approval": "granted by user for full batch integration, push and description-only publication",
+    "description_publication_allowlist_only": true,
+    "published_and_verified": 20
+  },
+  "surviving_checkout": "/home/vimkim/gh/my-cubrid-jira",
+  "surviving_branch": "main",
+  "integration": {
+    "reviewed_local_commit": "d9da84caf2a6a5ce2ee458276d0fa667fed269a3",
+    "rebased_report_commit": "eb49303a8fc63cf57f680acf922211da945b6800",
+    "destination_before_merge": "c1a7b2e58ae5c13aedfa085bb7aa89b82aaef73e",
+    "method": "rebase and fast-forward",
+    "remote": "origin",
+    "branch": "main",
+    "report_push": "successful before first live JIRA update"
   }
 }

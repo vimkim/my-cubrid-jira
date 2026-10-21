@@ -1,0 +1,1118 @@
+{
+  "approved_by_user": true,
+  "reviewed_original_commit": "d9da84caf2a6a5ce2ee458276d0fa667fed269a3",
+  "integrated_and_pushed_report_commit": "eb49303a8fc63cf57f680acf922211da945b6800",
+  "issues": {
+    "CBRD-27194": {
+      "key": "CBRD-27194",
+      "report_path": "issues/CBRD-27194-initialization-finalization_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:28:53.790765+00:00",
+        "target_verified": "2026-10-21T08:29:10.487314+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:29:10.665697+00:00",
+        "description_update_returned_success": "2026-10-21T08:29:37.881924+00:00",
+        "live_description_readback_verified": "2026-10-21T08:29:37.881924+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:37.881924+00:00"
+      },
+      "started_at": "2026-10-21T08:28:53.786539+00:00",
+      "source_sha256": "14f9e96e2d9dffc0a7dbb072a7d830abb32c056a3a30e2baf0e71210bd7da175",
+      "issue_id": "1419441",
+      "live_summary": "[PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27194",
+      "converted_description_sha256": "8d24bea48384b629fd43573cd422eb528cad84e55045158b893cf8e0d7a3c799",
+      "converted_characters": 12929,
+      "mutation_fields": [
+        "description"
+      ],
+      "result": "verified",
+      "update_result": {
+        "issue": "CBRD-27194",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "8d24bea48384b629fd43573cd422eb528cad84e55045158b893cf8e0d7a3c799",
+      "protected_fields_verified": [
+        "summary",
+        "issuetype",
+        "parent",
+        "components",
+        "subtasks",
+        "project",
+        "reporter",
+        "fixVersions",
+        "priority",
+        "resolution",
+        "labels",
+        "versions",
+        "issuelinks",
+        "assignee",
+        "status"
+      ],
+      "finished_at": "2026-10-21T08:29:37.881924+00:00",
+      "automation_notes": [
+        "Initial response assertion expected dry_run=false. Actual successful CLI schema is issue/updated_fields. Corrected assertion, then performed exact live readback and protected-metadata comparison; no repeated PUT."
+      ],
+      "protected_metadata_before_sha256": "4e5bc708c3cd0c5f96cf013e07d489f653f61c9a576c8ad8ff3f405e131367f3",
+      "protected_metadata_after_sha256": "4e5bc708c3cd0c5f96cf013e07d489f653f61c9a576c8ad8ff3f405e131367f3",
+      "final_protected_metadata_sha256": "4e5bc708c3cd0c5f96cf013e07d489f653f61c9a576c8ad8ff3f405e131367f3",
+      "replaced_description_sha256": "5571ce8f4673bce463d147ac17c29b0b99a99f9c8f9def9446ec1ebc8f04169e",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27194",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "8d24bea48384b629fd43573cd422eb528cad84e55045158b893cf8e0d7a3c799"
+    },
+    "CBRD-27196": {
+      "key": "CBRD-27196",
+      "report_path": "issues/CBRD-27196-sx-latch-survey_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:29:37.929182+00:00",
+        "target_verified": "2026-10-21T08:29:39.156731+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:29:39.336352+00:00",
+        "description_update_returned_success": "2026-10-21T08:29:39.966402+00:00",
+        "live_description_readback_verified": "2026-10-21T08:29:41.210659+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:41.210881+00:00"
+      },
+      "started_at": "2026-10-21T08:29:37.924751+00:00",
+      "source_sha256": "9cb3202676554813ae618a92528f3be3d5ed98224424217dbec7b19391e25247",
+      "issue_id": "1419443",
+      "live_summary": "(C1) [PGBUF] [Survey] Introduce SX latch",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27196",
+      "converted_description_sha256": "5229a6fde91792d3f8dda68a92db86cd86fcdbdcdb8ab3455bfa143771655bde",
+      "converted_characters": 12362,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27196",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "5229a6fde91792d3f8dda68a92db86cd86fcdbdcdb8ab3455bfa143771655bde",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:29:41.210889+00:00",
+      "protected_metadata_before_sha256": "5399c118ced4c02159e300a652d3979edd1c7b91d56c7c46a81bb143dc0b1f9d",
+      "protected_metadata_after_sha256": "5399c118ced4c02159e300a652d3979edd1c7b91d56c7c46a81bb143dc0b1f9d",
+      "final_protected_metadata_sha256": "5399c118ced4c02159e300a652d3979edd1c7b91d56c7c46a81bb143dc0b1f9d",
+      "replaced_description_sha256": "d2d3d97743109519a5efe6d38e4468df1a8825f4561371a3692dace4546ec61b",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27196",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "5229a6fde91792d3f8dda68a92db86cd86fcdbdcdb8ab3455bfa143771655bde"
+    },
+    "CBRD-27211": {
+      "key": "CBRD-27211",
+      "report_path": "issues/CBRD-27211-direct-victim-wait-policy_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:29:41.215312+00:00",
+        "target_verified": "2026-10-21T08:29:41.810019+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:29:41.978505+00:00",
+        "description_update_returned_success": "2026-10-21T08:29:42.353110+00:00",
+        "live_description_readback_verified": "2026-10-21T08:29:47.966895+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:47.967190+00:00"
+      },
+      "started_at": "2026-10-21T08:29:41.211136+00:00",
+      "source_sha256": "3525feb4e0a519f25497c1053568a2519a7ddd89ad77d368cffd9c6918a2b54b",
+      "issue_id": "1419463",
+      "live_summary": "(C2) [PGBUF] [PERF] [SURVEY] thread waiting for direct victim - my_count % 4",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27211",
+      "converted_description_sha256": "ea6adb66e3160858799df89de01317101d476761d8b65081e25182a4d8f39834",
+      "converted_characters": 10290,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27211",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "ea6adb66e3160858799df89de01317101d476761d8b65081e25182a4d8f39834",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:29:47.967199+00:00",
+      "protected_metadata_before_sha256": "62c34e6bd540d2353639320b4eee804811c6779d1a8d2a4df193a7116510e6af",
+      "protected_metadata_after_sha256": "62c34e6bd540d2353639320b4eee804811c6779d1a8d2a4df193a7116510e6af",
+      "final_protected_metadata_sha256": "62c34e6bd540d2353639320b4eee804811c6779d1a8d2a4df193a7116510e6af",
+      "replaced_description_sha256": "4df61ac2651ef8810c3935c05fb970bbfc6da0cbd8e9ff8390b52ab4a264af38",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27211",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "ea6adb66e3160858799df89de01317101d476761d8b65081e25182a4d8f39834"
+    },
+    "CBRD-27252": {
+      "key": "CBRD-27252",
+      "report_path": "issues/CBRD-27252-parallel-v2-strategy_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:29:47.971652+00:00",
+        "target_verified": "2026-10-21T08:29:53.891495+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:29:54.070849+00:00",
+        "description_update_returned_success": "2026-10-21T08:29:54.454275+00:00",
+        "live_description_readback_verified": "2026-10-21T08:29:55.387441+00:00",
+        "protected_metadata_verified": "2026-10-21T08:29:55.387687+00:00"
+      },
+      "started_at": "2026-10-21T08:29:47.967392+00:00",
+      "source_sha256": "2b040277ae3068d258bd92763914e1bfb87401eca8356f70ece8f3152ed40ef8",
+      "issue_id": "1419525",
+      "live_summary": "[PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 전략을 설계한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27252",
+      "converted_description_sha256": "5d5c61607316db583356275714cea11f721e5f8d3b0ecc8a8b68b054c18f3b64",
+      "converted_characters": 9522,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27252",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "5d5c61607316db583356275714cea11f721e5f8d3b0ecc8a8b68b054c18f3b64",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:29:55.387696+00:00",
+      "protected_metadata_before_sha256": "7d6ccc98208557c78700882d01f896db6ab5aee4857ba1bf0fad821342cd44f3",
+      "protected_metadata_after_sha256": "7d6ccc98208557c78700882d01f896db6ab5aee4857ba1bf0fad821342cd44f3",
+      "final_protected_metadata_sha256": "7d6ccc98208557c78700882d01f896db6ab5aee4857ba1bf0fad821342cd44f3",
+      "replaced_description_sha256": "810762569db284e71f5900afbd8d799956b7a2b1de1580107c31023e8c2a9b1d",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27252",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "5d5c61607316db583356275714cea11f721e5f8d3b0ecc8a8b68b054c18f3b64"
+    },
+    "CBRD-27262": {
+      "key": "CBRD-27262",
+      "report_path": "issues/CBRD-27262-flush-error-recovery_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:29:55.392144+00:00",
+        "target_verified": "2026-10-21T08:30:06.385694+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:06.581467+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:07.296502+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:07.978147+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:07.978471+00:00"
+      },
+      "started_at": "2026-10-21T08:29:55.387867+00:00",
+      "source_sha256": "55b1c6240f6d19d31d5bb3df95ad9cd693c9f56470bfdb93bfec0b6d6bf01879",
+      "issue_id": "1419541",
+      "live_summary": "[PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27262",
+      "converted_description_sha256": "005fe4f9517e666d426aec6d41f1da56c68c17ce4b72de86889bb14cbd5378b1",
+      "converted_characters": 11933,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27262",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "005fe4f9517e666d426aec6d41f1da56c68c17ce4b72de86889bb14cbd5378b1",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:07.978482+00:00",
+      "protected_metadata_before_sha256": "b4402d53f54a59b228463600d99136fff40993dfef6f148c16420dcc7986bdb6",
+      "protected_metadata_after_sha256": "b4402d53f54a59b228463600d99136fff40993dfef6f148c16420dcc7986bdb6",
+      "final_protected_metadata_sha256": "b4402d53f54a59b228463600d99136fff40993dfef6f148c16420dcc7986bdb6",
+      "replaced_description_sha256": "fe3f666fd77b242fd7932762dc9a92c9bf92b1fc9362894c243e04182139f38d",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27262",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "005fe4f9517e666d426aec6d41f1da56c68c17ce4b72de86889bb14cbd5378b1"
+    },
+    "CBRD-27263": {
+      "key": "CBRD-27263",
+      "report_path": "issues/CBRD-27263-deallocation-protection-accounting_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:07.983181+00:00",
+        "target_verified": "2026-10-21T08:30:09.031683+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:09.234701+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:15.905680+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:16.698263+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:16.698586+00:00"
+      },
+      "started_at": "2026-10-21T08:30:07.978733+00:00",
+      "source_sha256": "bbf387e637b5280af330bde2d44766cf986e2d914499b3e47ea1af66167d70b6",
+      "issue_id": "1419542",
+      "live_summary": "[PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27263",
+      "converted_description_sha256": "620635aa9fa9b8e868d004ce499f28e2854a76026393faa903635558931f6425",
+      "converted_characters": 16530,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27263",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "620635aa9fa9b8e868d004ce499f28e2854a76026393faa903635558931f6425",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:16.698596+00:00",
+      "protected_metadata_before_sha256": "49148fbb55f11de5c819789c4614756053bec9baabf6b324cb94d37c4903cc35",
+      "protected_metadata_after_sha256": "49148fbb55f11de5c819789c4614756053bec9baabf6b324cb94d37c4903cc35",
+      "final_protected_metadata_sha256": "49148fbb55f11de5c819789c4614756053bec9baabf6b324cb94d37c4903cc35",
+      "replaced_description_sha256": "65e84634085351b6eefe314d1cd6db8e08a0ce12f8c9179931b063aa1b01d256",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27263",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "620635aa9fa9b8e868d004ce499f28e2854a76026393faa903635558931f6425"
+    },
+    "CBRD-27264": {
+      "key": "CBRD-27264",
+      "report_path": "issues/CBRD-27264-direct-victim-emergency-path_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:27.229826+00:00",
+        "target_verified": "2026-10-21T08:30:28.166330+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:28.358746+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:30.567718+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:31.483835+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:31.484204+00:00"
+      },
+      "started_at": "2026-10-21T08:30:27.224604+00:00",
+      "source_sha256": "17bf45cc7b18b7a4393b31e0aa116b8d418c714a49bb8e4a1fcf18bbccd1caf2",
+      "issue_id": "1419543",
+      "live_summary": "[PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27264",
+      "converted_description_sha256": "0bcbf29bfbdee21f01104a5f512facc7f236aaf6d26957e101c119435820fc52",
+      "converted_characters": 10543,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27264",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "0bcbf29bfbdee21f01104a5f512facc7f236aaf6d26957e101c119435820fc52",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:31.484215+00:00",
+      "protected_metadata_before_sha256": "63cdd7bb516817de09ca8abb9f5ccfbaf1ecb00cbb3d2296fd30cb8703fba093",
+      "protected_metadata_after_sha256": "63cdd7bb516817de09ca8abb9f5ccfbaf1ecb00cbb3d2296fd30cb8703fba093",
+      "final_protected_metadata_sha256": "63cdd7bb516817de09ca8abb9f5ccfbaf1ecb00cbb3d2296fd30cb8703fba093",
+      "replaced_description_sha256": "3b4943ffc4a395fb6dd230670b58b1e20dcd37f3196bf26dca1e48a0f41d5796",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27264",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "0bcbf29bfbdee21f01104a5f512facc7f236aaf6d26957e101c119435820fc52"
+    },
+    "CBRD-27265": {
+      "key": "CBRD-27265",
+      "report_path": "issues/CBRD-27265-debug-build-defects_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:31.489525+00:00",
+        "target_verified": "2026-10-21T08:30:32.799023+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:33.013333+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:33.499430+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:34.169790+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:34.170194+00:00"
+      },
+      "started_at": "2026-10-21T08:30:31.484481+00:00",
+      "source_sha256": "2e1f92eddaa75b68d3ec85c11d8d549d80c47d3e0af1e5802066448c04e1a67b",
+      "issue_id": "1419544",
+      "live_summary": "[PGBUF] debug 빌드 전용 결함 2건을 수정한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27265",
+      "converted_description_sha256": "c948659c2731ec45aff756f77d2ad5602d7616636c0f0e17c187bff5d6fb9dd0",
+      "converted_characters": 13516,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27265",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "c948659c2731ec45aff756f77d2ad5602d7616636c0f0e17c187bff5d6fb9dd0",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:34.170205+00:00",
+      "protected_metadata_before_sha256": "17117900aaabc64cf5de01f3a92bd3653a5d6760b83a5c37fe5a7d7c694d7706",
+      "protected_metadata_after_sha256": "17117900aaabc64cf5de01f3a92bd3653a5d6760b83a5c37fe5a7d7c694d7706",
+      "final_protected_metadata_sha256": "17117900aaabc64cf5de01f3a92bd3653a5d6760b83a5c37fe5a7d7c694d7706",
+      "replaced_description_sha256": "6b73fb11916a910f1d8f0aea9f9caa77b04b9bff76620b2fa0216ada3a0c16b4",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27265",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "c948659c2731ec45aff756f77d2ad5602d7616636c0f0e17c187bff5d6fb9dd0"
+    },
+    "CBRD-27266": {
+      "key": "CBRD-27266",
+      "report_path": "issues/CBRD-27266-statistics-semantics_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:34.175465+00:00",
+        "target_verified": "2026-10-21T08:30:35.002153+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:35.193025+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:35.637345+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:36.347883+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:36.348303+00:00"
+      },
+      "started_at": "2026-10-21T08:30:34.170542+00:00",
+      "source_sha256": "67d8b82274f892cf272df249ddf94657097c9e0df4790a069685bdfbb945ee5d",
+      "issue_id": "1419545",
+      "live_summary": "[PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27266",
+      "converted_description_sha256": "c058b84a2c8a01e47f127542debbe3cfc21581665108bf725eae608ff4eb2c6d",
+      "converted_characters": 11771,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27266",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "c058b84a2c8a01e47f127542debbe3cfc21581665108bf725eae608ff4eb2c6d",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:36.348313+00:00",
+      "protected_metadata_before_sha256": "d8d3b6a2bf79b8ee3eaad5157618947bd454c5ab58bbb4514c6761b8d072edbc",
+      "protected_metadata_after_sha256": "d8d3b6a2bf79b8ee3eaad5157618947bd454c5ab58bbb4514c6761b8d072edbc",
+      "final_protected_metadata_sha256": "d8d3b6a2bf79b8ee3eaad5157618947bd454c5ab58bbb4514c6761b8d072edbc",
+      "replaced_description_sha256": "afdbbe138992ecf147a17d9d2983f23a97abd851f2100cb6486cdd89490168bd",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27266",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "c058b84a2c8a01e47f127542debbe3cfc21581665108bf725eae608ff4eb2c6d"
+    },
+    "CBRD-27267": {
+      "key": "CBRD-27267",
+      "report_path": "issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:36.353086+00:00",
+        "target_verified": "2026-10-21T08:30:37.200660+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:37.401637+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:43.001316+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:48.976040+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:48.976502+00:00"
+      },
+      "started_at": "2026-10-21T08:30:36.348621+00:00",
+      "source_sha256": "8651aa8cf66109e21aa62e9ecb20cb167c93e5b866f8ff82972a7323c4b0bd2a",
+      "issue_id": "1419546",
+      "live_summary": "[PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27267",
+      "converted_description_sha256": "21109330a6daaf731f4b0bc552c5dd0be929505511e9e9d9bb4d17ddcec644e5",
+      "converted_characters": 12109,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27267",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "21109330a6daaf731f4b0bc552c5dd0be929505511e9e9d9bb4d17ddcec644e5",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:48.976513+00:00",
+      "protected_metadata_before_sha256": "5f53ef5cdf333167706d584804ccb380e9a2c534b474ee81f9fe87650a29aed2",
+      "protected_metadata_after_sha256": "5f53ef5cdf333167706d584804ccb380e9a2c534b474ee81f9fe87650a29aed2",
+      "final_protected_metadata_sha256": "5f53ef5cdf333167706d584804ccb380e9a2c534b474ee81f9fe87650a29aed2",
+      "replaced_description_sha256": "2f8ad8ea84723933cf3bda5811e83830b1a4f2c58775fc1f87cd6e36ff498549",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27267",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "21109330a6daaf731f4b0bc552c5dd0be929505511e9e9d9bb4d17ddcec644e5"
+    },
+    "CBRD-27268": {
+      "key": "CBRD-27268",
+      "report_path": "issues/CBRD-27268-dwb-size-unit-syntax_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:48.981424+00:00",
+        "target_verified": "2026-10-21T08:30:49.946655+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:50.141484+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:50.586525+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:52.605544+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:52.605985+00:00"
+      },
+      "started_at": "2026-10-21T08:30:48.976859+00:00",
+      "source_sha256": "f2f83000e1f8c06f49b64602ca53495d7e7daa3591df34c4c9dece7e60ccc18f",
+      "issue_id": "1419547",
+      "live_summary": "[PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27268",
+      "converted_description_sha256": "ef54dd8561bbe47499c9685c8a82df3b3db70968fce4ddfb080df837a8e1b914",
+      "converted_characters": 10491,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27268",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "ef54dd8561bbe47499c9685c8a82df3b3db70968fce4ddfb080df837a8e1b914",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:52.605996+00:00",
+      "protected_metadata_before_sha256": "a63d1576d5347a0b8047c2f8f966fa6c6c35c64a61f688ba4e7a30d98b846c40",
+      "protected_metadata_after_sha256": "a63d1576d5347a0b8047c2f8f966fa6c6c35c64a61f688ba4e7a30d98b846c40",
+      "final_protected_metadata_sha256": "a63d1576d5347a0b8047c2f8f966fa6c6c35c64a61f688ba4e7a30d98b846c40",
+      "replaced_description_sha256": "208ad3099d1b27081d532796bd6ce09a86117190a9631c7fc9fc11e5ee7b3805",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27268",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "ef54dd8561bbe47499c9685c8a82df3b3db70968fce4ddfb080df837a8e1b914"
+    },
+    "CBRD-27269": {
+      "key": "CBRD-27269",
+      "report_path": "issues/CBRD-27269-dead-code-comments_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:52.611069+00:00",
+        "target_verified": "2026-10-21T08:30:53.855885+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:54.097467+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:54.755759+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:55.726235+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:55.726728+00:00"
+      },
+      "started_at": "2026-10-21T08:30:52.606353+00:00",
+      "source_sha256": "5ad506b975f74db6eb1935e1500ea43f9a51fb4eaf18401bb24ec53792b0d4b8",
+      "issue_id": "1419548",
+      "live_summary": "[PGBUF] 죽은 코드와 낡은 주석을 정리한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27269",
+      "converted_description_sha256": "69c68bce78d253c641254dc3e62a71ee263886e86e1c9292b24d8483d762daa1",
+      "converted_characters": 13168,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27269",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "69c68bce78d253c641254dc3e62a71ee263886e86e1c9292b24d8483d762daa1",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:55.726741+00:00",
+      "protected_metadata_before_sha256": "340ef1d76c075a3bfedb3254d6e5bbc125e24f79e87371a891e996efe567ddd4",
+      "protected_metadata_after_sha256": "340ef1d76c075a3bfedb3254d6e5bbc125e24f79e87371a891e996efe567ddd4",
+      "final_protected_metadata_sha256": "340ef1d76c075a3bfedb3254d6e5bbc125e24f79e87371a891e996efe567ddd4",
+      "replaced_description_sha256": "b6d6ff73f5d3585b1d0b525d3e21f08a6cfbada7e20f129fdbd5d2c5333d401a",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27269",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "69c68bce78d253c641254dc3e62a71ee263886e86e1c9292b24d8483d762daa1"
+    },
+    "CBRD-27270": {
+      "key": "CBRD-27270",
+      "report_path": "issues/CBRD-27270-recovery-temp-volume-survey_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:30:55.731877+00:00",
+        "target_verified": "2026-10-21T08:30:56.707838+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:30:56.955460+00:00",
+        "description_update_returned_success": "2026-10-21T08:30:57.491876+00:00",
+        "live_description_readback_verified": "2026-10-21T08:30:58.327331+00:00",
+        "protected_metadata_verified": "2026-10-21T08:30:58.327823+00:00"
+      },
+      "started_at": "2026-10-21T08:30:55.727166+00:00",
+      "source_sha256": "24e4de998bb4310d3f5c95562620d518437b04bb35c93a59452d07f30d6486cf",
+      "issue_id": "1419549",
+      "live_summary": "[PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27270",
+      "converted_description_sha256": "8dd62308ec331a0e16e4a9a677906168dd6a181f9778af7f06146728d394869f",
+      "converted_characters": 16482,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27270",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "8dd62308ec331a0e16e4a9a677906168dd6a181f9778af7f06146728d394869f",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:30:58.327832+00:00",
+      "protected_metadata_before_sha256": "ae38568f238f7eee0e35ee45555e8d4858fc2f79b2664d7aeda13cf1b51bc0be",
+      "protected_metadata_after_sha256": "ae38568f238f7eee0e35ee45555e8d4858fc2f79b2664d7aeda13cf1b51bc0be",
+      "final_protected_metadata_sha256": "ae38568f238f7eee0e35ee45555e8d4858fc2f79b2664d7aeda13cf1b51bc0be",
+      "replaced_description_sha256": "9eb4808f49a5ec7a96d094e7176e3d64c22b901bdb89a39df57726a41404d50c",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27270",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "8dd62308ec331a0e16e4a9a677906168dd6a181f9778af7f06146728d394869f"
+    },
+    "CBRD-27316": {
+      "key": "CBRD-27316",
+      "report_path": "issues/CBRD-27316-parallel-fix-private-lru-survey_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:11.726605+00:00",
+        "target_verified": "2026-10-21T08:31:12.571167+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:12.828035+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:13.283543+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:19.496008+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:19.496447+00:00"
+      },
+      "started_at": "2026-10-21T08:31:11.721767+00:00",
+      "source_sha256": "f13959d1233161b04d5358f437fa8a81bd3edeb5d51132f5f1e97188234e5725",
+      "issue_id": "1419618",
+      "live_summary": "(작성중) [PGBUF] parallel fix + private LRU survey (victimize pattern) ",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27316",
+      "converted_description_sha256": "cbd608e9f814189022494c81361d0105ae1cdb998e7665ddffd3b083a5726c87",
+      "converted_characters": 10274,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27316",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "cbd608e9f814189022494c81361d0105ae1cdb998e7665ddffd3b083a5726c87",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:19.496456+00:00",
+      "protected_metadata_before_sha256": "67fea87fa13da698a27090c4acb511f06ea86cb8039952ea2caa9d2c4d0dccb6",
+      "protected_metadata_after_sha256": "67fea87fa13da698a27090c4acb511f06ea86cb8039952ea2caa9d2c4d0dccb6",
+      "final_protected_metadata_sha256": "67fea87fa13da698a27090c4acb511f06ea86cb8039952ea2caa9d2c4d0dccb6",
+      "replaced_description_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27316",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "cbd608e9f814189022494c81361d0105ae1cdb998e7665ddffd3b083a5726c87"
+    },
+    "CBRD-27356": {
+      "key": "CBRD-27356",
+      "report_path": "issues/CBRD-27356-page-latch-timeout-policy_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:19.501513+00:00",
+        "target_verified": "2026-10-21T08:31:20.320268+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:20.539068+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:21.361395+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:22.240575+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:22.241104+00:00"
+      },
+      "started_at": "2026-10-21T08:31:19.496806+00:00",
+      "source_sha256": "cb5833e27f82f5fb4e4076a217d989b508b1e937dbd0bb57683ae81cf560e5a1",
+      "issue_id": "1419672",
+      "live_summary": "[PGBUF] transaction lock timeout과 page latch 정책 분리 Issue Triage",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27356",
+      "converted_description_sha256": "038cd46680a3579866dec5733bae18af5e5fa7a08e5b1badb3e7ebea3c2a6f5c",
+      "converted_characters": 13769,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27356",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "038cd46680a3579866dec5733bae18af5e5fa7a08e5b1badb3e7ebea3c2a6f5c",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:22.241115+00:00",
+      "protected_metadata_before_sha256": "7d7c0acb7daeb39fa132f455ea5ddb39739c6d5a1b4a4121559f25195fbfff87",
+      "protected_metadata_after_sha256": "7d7c0acb7daeb39fa132f455ea5ddb39739c6d5a1b4a4121559f25195fbfff87",
+      "final_protected_metadata_sha256": "7d7c0acb7daeb39fa132f455ea5ddb39739c6d5a1b4a4121559f25195fbfff87",
+      "replaced_description_sha256": "e62d160d42d894516bba5e3605864c2c7de3183fea11127f9f2442357a4b9558",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27356",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "038cd46680a3579866dec5733bae18af5e5fa7a08e5b1badb3e7ebea3c2a6f5c"
+    },
+    "CBRD-27370": {
+      "key": "CBRD-27370",
+      "report_path": "issues/CBRD-27370-nested-read-write-accounting_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:22.246410+00:00",
+        "target_verified": "2026-10-21T08:31:23.007541+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:23.216571+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:23.712732+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:24.989726+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:24.990252+00:00"
+      },
+      "started_at": "2026-10-21T08:31:22.241536+00:00",
+      "source_sha256": "66808ddf05da3fd81acbbb3192bfaaf378015c41940d9cb15e319cf503213e31",
+      "issue_id": "1419695",
+      "live_summary": "[PGBUF] [Regression] Ordinary nested READ-to-WRITE fix resets BCB fix count and desynchronizes holder debt",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27370",
+      "converted_description_sha256": "fd91fcf36ea1f322a8f5dc1eed3a778c25d71d709fbfa816970c2d08e78b7f69",
+      "converted_characters": 14552,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27370",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "fd91fcf36ea1f322a8f5dc1eed3a778c25d71d709fbfa816970c2d08e78b7f69",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:24.990261+00:00",
+      "protected_metadata_before_sha256": "07eb9a6f416d02215896f94421ed02350d23b9158c8a53f076bea1b0e21eef9b",
+      "protected_metadata_after_sha256": "07eb9a6f416d02215896f94421ed02350d23b9158c8a53f076bea1b0e21eef9b",
+      "final_protected_metadata_sha256": "07eb9a6f416d02215896f94421ed02350d23b9158c8a53f076bea1b0e21eef9b",
+      "replaced_description_sha256": "7c9ed7fa00029dff34b72ac77d70d736c8ef67dbb5ff8ff5dec95f0580069a76",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27370",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "fd91fcf36ea1f322a8f5dc1eed3a778c25d71d709fbfa816970c2d08e78b7f69"
+    },
+    "CBRD-27398": {
+      "key": "CBRD-27398",
+      "report_path": "issues/CBRD-27398-page-buffer-overlay_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:24.995117+00:00",
+        "target_verified": "2026-10-21T08:31:25.657382+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:25.884508+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:26.402762+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:27.336385+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:27.337303+00:00"
+      },
+      "started_at": "2026-10-21T08:31:24.990659+00:00",
+      "source_sha256": "77e5bb66c09475e54b1dd16dc3dcf659cc18384a42804d0541a6f640de7eb84f",
+      "issue_id": "1419813",
+      "live_summary": "[PGBUF] overlay",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27398",
+      "converted_description_sha256": "f8d79efbb67654768914e4831c22513108be002b406459aa6a48bf6c9d0c8295",
+      "converted_characters": 13632,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27398",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "f8d79efbb67654768914e4831c22513108be002b406459aa6a48bf6c9d0c8295",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:27.337319+00:00",
+      "protected_metadata_before_sha256": "c75f4657d819544f44f709a7120675f013ceefe4389890ae0b9dcfaa9fd55815",
+      "protected_metadata_after_sha256": "c75f4657d819544f44f709a7120675f013ceefe4389890ae0b9dcfaa9fd55815",
+      "final_protected_metadata_sha256": "c75f4657d819544f44f709a7120675f013ceefe4389890ae0b9dcfaa9fd55815",
+      "replaced_description_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27398",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "f8d79efbb67654768914e4831c22513108be002b406459aa6a48bf6c9d0c8295"
+    },
+    "CBRD-27423": {
+      "key": "CBRD-27423",
+      "report_path": "issues/CBRD-27423-performance-analysis-framework_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:27.343225+00:00",
+        "target_verified": "2026-10-21T08:31:28.238286+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:28.442221+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:33.865552+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:35.484344+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:35.485112+00:00"
+      },
+      "started_at": "2026-10-21T08:31:27.338072+00:00",
+      "source_sha256": "dc27428611e53cbf3d2577fe0b346c87a644baaf423c028b255364e9b05c84a9",
+      "issue_id": "1419924",
+      "live_summary": "[PGBUF] [Survey] page buffer 성능 분석 프레임워크 ",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27423",
+      "converted_description_sha256": "ff63944d5c7c3a0ad6f92e1bddfa6641f7394ab050f9d6dec42887c7019a96e8",
+      "converted_characters": 10147,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27423",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "ff63944d5c7c3a0ad6f92e1bddfa6641f7394ab050f9d6dec42887c7019a96e8",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:35.485128+00:00",
+      "protected_metadata_before_sha256": "e22efb12129776c13eb85f7bd59e922d7a7d67141c78baefcfeb561f5edb004f",
+      "protected_metadata_after_sha256": "e22efb12129776c13eb85f7bd59e922d7a7d67141c78baefcfeb561f5edb004f",
+      "final_protected_metadata_sha256": "e22efb12129776c13eb85f7bd59e922d7a7d67141c78baefcfeb561f5edb004f",
+      "replaced_description_sha256": "3fd9d99d138f1b09e5ca465e5695e9e55cf3e952ea0402aa304430e0ccfa684f",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27423",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "ff63944d5c7c3a0ad6f92e1bddfa6641f7394ab050f9d6dec42887c7019a96e8"
+    },
+    "CBRD-27630": {
+      "key": "CBRD-27630",
+      "report_path": "issues/CBRD-27630-simple-fix-loading-cleanup_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:35.490450+00:00",
+        "target_verified": "2026-10-21T08:31:36.401265+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:36.596315+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:37.407998+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:38.380748+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:38.381352+00:00"
+      },
+      "started_at": "2026-10-21T08:31:35.485794+00:00",
+      "source_sha256": "bcb4645cc5c6b97150927d1b770634564b18f4e73eeb896bafc94cae91217405",
+      "issue_id": "1420311",
+      "live_summary": "[PGBUF] pgbuf_simple_fix 실패 후 중복 정리가 다른 스레드의 로딩 기록을 삭제할 수 있다",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27630",
+      "converted_description_sha256": "071731cf8264fb0bc3e56256d8b7bf97900be4a795d2acb11cd0639d951aa1d4",
+      "converted_characters": 13642,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27630",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "071731cf8264fb0bc3e56256d8b7bf97900be4a795d2acb11cd0639d951aa1d4",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:38.381363+00:00",
+      "protected_metadata_before_sha256": "c6f12840909eb2c7a6efa7e7064d513b655142adfbf5bea4f4e655c72906fc44",
+      "protected_metadata_after_sha256": "c6f12840909eb2c7a6efa7e7064d513b655142adfbf5bea4f4e655c72906fc44",
+      "final_protected_metadata_sha256": "c6f12840909eb2c7a6efa7e7064d513b655142adfbf5bea4f4e655c72906fc44",
+      "replaced_description_sha256": "403b79400bbfc410eaf36bd0ee2be6d31c418602d2251694a4f75770af9afcf9",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27630",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "071731cf8264fb0bc3e56256d8b7bf97900be4a795d2acb11cd0639d951aa1d4"
+    },
+    "CBRD-27193": {
+      "key": "CBRD-27193",
+      "report_path": "issues/CBRD-27193-page-buffer-program_f6cac31_codex.md",
+      "stages": {
+        "pushed_content_verified": "2026-10-21T08:31:38.386313+00:00",
+        "target_verified": "2026-10-21T08:31:39.351568+00:00",
+        "fresh_dry_run_inspected": "2026-10-21T08:31:39.561709+00:00",
+        "description_update_returned_success": "2026-10-21T08:31:40.701526+00:00",
+        "live_description_readback_verified": "2026-10-21T08:31:41.693121+00:00",
+        "protected_metadata_verified": "2026-10-21T08:31:41.694176+00:00"
+      },
+      "started_at": "2026-10-21T08:31:38.381833+00:00",
+      "source_sha256": "7f27a70777b4da23c2cfdcd3a17e160998722f0b8cf3de69f31e2f03260eed23",
+      "issue_id": "1419439",
+      "live_summary": "[EPIC] page buffer",
+      "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27193",
+      "converted_description_sha256": "508c39a48af148ff4b2623a61366e68e52dc891238adf1325574b8c90a9e833a",
+      "converted_characters": 15358,
+      "mutation_fields": [
+        "description"
+      ],
+      "update_result": {
+        "issue": "CBRD-27193",
+        "updated_fields": [
+          "description"
+        ]
+      },
+      "live_description_sha256": "508c39a48af148ff4b2623a61366e68e52dc891238adf1325574b8c90a9e833a",
+      "protected_fields_verified": [
+        "summary",
+        "status",
+        "issuetype",
+        "assignee",
+        "priority",
+        "parent",
+        "subtasks",
+        "components",
+        "labels",
+        "fixVersions",
+        "versions",
+        "resolution",
+        "reporter",
+        "project",
+        "issuelinks"
+      ],
+      "result": "verified",
+      "finished_at": "2026-10-21T08:31:41.694192+00:00",
+      "protected_metadata_before_sha256": "296a194745268bc001ae5983edb038734169b14394efc871620726cfa92dccd5",
+      "protected_metadata_after_sha256": "296a194745268bc001ae5983edb038734169b14394efc871620726cfa92dccd5",
+      "final_protected_metadata_sha256": "296a194745268bc001ae5983edb038734169b14394efc871620726cfa92dccd5",
+      "replaced_description_sha256": "54694e66baa454cab3a50bbf1d685d200ae86881952761c055259c85333fbdea",
+      "jira_url": "https://jira.cubrid.org/browse/CBRD-27193",
+      "final_batch_readback": "passed",
+      "final_live_description_sha256": "508c39a48af148ff4b2623a61366e68e52dc891238adf1325574b8c90a9e833a"
+    }
+  },
+  "final_batch_verification": {
+    "verified_at": "2026-10-21T08:32:10.916694+00:00",
+    "issues": 20,
+    "descriptions_exactly_match": 20,
+    "protected_metadata_unchanged": 20,
+    "hierarchy": "19 direct children; no deeper descendants",
+    "readback_sha256": "309a687623130ee5104d7213199f17547422b1c144f10691a6eb0ea3523aa467"
+  }
+}

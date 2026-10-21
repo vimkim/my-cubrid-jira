@@ -4,7 +4,7 @@
   "dedicated_writers": 20,
   "actual_children": 19,
   "github_blob_link_occurrences_checked": 527,
-  "local_markdown_link_targets_checked": 74,
+  "local_markdown_link_targets_checked": 99,
   "original_units": 1701,
   "original_dispositions": {
     "corrected": 1016,
@@ -14,7 +14,7 @@
   },
   "additional_screenshot_claims": 5,
   "dry_runs_passed": 20,
-  "live_updates_executed": 0,
+  "live_updates_executed": 20,
   "converted_character_range": [
     9522,
     16530
@@ -23,5 +23,11 @@
   "type_specific_sections": "passed",
   "report_hashes_match_manifest_audit_and_dryrun": true,
   "runtime_build_benchmark_lean_execution": "not performed",
-  "https_docserve_reachability": "unverified: hostname did not resolve"
+  "https_docserve_reachability": "unverified: hostname did not resolve",
+  "fresh_publication_dryruns_passed": 20,
+  "live_exact_readbacks_verified": 20,
+  "protected_metadata_unchanged": 20,
+  "final_batch_hierarchy": "19 direct children; no deeper descendants",
+  "pushed_report_commit": "eb49303a8fc63cf57f680acf922211da945b6800",
+  "publication": "completed and verified"
 }

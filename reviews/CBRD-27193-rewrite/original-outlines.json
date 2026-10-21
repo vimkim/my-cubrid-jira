@@ -1,0 +1,3321 @@
+{
+  "CBRD-27193": {
+    "live_summary": "[EPIC] page buffer",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-페이지-버퍼-안정성동시성관측성-개선-epic}\\[PGBUF\\] 페이지 버퍼 안정성·동시성·관측성 개선 EPIC"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:신규-확인-결함-n1n9-e6ed61e87-기준}신규 확인 결함 \\(N1~N9, e6ed61e87 기준)"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:자식-이슈-구성-확정안}자식 이슈 구성 \\(확정안)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:심각도-평가}심각도 평가"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:순위a1-오류-흐름}1순위(A1) 오류 흐름"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:순위a2-오류-흐름-등록해제-회계}2순위(A2) 오류 흐름 — 등록/해제 회계"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:별도-이슈를-권하지-않는-항목}별도 이슈를 권하지 않는 항목"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:a2의-수정-방식}A2의 수정 방식"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:a3의-목표-동작}A3의 목표 동작"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:big-private-queue의-목표-상태-b2}big private queue의 목표 상태 \\(B2)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:통계-호환성-b1}통계 호환성 \\(B1)"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "# [PGBUF] 페이지 버퍼 안정성·동시성·관측성 개선 EPIC"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### 변경 범위"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### 권장 자식 이슈"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### 1순위 오류 흐름"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### SX latch 후보의 경계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### 별도 이슈를 권하지 않는 항목"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### latch mode 명칭과 최초 적용 대상"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### big private queue의 목표 상태"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "### 통계 호환성"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+        "text": "## References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "# [PGBUF] 페이지 버퍼 안정성·동시성·관측성 개선 EPIC"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 신규 확인 결함 (N1~N9, e6ed61e87 기준)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 자식 이슈 구성 (확정안)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 심각도 평가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 1순위(A1) 오류 흐름"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 2순위(A2) 오류 흐름 — 등록/해제 회계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 별도 이슈를 권하지 않는 항목"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### A2의 수정 방식"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### A3의 목표 동작"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### big private queue의 목표 상태 (B2)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "### 통계 호환성 (B1)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+        "text": "## References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27193-page-buffer-program_f6cac31_codex.md"
+  },
+  "CBRD-27194": {
+    "live_summary": "[PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-초기화종료-경로의-위생-결함을-일괄-수정한다}\\[PGBUF\\] 초기화/종료 경로의 위생 결함을 일괄 수정한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:memset-이-대상-구조체를-다-덮지-못한다}1. memset 이 대상 구조체를 다 덮지 못한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:aout_mutex-파괴-소유권이-둘로-갈린다}2. Aout_mutex 파괴 소유권이 둘로 갈린다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:크기-0-할당의-반환값에-의존한다}3. 크기 0 할당의 반환값에 의존한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "# 1) memset 크기 불일치: 두 타입의 실제 크기를 오브젝트 파일의 디버그 정보에서 읽는다"
+      },
+      {
+        "origin": "live description",
+        "text": "# memset 이 어느 타입 크기를 쓰는지 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "# 2) Aout_mutex 이중 destroy 경로 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "# 오류 주입으로 실제 도달을 확인하려면: cubrid.conf 의 [common] 에 data_aout_ratio=0.1 을 넣고,"
+      },
+      {
+        "origin": "live description",
+        "text": "# :5814 의 malloc 결과를 강제로 NULL 로 만든 임시 빌드에서 서버를 기동한 뒤,"
+      },
+      {
+        "origin": "live description",
+        "text": "# 두 destroy 지점(:5851, :1980) 앞에 로그를 넣어 같은 mutex 주소가 두 번 출력되는지 본다"
+      },
+      {
+        "origin": "live description",
+        "text": "# 3) malloc(0) 의존 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "### 1. memset 이 대상 구조체를 다 덮지 못한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "### 2. Aout_mutex 파괴 소유권이 둘로 갈린다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "### 3. 크기 0 할당의 반환값에 의존한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# 1) memset 크기 불일치: 두 타입의 실제 크기를 오브젝트 파일의 디버그 정보에서 읽는다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# memset 이 어느 타입 크기를 쓰는지 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# 2) Aout_mutex 이중 destroy 경로 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# 오류 주입으로 실제 도달을 확인하려면: cubrid.conf 의 [common] 에 data_aout_ratio=0.1 을 넣고,"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# :5814 의 malloc 결과를 강제로 NULL 로 만든 임시 빌드에서 서버를 기동한 뒤,"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# 두 destroy 지점(:5851, :1980) 앞에 로그를 넣어 같은 mutex 주소가 두 번 출력되는지 본다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "# 3) malloc(0) 의존 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+        "text": "### 참고 코드"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27194-initialization-finalization_f6cac31_codex.md"
+  },
+  "CBRD-27196": {
+    "live_summary": "(C1) [PGBUF] [Survey] Introduce SX latch",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-sx-page-latch-도입-조사}\\[PGBUF\\] SX page latch 도입 조사"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "# *교착 가능성*: 위 행렬은 서로 다른 스레드 사이의 호환성이고, 같은 스레드가 READ를 쥔 채 SX를 blocking으로 기다리는 승격은 금지가 전제다 — 이를 허용하면 \"SX holder는 READ가 빠지길 기다리고, READ holder는 SX를 기다리는\" 같은 교착이 한 단계 위에서 재현된다. SX를 fix 시점에 요청하거나 nowait 승격만 허용하면, SX holder는 페이지당 최대 1명으로 직렬화되고, 동일 page 범위에서는 그가 기다리는 대상이 언젠가 반드시 unfix하는 순수 READ뿐이라 대기 사이클이 성립하지 않는다(여러 page에 걸친 latch 순서 문제는 검토 항목 3의 대기 정책·ordered fix 항목과 Open Questions 7에서 다룬다). 이 규칙 아래에서 SX→WRITE는 \"기다리면 반드시 얻는\" 승격이 되어 위 promotion 흐름의 실패 분기가 사라진다. 단, 결정성은 승격 대기 시작 시 신규 reader 유입을 닫는 밸브를 전제하며, 그 밸브의 구현은 검토 항목 3에서 다룬다."
+      },
+      {
+        "origin": "live description",
+        "text": "# *배타 창의 길이*: 읽기·판단 구간을 SX로 지나가는 동안 reader는 계속 통과하고, 배타는 실제 frame 수정 순간으로 줄어든다. 현재는 승격 실패가 두려운 호출자가 처음부터 WRITE 하강을 택해 배타 창이 작업 전체로 늘어난다."
+      },
+      {
+        "origin": "live description",
+        "text": "# *승격이 필요 없는 사용처*: flush는 page를 수정하지 않으므로 SX만 쥔 채 write I/O를 끝내면 되고, WRITE로 올라갈 일 자체가 없다. InnoDB가 정확히 이 방식이다."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:주요-검토-항목}주요 검토 항목"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:타-dbms의-sx-등가-mode와-성능-이점}1. 타 DBMS의 SX 등가 mode와 성능 이점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:cubrid-적용-후보-지점}2. CUBRID 적용 후보 지점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:설계-스케치-상태-표현과-경로별-변경점}3. 설계 스케치 — 상태 표현과 경로별 변경점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:성능-검증-계획}4. 성능 검증 계획"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "# *명칭* — 다중 단위 intent semantics가 없으므로 EPIC은 {{SIX}} 대신 {{SX}} 를 권장한다. transaction lock의 SIX와 혼동을 피하는 확정 명칭 합의가 필요하다."
+      },
+      {
+        "origin": "live description",
+        "text": "# *최초 적용 대상* — flush 내부 상태(1단계)부터인지, B-tree 승격까지 한 번에인지. {{TBD - 합의 미확인}}."
+      },
+      {
+        "origin": "live description",
+        "text": "# *신규 READ 밸브를 닫는 시점* — 승격의 결정성은 대기 시작 시 신규 reader 유입 차단을 전제한다(설계 스케치의 {{waiter_exists}} 게이트). SX 획득 즉시 닫을지 승격 요청 시점에 닫을지에 따라 reader 지연과 승격 대기시간이 반대로 움직이므로, 기존 {{waiter_exists}} fairness 정책과 일관되게 정해야 한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# {{FLUSHING_TO_DISK}} *플래그와 SX 상태의 관계* — 통합(플래그가 곧 SX)인지 병존인지. 통합 시 기존 재더티 추적\\({{pgbuf_bcb_mark_is_flushing}} 의 DIRTY 해제)이 불필요해지는지 검증이 필요하다."
+      },
+      {
+        "origin": "live description",
+        "text": "# *DWB 경로의 사본 수* — {{dwb_set_data_on_next_slot}} 이 slot에 이미지를 보관하는 방식에 따라 SX 직접 flush에서도 사본 한 번이 남는지가 갈린다. DWB 코드 확인 후 판정."
+      },
+      {
+        "origin": "live description",
+        "text": "# *재귀 SX와 downgrade* — 같은 스레드의 중복 SX 획득 허용 여부, SX→READ downgrade 제공 여부."
+      },
+      {
+        "origin": "live description",
+        "text": "# *다중 page 연속 승격* — delete/merge의 3-page 승격(검토 항목 2(b))에서 SX 획득 순서와 부분 실패 롤백 규칙."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "# [PGBUF] SX page latch 도입 조사"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## 주요 검토 항목"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "### 1. 타 DBMS의 SX 등가 mode와 성능 이점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "### 2. CUBRID 적용 후보 지점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "### 3. 설계 스케치 — 상태 표현과 경로별 변경점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "### 4. 성능 검증 계획"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27196-pgbuf-sx-latch-survey_5cd4f86_claude.md",
+        "text": "## References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27196-sx-latch-survey_f6cac31_codex.md"
+  },
+  "CBRD-27211": {
+    "live_summary": "(C2) [PGBUF] [PERF] [SURVEY] thread waiting for direct victim - my_count % 4",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-direct-victim-대기-큐의-고정값-4를-검증한다}\\[PGBUF\\] direct victim 대기 큐의 고정값 {{4}} 를 검증한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:현재-선택-순서}현재 선택 순서"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:확인할-지표}확인할 지표"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:비교할-후보}비교할 후보"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:검증할-상황}검증할 상황"
+      },
+      {
+        "origin": "live description",
+        "text": "# 일반 worker만 대기하는 경우"
+      },
+      {
+        "origin": "live description",
+        "text": "# vacuum 등 high priority만 대기하는 경우"
+      },
+      {
+        "origin": "live description",
+        "text": "# high와 low가 함께 대기하는 경우"
+      },
+      {
+        "origin": "live description",
+        "text": "# CBRD-27188, CBRD-27191에서 사용한 TPC-H 회귀 workload"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:적응형-규칙의-입력}적응형 규칙의 입력"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:설정값-노출-여부}설정값 노출 여부"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "# [PGBUF] direct victim 대기 큐의 고정값 `4`를 검증한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 현재 선택 순서"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 확인할 지표"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 비교할 후보"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 검증할 상황"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 적응형 규칙의 입력"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "### 설정값 노출 여부"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27211-direct-victim-waiter-policy_f30f1c2_codex.md",
+        "text": "## References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27211-direct-victim-wait-policy_f6cac31_codex.md"
+  },
+  "CBRD-27252": {
+    "live_summary": "[PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 전략을 설계한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-survey-pgbuf-default-v2-병행-버전-도입-전략을-설계한다}\\[PGBUF\\] \\[Survey\\] pgbuf default / v2 병행 버전 도입 전략을 설계한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:주요-검토-항목}주요 검토 항목"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:버전-선택-메커니즘}1. 버전 선택 메커니즘"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:v2-가-개선할-대상-확정}2. v2 가 개선할 대상 확정"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계적-검증-전략}3. 단계적 검증 전략"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:이중-유지보수-위험}4. 이중 유지보수 위험"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "# 검토 항목 1의 후보 5종을 표 기준으로 평가하고, 1순위 후보에 대해서만 실제 빌드 가능성을 확인한다 — {{page_buffer.c}} 를 그대로 복사한 파일을 CMake 옵션으로 바꿔 넣어 {{cubrid}} 와 {{sa}} 두 타깃이 빌드되는지 보는 수준으로 충분하다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 검토 항목 2의 후보별로 default 직접 수정과 v2 편입 중 어느 쪽인지 판정표를 채우고, 판정에 쓴 기준을 함께 적는다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 검토 항목 3의 하네스 두 갈래 중 하나를 고르고, M0 의 통과 기준 한 개를 실제 테스트로 작성해 그 방식이 성립하는지 확인한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 위 결과와 검토 항목 4의 위험표를 합쳐 도입 여부 권고안을 낸다. 권고가 도입이면 마일스톤별 후속 이슈 목록을, 미도입이면 그 근거와 대안(default 직접 수정 순서)을 남긴다."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:병행-버전-도입-자체의-승인}병행 버전 도입 자체의 승인"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:v2-의-최초-범위}v2 의 최초 범위"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:선택값의-노출-수준}선택값의 노출 수준"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:v2-의-언어와-파일-형태}v2 의 언어와 파일 형태"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "# [PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 전략을 설계한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## 주요 검토 항목"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 1. 버전 선택 메커니즘"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 2. v2 가 개선할 대상 확정"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 3. 단계적 검증 전략"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 4. 이중 유지보수 위험"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 병행 버전 도입 자체의 승인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### v2 의 최초 범위"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### 선택값의 노출 수준"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "### v2 의 언어와 파일 형태"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27252-pgbuf-v2-parallel-implementation_e6ed61e_claude.md",
+        "text": "## References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27252-parallel-v2-strategy_f6cac31_codex.md"
+  },
+  "CBRD-27262": {
+    "live_summary": "[PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-flush-준비-후-tdedwb-오류-시-bcb-상태를-복구한다}\\[PGBUF\\] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:곁가지-결함-dwb_read_page-실패-경로의-정리-누락-n2}곁가지 결함 — {{dwb_read_page}} 실패 경로의 정리 누락 \\(N2)"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:구현-시-참고}구현 시 참고"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:범위-밖}범위 밖"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "# [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "### 곁가지 결함 — `dwb_read_page` 실패 경로의 정리 누락 (N2)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "### 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "### 구현 시 참고"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27262-pgbuf-flush-error-bcb-recovery_e6ed61e_claude.md",
+        "text": "### 범위 밖"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27262-flush-error-recovery_f6cac31_codex.md"
+  },
+  "CBRD-27263": {
+    "live_summary": "[PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-lock-free-fix-경로의-dealloc-보호-카운터-비대칭을-수정한다}\\[PGBUF\\] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:요청-page-의-보호는-두-함수가-나눠-맡는다}요청 page 의 보호는 두 함수가 나눠 맡는다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:방어가-막아-주지-못하는-부분}0 방어가 막아 주지 못하는 부분"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:노출-경로}노출 경로"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:등록해제-짝이-깨지는지-계측}1. 등록/해제 짝이 깨지는지 계측"
+      },
+      {
+        "origin": "live description",
+        "text": "# 빌드 산출물로 환경을 잡는다 (이후 단계 전부가 이 환경을 전제한다)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:부하-시나리오-순차-scan-update-혼합}2. 부하 시나리오 — 순차 scan + UPDATE 혼합"
+      },
+      {
+        "origin": "live description",
+        "text": "# 버퍼 풀을 작게 잡아 victim 교체 압력을 만들고, 0 방어의 진단 로그가 보이도록 debug 로그를 켠다"
+      },
+      {
+        "origin": "live description",
+        "text": "# 순차 scan 10 세션 (인덱스를 타지 않도록 b 로 필터) + 구간 UPDATE 4 세션"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:vpid-별-순증감-집계}3. vpid 별 순증감 집계"
+      },
+      {
+        "origin": "live description",
+        "text": "# register 는 +1, unregister 는 감소 직전 값이 1 이상일 때만 -1 로 센다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:보호가-지워졌을-때의-결과-확인-확률적}4. 보호가 지워졌을 때의 결과 확인 \\(확률적)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 세션 1..6: 순차 scan 반복 / 세션 7: 만행 단위 배치 삭제로 empty heap page 유도"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:수정-방향-후보}수정 방향 후보"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:확인해-둔-사항}확인해 둔 사항"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 요청 page 의 보호는 두 함수가 나눠 맡는다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 0 방어가 막아 주지 못하는 부분"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 노출 경로"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 1. 등록/해제 짝이 깨지는지 계측"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# 빌드 산출물로 환경을 잡는다 (이후 단계 전부가 이 환경을 전제한다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 2. 부하 시나리오 — 순차 scan + UPDATE 혼합"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# 버퍼 풀을 작게 잡아 victim 교체 압력을 만들고, 0 방어의 진단 로그가 보이도록 debug 로그를 켠다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# 순차 scan 10 세션 (인덱스를 타지 않도록 b 로 필터) + 구간 UPDATE 4 세션"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 3. vpid 별 순증감 집계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# register 는 +1, unregister 는 감소 직전 값이 1 이상일 때만 -1 로 센다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 4. 보호가 지워졌을 때의 결과 확인 (확률적)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "# 세션 1..6: 순차 scan 반복 / 세션 7: 만행 단위 배치 삭제로 empty heap page 유도"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 수정 방향 후보"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "### 확인해 둔 사항"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27263-deallocation-protection-accounting_f6cac31_codex.md"
+  },
+  "CBRD-27264": {
+    "live_summary": "[PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-direct-victim-긴급-배정-경로가-실행되지-않는-오류를-처리한다}\\[PGBUF\\] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:두-경로가-죽은-방식}두 경로가 죽은 방식"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:왜-오래-잠복했는가}왜 오래 잠복했는가"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "# 1) 순회 조건이 첫 평가에서 거짓임을 확인한다 (index 초기값 = prv_index)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 2) 순회 본문이 두 함수의 유일한 호출부임을 확인한다 (9580, 9589 뿐)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 3) 남은 호출부가 NULL 을 넘기는 것을 확인한다"
+      },
+      {
+        "origin": "live description",
+        "text": "# 4) 순회 형태만 떼어내 본문 실행 횟수를 센다 (DB 불필요)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 5) 실행 중 서버에서 긴급 배정 통계를 확인한다 (부하 종류와 시간에 무관하다)"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:후보-조건별-순회-궤적}후보 조건별 순회 궤적"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:관련-이슈}관련 이슈"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### 두 경로가 죽은 방식"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### 왜 오래 잠복했는가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# 1) 순회 조건이 첫 평가에서 거짓임을 확인한다 (index 초기값 = prv_index)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# 2) 순회 본문이 두 함수의 유일한 호출부임을 확인한다 (9580, 9589 뿐)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# 3) 남은 호출부가 NULL 을 넘기는 것을 확인한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# 4) 순회 형태만 떼어내 본문 실행 횟수를 센다 (DB 불필요)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "# 5) 실행 중 서버에서 긴급 배정 통계를 확인한다 (부하 종류와 시간에 무관하다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### 후보 조건별 순회 궤적"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### 관련 이슈"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "text": "### 참고 코드"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27264-direct-victim-emergency-path_f6cac31_codex.md"
+  },
+  "CBRD-27265": {
+    "live_summary": "[PGBUF] debug 빌드 전용 결함 2건을 수정한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-debug-빌드-전용-결함-2건을-수정한다}\\[PGBUF\\] debug 빌드 전용 결함 2건을 수정한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:n4-pgbuf_dump-가-두-차례-리팩터링을-따라가지-못했다}N4 — pgbuf_dump 가 두 차례 리팩터링을 따라가지 못했다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:n5-보상-복구가-대입되지-않은-vpid-를-로그에-찍는다}N5 — 보상 복구가 대입되지 않은 VPID 를 로그에 찍는다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:n4-cubrid_debug-컴파일-실패}N4 — CUBRID_DEBUG 컴파일 실패"
+      },
+      {
+        "origin": "live description",
+        "text": "# 1) debug 빌드 트리를 준비한다 (compile_commands.json 이 생성된다)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 2) 최상위에 compile_commands.json 을 노출한다"
+      },
+      {
+        "origin": "live description",
+        "text": "# 3) 서버 빌드 변형(SERVER_MODE)의 컴파일 명령에 -DCUBRID_DEBUG 만 추가해 문법 검사"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:n5-미초기화-vpid-출력}N5 — 미초기화 VPID 출력"
+      },
+      {
+        "origin": "live description",
+        "text": "# 1) 대입 지점이 없음을 확인한다 (선언 :15255, 사용 :15271 사이에 vpid 대입이 없다)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 2) 같은 일을 하는 정상 함수와 대조한다 (:15209-15210 에 대입이 있다)"
+      },
+      {
+        "origin": "live description",
+        "text": "# 3) 런타임 관측: TDE 볼륨을 쓰는 debug 빌드에서 로그를 켠다"
+      },
+      {
+        "origin": "live description",
+        "text": "#    cubrid.conf 의 [common] 아래 er_log_tde=yes 를 넣고 서버를 재기동한 뒤,"
+      },
+      {
+        "origin": "live description",
+        "text": "#    TDE 테이블에 페이지 dealloc 이 일어나는 트랜잭션을 rollback 하고"
+      },
+      {
+        "origin": "live description",
+        "text": "#    체크포인트 전에 서버를 kill -9 한 다음 재기동해 복구 redo 를 유발한다."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# [PGBUF] debug 빌드 전용 결함 2건을 수정한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### N4 — pgbuf_dump 가 두 차례 리팩터링을 따라가지 못했다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### N5 — 보상 복구가 대입되지 않은 VPID 를 로그에 찍는다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### N4 — CUBRID_DEBUG 컴파일 실패"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 1) debug 빌드 트리를 준비한다 (compile_commands.json 이 생성된다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 2) 최상위에 compile_commands.json 을 노출한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 3) 서버 빌드 변형(SERVER_MODE)의 컴파일 명령에 -DCUBRID_DEBUG 만 추가해 문법 검사"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### N5 — 미초기화 VPID 출력"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 1) 대입 지점이 없음을 확인한다 (선언 :15255, 사용 :15271 사이에 vpid 대입이 없다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 2) 같은 일을 하는 정상 함수와 대조한다 (:15209-15210 에 대입이 있다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "# 3) 런타임 관측: TDE 볼륨을 쓰는 debug 빌드에서 로그를 켠다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "#    cubrid.conf 의 [common] 아래 er_log_tde=yes 를 넣고 서버를 재기동한 뒤,"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "#    TDE 테이블에 페이지 dealloc 이 일어나는 트랜잭션을 rollback 하고"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "#    체크포인트 전에 서버를 kill -9 한 다음 재기동해 복구 redo 를 유발한다."
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+        "text": "### 참고 코드"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27265-debug-build-defects_f6cac31_codex.md"
+  },
+  "CBRD-27266": {
+    "live_summary": "[PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-page-buffer-통계의-논리-페이지와-물리-io-의미를-정리한다}\\[PGBUF\\] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:flush-경로의-카운터-위치}flush 경로의 카운터 위치"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:이전-분석에서-정정된-부분}이전 분석에서 정정된 부분"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:확인된-불일치-목록}확인된 불일치 목록"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:라인-대조에서-확인된-문서-오차}라인 대조에서 확인된 문서 오차"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계-미집계-수정-n8}1단계 — 미집계 수정 \\(N8)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계-논리-지표를-기본-노출-d6-b}2단계 — 논리 지표를 기본 노출 \\(D6-b)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계-snapshot-정의-정합-d6-c}3단계 — snapshot 정의 정합 \\(D6-c)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계-new_page-hit-처리-d6-d}4단계 — NEW_PAGE hit 처리 \\(D6-d)"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:기존-컬럼-호환성}기존 컬럼 호환성"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:num_data_page_flushed-의-목표-정의}{{Num_data_page_flushed}} 의 목표 정의"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:new_page-의-hit-집계-유지-여부}NEW_PAGE 의 hit 집계 유지 여부"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "# [PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### flush 경로의 카운터 위치"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 이전 분석에서 정정된 부분"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 확인된 불일치 목록"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 라인 대조에서 확인된 문서 오차"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 1단계 — 미집계 수정 (N8)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 2단계 — 논리 지표를 기본 노출 (D6-b)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 3단계 — snapshot 정의 정합 (D6-c)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 4단계 — NEW_PAGE hit 처리 (D6-d)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### 기존 컬럼 호환성"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### `Num_data_page_flushed` 의 목표 정의"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "### NEW_PAGE 의 hit 집계 유지 여부"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27266-statistics-semantics_f6cac31_codex.md"
+  },
+  "CBRD-27267": {
+    "live_summary": "[PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-big-private-victim-queue의-생산-경로를-복구하거나-제거한다}\\[PGBUF\\] big private victim queue의 생산 경로를 복구하거나 제거한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:생산소비-지점-현황-e6ed61e87-실측}생산·소비 지점 현황 \\(e6ed61e87 실측)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:소비-경로와-막히는-지점}소비 경로와 막히는 지점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:이전-분석-주장의-재검증-결과}이전 분석 주장의 재검증 결과"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:후보안-비교}후보안 비교"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:a안을-택할-경우의-변경-지점}\\(a)안을 택할 경우의 변경 지점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:검증-방법}검증 방법"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:함께-수정할-출력-인자-초기화-누락}함께 수정할 출력 인자 초기화 누락"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:목표-동작-선택}목표 동작 선택"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:big-조건-판정-위치}big 조건 판정 위치"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:big-큐-편중-가능성}big 큐 편중 가능성"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "# [PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 생산·소비 지점 현황 (e6ed61e87 실측)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 소비 경로와 막히는 지점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 이전 분석 주장의 재검증 결과"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 후보안 비교"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### (a)안을 택할 경우의 변경 지점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 검증 방법"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 함께 수정할 출력 인자 초기화 누락"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### 목표 동작 선택"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### big 조건 판정 위치"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "### big 큐 편중 가능성"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+  },
+  "CBRD-27268": {
+    "live_summary": "[PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-double_write_buffer_size에-크기-단위-문법을-지원한다}\\[PGBUF\\] double_write_buffer_size에 크기 단위 문법을 지원한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:재현-절차}재현 절차"
+      },
+      {
+        "origin": "live description",
+        "text": "# 1. conf 에 크기 단위 표기로 값을 지정"
+      },
+      {
+        "origin": "live description",
+        "text": "# 2. 서버 기동 시도"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:값이-거부되는-경로}값이 거부되는 경로"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:크기-파라미터-문법-현황}크기 파라미터 문법 현황"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:입력-문법}입력 문법"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:값-처리-규칙-변경-없음-명시만}값 처리 규칙 \\(변경 없음, 명시만)"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:출력-표시-변경}출력 표시 변경"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:변경-지점}변경 지점"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:후보안-비교}후보안 비교"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:검증}검증"
+      },
+      {
+        "origin": "live description",
+        "text": "# 단위 문법 수용"
+      },
+      {
+        "origin": "live description",
+        "text": "# 하한 미달 반올림 (512K 로 올라가야 한다)"
+      },
+      {
+        "origin": "live description",
+        "text": "# conf 값을 300K 로 바꾼 뒤 재기동하고 paramdump 로 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "# 상한 초과 거부 (기동 실패 + BAD_RANGE)"
+      },
+      {
+        "origin": "live description",
+        "text": "# conf 값을 64M 로 바꾼 뒤 재기동 시도"
+      },
+      {
+        "origin": "live description",
+        "text": "# 비활성 값 유지"
+      },
+      {
+        "origin": "live description",
+        "text": "# conf 값을 0 으로 바꾼 뒤 재기동하고 DWB 파일이 생성되지 않음을 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "# 기존 정수 표기 하위 호환"
+      },
+      {
+        "origin": "live description",
+        "text": "# conf 값을 2097152 로 바꾼 뒤 재기동하고 2M 지정과 동일하게 동작함을 확인"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# [PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 재현 절차"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 1. conf 에 크기 단위 표기로 값을 지정"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 2. 서버 기동 시도"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 값이 거부되는 경로"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 크기 파라미터 문법 현황"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 입력 문법"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 값 처리 규칙 (변경 없음, 명시만)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 출력 표시 변경"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 변경 지점"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 후보안 비교"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "### 검증"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 단위 문법 수용"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 하한 미달 반올림 (512K 로 올라가야 한다)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# conf 값을 300K 로 바꾼 뒤 재기동하고 paramdump 로 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 상한 초과 거부 (기동 실패 + BAD_RANGE)"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# conf 값을 64M 로 바꾼 뒤 재기동 시도"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 비활성 값 유지"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# conf 값을 0 으로 바꾼 뒤 재기동하고 DWB 파일이 생성되지 않음을 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# 기존 정수 표기 하위 호환"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "# conf 값을 2097152 로 바꾼 뒤 재기동하고 2M 지정과 동일하게 동작함을 확인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27268-dwb-size-unit-syntax_f6cac31_codex.md"
+  },
+  "CBRD-27269": {
+    "live_summary": "[PGBUF] 죽은 코드와 낡은 주석을 정리한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-죽은-코드와-낡은-주석을-정리한다}\\[PGBUF\\] 죽은 코드와 낡은 주석을 정리한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:정리-항목}정리 항목"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:항목-2---victim-탐색-주석과-실제-루프}항목 2 - victim 탐색 주석과 실제 루프"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:항목-8---pgbuf_peek_stats-인자명-대조}항목 8 - {{pgbuf_peek_stats}} 인자명 대조"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:항목-9---정의가-없는-pgbuf_fix_without_validation}항목 9 - 정의가 없는 {{pgbuf_fix_without_validation}}"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:커밋-분리와-병합-순서}커밋 분리와 병합 순서"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "# [PGBUF] 죽은 코드와 낡은 주석을 정리한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### 정리 항목"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### 항목 2 - victim 탐색 주석과 실제 루프"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### 항목 8 - `pgbuf_peek_stats` 인자명 대조"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### 항목 9 - 정의가 없는 `pgbuf_fix_without_validation`"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "### 커밋 분리와 병합 순서"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27269-dead-code-comments_f6cac31_codex.md"
+  },
+  "CBRD-27270": {
+    "live_summary": "[PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-survey-복구-중-temp-볼륨-판정의-영향을-조사한다}\\[PGBUF\\] \\[Survey\\] 복구 중 temp 볼륨 판정의 영향을 조사한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:볼륨-축이-temp-로-보는-볼륨은-두-종류다}볼륨 축이 temp 로 보는 볼륨은 두 종류다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:판정이-false-로-고정되는-구간}판정이 false 로 고정되는 구간"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:가드가-있는-이유로-보이는-것}가드가 있는 이유로 보이는 것"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:이미-확인한-완화-요인}이미 확인한 완화 요인"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:구간-안에서-temp-볼륨-page-접근이-실제로-발생하는가}1. 구간 안에서 temp 볼륨 page 접근이 실제로 발생하는가"
+      },
+      {
+        "origin": "live description",
+        "text": "# 영구 voltype + temp 용도 볼륨이 있는 데이터베이스를 만든다"
+      },
+      {
+        "origin": "live description",
+        "text": "# temp 볼륨을 쓰는 정렬 부하를 걸고, 그 도중에 서버를 강제 종료해 crash recovery 를 만든다"
+      },
+      {
+        "origin": "live description",
+        "text": "# 재기동해 복구를 태운 뒤 계측 로그를 확인한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:접근이-존재한다면-non-temp-취급이-안전-측인가-위험-측인가}2. 접근이 존재한다면 non-temp 취급이 안전 측인가 위험 측인가"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:현재-동작을-유지한다면-근거를-어디에-남기는가}3. 현재 동작을 유지한다면 근거를 어디에 남기는가"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:판정-로직을-바꾸는-쪽이-나은가}판정 로직을 바꾸는 쪽이 나은가"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:호출-빈도-문제를-여기서-다룰지}호출 빈도 문제를 여기서 다룰지"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:참고-코드}참고 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "# [PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 볼륨 축이 temp 로 보는 볼륨은 두 종류다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 판정이 false 로 고정되는 구간"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 가드가 있는 이유로 보이는 것"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 이미 확인한 완화 요인"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 1. 구간 안에서 temp 볼륨 page 접근이 실제로 발생하는가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "# 영구 voltype + temp 용도 볼륨이 있는 데이터베이스를 만든다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "# temp 볼륨을 쓰는 정렬 부하를 걸고, 그 도중에 서버를 강제 종료해 crash recovery 를 만든다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "# 재기동해 복구를 태운 뒤 계측 로그를 확인한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 2. 접근이 존재한다면 non-temp 취급이 안전 측인가 위험 측인가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 3. 현재 동작을 유지한다면 근거를 어디에 남기는가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 판정 로직을 바꾸는 쪽이 나은가"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "### 호출 빈도 문제를 여기서 다룰지"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+        "text": "## 참고 코드"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27270-recovery-temp-volume-survey_f6cac31_codex.md"
+  },
+  "CBRD-27316": {
+    "live_summary": "(작성중) [PGBUF] parallel fix + private LRU survey (victimize pattern) ",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27316-parallel-fix-private-lru-survey_f6cac31_codex.md"
+  },
+  "CBRD-27356": {
+    "live_summary": "[PGBUF] transaction lock timeout과 page latch 정책 분리 Issue Triage",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-transaction-lock-timeout과-page-latch-정책-분리}\\[PGBUF\\] transaction lock timeout과 page latch 정책 분리"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "# {{LK_ZERO_WAIT}} 와 {{LK_FORCE_ZERO_WAIT}} 가 unconditional latch 요청을 conditional로 바꾼다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 같은 300초가 지나도 inactive transaction은 대기를 다시 시작하고, active positive-policy transaction은 복구 가능한 {{ER_LK_PAGE_TIMEOUT}} 을 받는다. active infinite-policy 경로는 {{ER_PAGE_LATCH_TIMEDOUT}} 을 설정하고 debug assert를 거쳐 unilateral abort로 분류된다. 즉 현재 코드는 하나의 명확한 치명적 정지 감시가 아니라 서로 다른 제어 흐름을 한 값에 묶고 있다."
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:비교-dbms의-정책-경계}비교 DBMS의 정책 경계"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:목표-interface-경계}목표 interface 경계"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계별-전환}단계별 전환"
+      },
+      {
+        "origin": "live description",
+        "text": "# {{pgbuf_fix_internal()}}, {{pgbuf_timed_sleep()}}, {{pgbuf_ordered_fix()}} 가 {{wait_msecs}} 를 참조하는 지점과 {{xlogtb_reset_wait_msecs(LK_FORCE_ZERO_WAIT)}} 호출부를 전수 조사한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# {{PGBUF_LATCH_CONDITION}} 을 대기 진입의 단일 기준으로 만들고, blocking과 nonblocking 결과를 명확히 구분한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# best-space, B-tree/heap 및 disk metadata 호출부를 wait, try, ordered retry 중 하나로 분류해 이전한다. volume header와 sector table을 함께 잡는 경로는 latch order와 연쇄 대기(convoy)를 별도 검증한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# {{page_latch_timeout_in_msecs}} 가 담당하던 역할을 warning/telemetry, fatal dead-latch watchdog, BCB victim progress watchdog, positive-policy recoverable compatibility cutoff로 나눈다. 기존 동작을 보존하기 위해 fatal watchdog, BCB progress watchdog, positive-policy compatibility cutoff는 처음에 각각 300초를 유지한다. warning threshold는 제어 흐름을 바꾸지 않으며 계측값으로 별도 결정한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 운영과 stress workload에서 대기 분포를 수집하고 latch-order 검증을 마친 뒤 positive-policy 호환 cutoff를 이 이슈에서 제거한다. fatal threshold와 BCB progress threshold의 후속 조정은 각각의 장애 감지·재시작 정책과 buffer 확보 분포를 근거로 결정하며, 300초를 고유하게 옳은 값으로 간주하지 않는다."
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:검증-범위}검증 범위"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:open-questions}Open Questions"
+      },
+      {
+        "origin": "live description",
+        "text": "# 명시적인 page-latch API를 기존 {{PGBUF_LATCH_CONDITION}} 확장으로 구현할지, wait/try/ordered-retry 함수를 분리할지: {{TBD - ANALYSIS 단계에서 결정}}."
+      },
+      {
+        "origin": "live description",
+        "text": "# active transaction의 기존 300초 recoverable cutoff를 어느 release까지 호환 동작으로 유지할지: {{TBD - 합의 미확인}}."
+      },
+      {
+        "origin": "live description",
+        "text": "# warning threshold의 초기값과 300초로 분리한 fatal/BCB threshold의 후속 조정값을 얼마로 정할지: production-like workload의 wait histogram과 운영 장애 감지 정책을 기준으로 결정한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# volume header를 잡은 채 sector table을 기다리는 경로가 허용 가능한 ordering인지, release/retry로 바꿔야 하는지: latch-order audit 후 결정한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# watchdog 설정을 공개 system parameter로 제공할지 내부 진단값으로 유지할지: {{TBD - 합의 미확인}}."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:remarks}Remarks"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "# [PGBUF] transaction lock timeout과 page latch 정책 분리"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "### 비교 DBMS의 정책 경계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "### 목표 interface 경계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "### 단계별 전환"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "### 검증 범위"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Open Questions"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27356-page-latch-timeout-policy_f6cac31_codex.md"
+  },
+  "CBRD-27370": {
+    "live_summary": "[PGBUF] [Regression] Ordinary nested READ-to-WRITE fix resets BCB fix count and desynchronizes holder debt",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-중첩-read-to-write-fix가-bcb-fix-count를-초기화하는-회귀}\\[PGBUF\\] 중첩 READ-to-WRITE fix가 BCB fix count를 초기화하는 회귀"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:summary}Summary"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:관련-코드}관련 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:수정-정책-검토}수정 정책 검토"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "# [PGBUF] 중첩 READ-to-WRITE fix가 BCB fix count를 초기화하는 회귀"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "### Summary"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "### 관련 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "text": "### 수정 정책 검토"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27370-nested-read-write-accounting_f6cac31_codex.md"
+  },
+  "CBRD-27398": {
+    "live_summary": "[PGBUF] overlay",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "# [PGBUF] 선택적으로 활성화하는 페이지 버퍼 상태 관찰 인터페이스"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 변경 범위와 기준"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 활성화와 지원 범위"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 접속과 식별"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 상태 레코드와 완전성"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 생산자 제한"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### Volmap 연동 경계"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 엔진과 소비자의 책임"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "### 브랜치와 인계 순서"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27398-pgbuf-overlay_cd593bc_codex.md",
+        "text": "## Remarks"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27398-page-buffer-overlay_f6cac31_codex.md"
+  },
+  "CBRD-27423": {
+    "live_summary": "[PGBUF] [Survey] page buffer 성능 분석 프레임워크 ",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-리팩토링-전후-성능을-비교하는-페이지-버퍼-분석-프레임워크}\\[PGBUF\\] 리팩토링 전후 성능을 비교하는 페이지 버퍼 분석 프레임워크"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:specification-changes}Specification Changes"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:비교-결과의-의미}비교 결과의 의미"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:범위-구분}범위 구분"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:implementation}Implementation"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:실제-구현을-사용하는-실행기}1. 실제 구현을 사용하는 실행기"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:부하-시나리오}2. 부하 시나리오"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:기준판과-변경판의-비교-조건}3. 기준판과 변경판의 비교 조건"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:수집-지표와-비용-귀속}4. 수집 지표와 비용 귀속"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:결과-보관과-회귀-판단}5. 결과 보관과 회귀 판단"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:기록재생-방식의-조사}6. 기록·재생 방식의 조사"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:단계별-결과물}7. 단계별 결과물"
+      },
+      {
+        "origin": "live description",
+        "text": "# 시나리오·지표·실행 조건·비교 가능성 기준과 최소 엔진 구동 방식을 확정한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 대표 직접 부하로 기준판·변경판 실행 및 비교 보고서 생성을 구현하고 A/A 및 통제된 악화 검증을 수행한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# holder, 경합, 교체, dirty/flush와 혼합 세션으로 범위를 확장하고 대표 SQL 부하로 회귀를 확인한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 실행 시간과 안정성을 확인한 뒤 일일 CI 및 기록·재생의 도입 여부를 결정한다."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:acceptance-criteria}Acceptance Criteria"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:definition-of-done}Definition of done"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:references}References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "# [PGBUF] 리팩토링 전후 성능을 비교하는 페이지 버퍼 분석 프레임워크"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Specification Changes"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 비교 결과의 의미"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 범위 구분"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Implementation"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 1. 실제 구현을 사용하는 실행기"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 2. 부하 시나리오"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 3. 기준판과 변경판의 비교 조건"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 4. 수집 지표와 비용 귀속"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 5. 결과 보관과 회귀 판단"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 6. 기록·재생 방식의 조사"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "### 7. 단계별 결과물"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Acceptance Criteria"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## Definition of done"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27423-page-buffer-performance-framework_c63a3b9_codex.md",
+        "text": "## References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27423-performance-analysis-framework_f6cac31_codex.md"
+  },
+  "CBRD-27630": {
+    "live_summary": "[PGBUF] pgbuf_simple_fix 실패 후 중복 정리가 다른 스레드의 로딩 기록을 삭제할 수 있다",
+    "summary_handling": "Preserved as live metadata; new report heading is part of the description only.",
+    "outline_units": [
+      {
+        "origin": "live description",
+        "text": "h1. {anchor:pgbuf-pgbuf_simple_fix-실패-후-중복-정리가-다른-스레드의-로딩-기록을-삭제할-수-있다}\\[PGBUF\\] pgbuf_simple_fix 실패 후 중복 정리가 다른 스레드의 로딩 기록을 삭제할 수 있다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:issue-triage}Issue Triage"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:ai-generated-context}AI-Generated Context"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:description}Description"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:중복-정리가-실행되는-코드}중복 정리가 실행되는 코드"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:등록은-스레드별-슬롯을-사용하지만-삭제는-vpid만-확인한다}등록은 스레드별 슬롯을 사용하지만 삭제는 VPID만 확인한다"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:test-build}Test Build"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:repro}Repro"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:확인한-교차-실행-순서}확인한 교차 실행 순서"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:lean-모델-검증-명령}Lean 모델 검증 명령"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:실제-c-재현-상태와-후속-검증}실제 C\\+\\+ 재현 상태와 후속 검증"
+      },
+      {
+        "origin": "live description",
+        "text": "# A가 로딩 기록을 소유한 상태에서 버퍼 할당 또는 파일 읽기 실패를 발생시킨다. 첫 번째 정리가 끝난 뒤 호출자의 두 번째 정리 직전에 A를 대기시킨다."
+      },
+      {
+        "origin": "live description",
+        "text": "# B가 같은 VPID의 기록을 등록하도록 하고, 해시 공개 전까지 B를 대기시킨다."
+      },
+      {
+        "origin": "live description",
+        "text": "# A의 두 번째 정리를 실행한 뒤 B의 기록이 그대로 연결되어 있는지 확인한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# C의 동일 VPID 요청이 새 로더가 되지 않고 기존 로더를 기다리는지 확인한다."
+      },
+      {
+        "origin": "live description",
+        "text": "# 실제로 도달 가능한 복호화 실패 경로와 정상 성공 경로도 함께 검증한다."
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:expected-result}Expected Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:actual-result}Actual Result"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:additional-information}Additional Information"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:수정-후보와-검증-범위}수정 후보와 검증 범위"
+      },
+      {
+        "origin": "live description",
+        "text": "h3. {anchor:관련-이슈와-검증-자료}관련 이슈와 검증 자료"
+      },
+      {
+        "origin": "live description",
+        "text": "h2. {anchor:code-references}Code References"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "# [PGBUF] pgbuf_simple_fix 실패 후 중복 정리가 다른 스레드의 로딩 기록을 삭제할 수 있다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Issue Triage"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## AI-Generated Context"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Description"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 중복 정리가 실행되는 코드"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 등록은 스레드별 슬롯을 사용하지만 삭제는 VPID만 확인한다"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Test Build"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Repro"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 확인한 교차 실행 순서"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### Lean 모델 검증 명령"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 실제 C++ 재현 상태와 후속 검증"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Expected Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Actual Result"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Additional Information"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 수정 후보와 검증 범위"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "### 관련 이슈와 검증 자료"
+      },
+      {
+        "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "text": "## Code References"
+      }
+    ],
+    "outline_handling": "Organizational headings are replaced by the current skill structure. Any technical assertions in old headings are evaluated with their associated paragraph/table/code claim groups; see the per-issue audit and report. No old heading is independent authority.",
+    "report_path": "issues/CBRD-27630-simple-fix-loading-cleanup_f6cac31_codex.md"
+  }
+}

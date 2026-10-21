@@ -1,0 +1,1326 @@
+{
+  "issue": "CBRD-27263",
+  "reviewer": "/root",
+  "report_sha256": "bbf387e637b5280af330bde2d44766cf986e2d914499b3e47ea1af66167d70b6",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27263-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: `OLD_PAGE_PREVENT_DEALLOC` fix 한 건이 dealloc 보호 카운터에 남기는 순증감을 어느 경로로 들어오든 항상 0 으로 만든다.",
+      "sha256": "3e2c67db5b71dc884df82adc27b843e505951f5d5caf8d7f9312db895cbbc453",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27263-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27263-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |\n|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | `pgbuf_fix` 의 lock-free 빠른 경로가 dealloc 보호 카운터 등록(`page_buffer.c:2425-2428`)을 건너뛴 채 해제(`:2513-2517`)만 실행한다. 같은 성질의 짝 깨짐이 오류 경로 2 곳에 더 있어, 진입 상황 5 가지 중 3 가지에서 순증감이 0 이 아니다. 계측 빌드 실측으로 확인됐다 --- 등록 없는 해제 40 회, 살아 있는 보호 감소 7 회, 종료 후 net -1 page 잔존 (상세는 Actual Result).                                                                                                                                                                                                                                         |\n| **TO-BE (목표 상태 / 기대 동작)** | `OLD_PAGE_PREVENT_DEALLOC` 요청 한 건이 성공하든 실패하든, 어느 경로로 들어오든 `count_fix_and_avoid_dealloc` 하위 16 비트에 남기는 순증감이 0 이다.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |\n| **영향**                          | 고객 장애 가능성 --- 보호가 지워지면 vacuum 이 보호 중인 empty heap page 를 회수하고(`vacuum.c:1850`, `heap_file.c:3383`), 그 page 를 다시 fix 하던 스레드가 `pgbuf_ordered_fix` 의 `page was deallocated an we told it not to!` 경로(`:12816-12819`, debug 빌드는 `assert (false)`)로 떨어진다. 반대로 증가가 남으면 그 page 는 vacuum 회수 대상에서 영구히 빠진다. 결함 유입 커밋은 정식 유지보수 릴리스(v11.4.5, 2026-04-24)와 `release/11.4_hotfix` 에는 미포함이고 develop 빌드 태그 `v11.4.5.1898` 에만 들어 있다 --- 해당 빌드의 외부 배포 여부만 확인되면, 다음 릴리스 전 수정으로 고객 노출 없이 끝난다. |",
+      "sha256": "032792fe5dda7ce9615bdf7ac778a69343e511582fb33c0bc97344ce0147f776",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27263-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: `TBD - 합의 미확인`. 후보 비교와 권장안은 아래 Additional Information 의 수정 방향 후보 표에 정리했다. 어느 쪽을 골라도 판정 기준은 위 TO-BE 한 줄이며, 회계 표의 5 가지 진입 상황이 모두 0 이 되어야 한다.",
+      "sha256": "8c34f23858d1a7743f950ffd052a8c2412f0fe81425c329c4d522280f4a6506e",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27263-C005",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c` 의 `pgbuf_fix` (`:2207-2636`), `pgbuf_lockfree_fix_ro` (`:7671-7734`), `pgbuf_ordered_fix` (`:12206-13001`) 세 함수. 디스크 형식, 설정, 공개 함수 시그니처, 호출부는 그대로다 --- `OLD_PAGE_PREVENT_DEALLOC` 사용처 10 곳은 전부 `pgbuf_ordered_fix` 를 거치므로 fix 계약 자체는 변하지 않는다.",
+      "sha256": "924974f88692d7555a56538ae11ac18ca056f3b9cca541817370cdbefabf3d10",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27263-C006",
+      "origin": "live-description",
+      "text": "-   **결함 출처**: lock-free 빠른 경로는 커밋 `58cef8e01` (CBRD-26425, PR #6704, 2026-01-14 병합) 이 도입했다. 목적은 CBRD-26242 (같은 page 동시 READ 시 `PGBUF_BCB_LOCK` mutex 병목, 64 core 4 배 개선 목표) 해소다. 도입 diff 는 `register/unregister_avoid_deallocation` 을 한 줄도 건드리지 않았다 --- 등록 누락은 설계 판단이 아니라 실수다. 같은 `goto` 가 건너뛰는 다른 회계 두 건은 아래 Remarks 에. 같은 커밋의 회귀로는 CBRD-27084 (waiter_exists 미해제 무한 spin) 가 이미 있었다.",
+      "sha256": "18b5ac4e2f248e4f90e1d16ae36b8fd8ad2a99f62f254625e7ca46da09133212",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27263-C007",
+      "origin": "live-description",
+      "text": "-   **관련 필드**: `count_fix_and_avoid_dealloc` (`:535-540`) 은 상위 16 비트가 hot page 판정용 fix 횟수, 하위 16 비트가 dealloc 보호 수인 2 용도 필드이고(`:267-269`), 이 이슈는 하위 16 비트만 다룬다. latch 상태를 담는 64 비트 CAS 워드 `atomic_latch` (`:501-510`) 와는 별개 필드다. 이 이슈는 부모 EPIC CBRD-27193 의 결함 N1 을 소유한다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "bb1deb45070cd21a4d5bc744e7f1b14c2eec16133a02a82f26975509d63ed1e7",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27263-C008",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 에는 \\\"이 page 를 지금 쓰고 있으니 해제하지 말라\\\" 는 표시가 있다. fetch mode `OLD_PAGE_PREVENT_DEALLOC` 로 fix 하면 BCB (Buffer Control Block --- frame 에 올라온 page 의 fix 수, latch 상태, dirty 여부를 보관하는 제어 블록) 의 `count_fix_and_avoid_dealloc` 하위 16 비트가 1 늘고, latch (page 단위 짧은 읽기/쓰기 잠금) 를 얻은 뒤 다시 1 줄어든다.",
+      "sha256": "870a1ded2174ef3ba275edf118075c2fdfc91032ee185a33cf57dddb9281a388",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27263-C009",
+      "origin": "live-description",
+      "text": "소비자는 vacuum (MVCC 에서 더 이상 보이지 않는 레코드 버전을 정리하는 백그라운드 작업) 쪽 두 곳이다. 이하 `vacuum.c` 는 `src/query/vacuum.c`, `heap_file.c` 는 `src/storage/heap_file.c` 다.",
+      "sha256": "ba1864adc2edc3ae1b8e0d452b81f5622cb059b09c5099e6854c23d2a72ffce6",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27263-C010",
+      "origin": "live-description",
+      "text": "vacuum_heap_page ()                                       vacuum.c:1581\n      └ 레코드가 1 개 이하로 남은 heap page 를 회수 후보로 본다\n           ├ pgbuf_has_prevent_dealloc (home_page) == false    vacuum.c:1850\n           └ heap_remove_page_on_vacuum ()\n                ├ 필요한 latch 를 모두 잡은 뒤 재확인            heap_file.c:3383\n                └ 두 확인이 모두 false 면 heap 파일에서 page 를 떼어낸다\n    ★ 보호 카운트가 0 으로 보이면 vacuum 은 회수해도 된다고 판단한다",
+      "sha256": "178565d5fcfdd617691b4ec7b356b036a1986625e1a1aeec5073ccd42ec6d9c5",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27263-C011",
+      "origin": "live-description",
+      "text": "이 마커가 지키는 구간은 두 개다. 첫째, `pgbuf_fix` 가 latch 를 얻기 전 대기하는 구간 --- 스캐너가 등록(\\\\+1) 후 latch 대기에 들어가 있으면 vacuum 의 재확인(`heap_file.c:3383`)이 이 값을 보고 \\\"somebody was doing a heap scan\\\" 으로 판단해 정상적으로 물러난다. 마커 없이 대기자만 있으면 `heap_file.c:3395` 의 `pgbuf_has_any_waiters` → `assert (false)` (\\\"Unexpected page waiters\\\") 로 넘어간다 --- vacuum 은 마커가 대기자보다 먼저 보인다는 가정 위에 서 있다. 둘째, `pgbuf_ordered_fix` (heap page 여러 장을 데드락 없이 잡도록 전역 순서에 따라 latch 를 재배열하는 fix 변형) 가 보유 page 를 전부 놓고 재정렬하는 구간이다.",
+      "sha256": "c72815dc6e477be5638f0a28884ed52dc1e2c8ab9ab986682f9adf98d14367af",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27263-C012",
+      "origin": "live-description",
+      "text": "마커는 소유자 기준으로도 두 종류다. 요청 page 용 등록(`:2427`, fetch mode 에 의존, 이하 요청 page 마커)과 보유 page 용 등록(`:12639`, fetch mode 와 무관하게 무조건, `:12883`/`:12994` 에서 해제)이며, **깨진 것은 요청 page 마커의 회계뿐이고 보유 page 쪽은 건전하다.**",
+      "sha256": "70b02f423524bba77a89b70b301307a90748af480b69f3ccf30c868e1cfc0695",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27263-C013",
+      "origin": "live-description",
+      "text": "이 fetch mode 를 외부에서 `pgbuf_fix` 로 직접 넘기는 호출부는 트리 전체에 하나도 없다. 전부 `pgbuf_ordered_fix` 로 들어온다. 그런데 그 안에서 요청 page 의 보호를 걸고 푸는 주체가 상황마다 달라진다.",
+      "sha256": "723dc1efad07c9b43cabcde2329f632e08c07c6c9e5afe9fbffba33b006110c2",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27263-C014",
+      "origin": "live-description",
+      "text": "pgbuf_ordered_fix (req_vpid, OLD_PAGE_PREVENT_DEALLOC, ...)          :12206\n      │\n      ├ latch 조건 결정: 보유 page 가 없거나 요청 page 만 보유면 무조건    :12280-12284\n      │\n      ├ 1차 시도: pgbuf_fix (req_vpid, fetch_mode 원본, latch 조건)       :12292-12296\n      │    ├ lock-free 빠른 경로 성공 -> 등록 건너뛰고 해제만 (-1)        :2315-2328 ★\n      │    ├ 일반 경로 성공 -> 등록(:2427) + 해제(:2516) = 0\n      │    └ 조건부 latch 충돌로 실패 -> 등록(:2427) 만 남기고 NULL       :2440-2463\n      │\n      ├ fetch_mode 를 OLD_PAGE 로 재작성, has_dealloc_prevent_flag = true :12392-12396\n      │    (여기부터 내부 pgbuf_fix 는 등록도 해제도 하지 않는다)\n      │\n      ├ 보유 page 들을 보호 등록(:12639) 후 unfix, 순서대로 재 fix\n      │\n      ├ 재 fix 성공 시 요청 page 해제 (-1)                    :12702 또는 :12850\n      └ 재정렬 중 오류로 exit -> 요청 page 해제 없음 (+1 잔존)   :12829 -> :12946 ★",
+      "sha256": "8e292ee6cbddaaf75ced5a578a6162fa4362c7ca667ceee22aa84cc6883a00e5",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C015",
+      "origin": "live-description",
+      "text": "★ 는 짝이 깨지는 지점. exit 정리 루프(:12972-12998)는 :12639 로 등록한\n      \"보유 page\" 분만 되돌리고, has_dealloc_prevent_flag 는 보지 않는다.",
+      "sha256": "ee71f4f54778ed9623968d1bda0488303476c0f442f7570f31cbdddf2f13a49e",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27263-C016",
+      "origin": "live-description",
+      "text": "진입 상황별로 순증감을 세어 보면 5 가지 중 3 가지가 0 이 아니다.",
+      "sha256": "3f1f98958052a82532e8fc6b78b3b59ae40fa1cf53440cc3e3007a1f6321c6c0",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C017",
+      "origin": "live-description",
+      "text": "| 진입 상황                                                                    | `:2427` 등록 | 해제                   | 순증감 | 판정                                      |\n|------------------------------------------------------------------------------|--------------|------------------------|--------|-------------------------------------------|\n| 1차 시도가 lock-free 빠른 경로로 성공                                        | 건너뜀       | `:2516` 실행           | -1     | 결함 --- 남이 걸어 둔 보호를 감소         |\n| 1차 시도가 일반 경로로 성공                                                  | \\\\+1         | `:2516`                | 0      | 정상                                      |\n| 1차 시도가 조건부 latch 충돌로 실패 -\\> 재정렬 후 재 fix 성공                | \\\\+1         | `:12702` 또는 `:12850` | 0      | 정상, 단 두 함수에 걸친 암묵적 분담       |\n| 1차 시도가 `:2427` 도달 전 실패(BCB 확보·read 오류) -\\> 조건부라 재정렬 진행 | 없음         | `:12702` 또는 `:12850` | -1     | 결함 --- 드문 오류 경로                   |\n| 재정렬 도중 오류로 `exit`                                                    | \\\\+1         | 없음                   | \\\\+1   | 결함 --- 오류 exit 한정, 보호가 영구 잔존 |",
+      "sha256": "1930b42bdb91364062d4af90d6d5c15be15de822324ce287ddcf8d9cc98ad297",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C018",
+      "origin": "live-description",
+      "text": "세 번째 행이 이 코드의 유일한 안전판이다. 조건부 latch 실패로 반환할 때 `pgbuf_fix` 가 `:2427` 의 등록을 되돌리지 않고 남겨 두고(`:2440-2463`), `pgbuf_ordered_fix` 가 page 를 놓고 순서를 재정렬하는 동안 그 등록이 보호 역할을 하다가 재 fix 후 `:12702`/`:12850` 에서 풀린다. 의도된 handshake 로 보이지만 두 함수 어디에도 이 계약이 적혀 있지 않고, 그래서 나머지 세 조합이 조용히 깨져 있다.",
+      "sha256": "e03942e57604257e73b2cf085e987aba6cbdf546e35f8ad5442dffa22a69ae1f",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27263-C019",
+      "origin": "live-description",
+      "text": "첫 번째 행은 진입 조건이 겹치기 때문에 생긴다. `pgbuf_fix` 의 lock-free 진입 조건(`:2311-2313`)은 READ latch + `OLD_PAGE`/`OLD_PAGE_PREVENT_DEALLOC`/`OLD_PAGE_MAYBE_DEALLOCATED` + 무조건 latch 인데, `pgbuf_ordered_fix` 의 1차 시도가 원본 fetch mode 를 그대로 넘기므로(`:12292`, `:12295`) 세 조건이 동시에 성립한다. `pgbuf_lockfree_fix_ro` (`:7671-7734`) 전체에 등록 호출이 없고, 성공 시 `goto fast_path` 로 `:2425-2428` 을 건너뛴 뒤 `:2513-2517` 의 해제만 실행한다. 실제로 성립하려면 그 순간 page 가 READ latch 상태이고 fix 수가 1 이상이며 대기자가 없어야 하므로(`:7689-7693`), 같은 page 를 읽는 스레드가 이미 있거나 내가 그 page 를 이미 READ 로 들고 있는 경우다. 후자는 `:12280-12284` 의 \\\"요청 page 만 보유\\\" 조건과 정확히 겹친다.",
+      "sha256": "418aa6627012a9770c26e2b7cefcc70246b28021e9174dda8c398062587c8e39",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27263-C020",
+      "origin": "live-description",
+      "text": "네 번째와 다섯 번째 행은 오류 경로에서만 생긴다. 1차 시도가 `:2427` 에 닿기도 전에 실패했는데(예: `pgbuf_claim_bcb_for_fix` 의 read 오류) 그 오류가 `:12349` 의 `ER_PB_BAD_PAGEID`/`ER_INTERRUPTED` 필터에 걸리지 않으면, 등록이 없는 상태로 `:12392` 를 지나 해제만 실행된다. 반대로 재정렬 중 어느 page 의 재 fix 가 실패해 `:12829` 로 빠지면 요청 page 의 해제 지점에 닿지 못하는데, `exit` 정리 루프는 `ordered_holders_info[i].prevent_dealloc` 만 보고 `has_dealloc_prevent_flag` 는 보지 않으므로 `:2427` 의 \\\\+1 이 그대로 남는다. 그 page 는 이후 vacuum 의 회수 대상에서 영구히 빠진다.",
+      "sha256": "a0a53e44bbbfaa0fe6746abe812be06a92f666955ff72a11c7b2477a1bafcd47",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27263-C021",
+      "origin": "live-description",
+      "text": "카운터가 0 이면 `pgbuf_bcb_unregister_avoid_deallocation` 의 0 방어(조건 `:16226`, else 블록 `:16230-16250`)가 감소를 막고 디버그 로그만 남기므로 값이 음수로 깨지지는 않는다. 그 안의 주석(`:16232-16244`)은 \\\"`pgbuf_ordered_fix` 가 보유 page 를 전부 unfix 하는 동안 그 page 가 victim 이 될 수 있어 카운터 0 을 만날 수 있다\\\" 며 그 경우를 예상된 것으로 적고, 회피 설계가 더 위험하다는 이유로 `we prefer the existing risks` 라고 위험 감수를 선언한다.",
+      "sha256": "43006fb5e822e6cf22dd14bb7274293e525594c26fbd75b5c95bfd2d4e68202c",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27263-C022",
+      "origin": "live-description",
+      "text": "> **요지**: 그 주석이 감수하겠다고 한 것은 \\\"내가 걸어 둔 마커가 사라진 0 케이스\\\" 뿐이다. 이 이슈가 문제로 삼는 것은 카운터가 1 이상인 상태에서 **다른 주체(vacuum 을 막으려고 보호를 걸어 둔 스레드)의 카운트를 감소시키는** 경우이고, 이때는 0 방어가 발동하지 않으므로 주석의 감수 선언 밖이다. 아래 Actual Result 의 실측에서 이 도난이 7 회 관측됐다.",
+      "sha256": "88db841671cd71bb1e007acad47466e0f1c76a3b9f650697e389346cfb2feff3",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27263-C023",
+      "origin": "live-description",
+      "text": "`OLD_PAGE_PREVENT_DEALLOC` 사용처는 10 곳이며 전부 `pgbuf_ordered_fix` 로 수렴한다.",
+      "sha256": "db069348b2dcc13768dd9e51a37c5738f3e5cc471b64162ea41bc71ae3bd3cb1",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27263-C024",
+      "origin": "live-description",
+      "text": "| 호출부                                                 | 경유                                                                                                                                                                      | latch        |\n|--------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|\n| `heap_file.c:7572`, `7726` (`heap_next_internal`)      | `heap_scan_pb_latch_and_fetch` 의 watcher (pgbuf_ordered_fix 가 재배열로 pgptr 가 바뀌어도 호출자가 따라갈 수 있게 쥐여 주는 page 추적 핸들) 분기 (`heap_file.c:957-968`) | READ         |\n| `heap_file.c:9375`, `14366`, `14780`, `18923`, `19022` | 같은 분기                                                                                                                                                                 | READ         |\n| `heap_file.c:17478`                                    | 같은 분기                                                                                                                                                                 | WRITE        |\n| `heap_file.c:8979`, `locator_sr.c:12788`               | `pgbuf_ordered_fix` 직접 호출                                                                                                                                             | READ / WRITE |",
+      "sha256": "93e610f8c506b6c789496dadc4120fe9013e818c4398cd05debb9e925a960df5",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27263-C025",
+      "origin": "live-description",
+      "text": "`heap_next_internal` 은 인덱스를 타지 않는 순차 heap scan 이라 상시 실행된다. 10 곳 모두 page 안의 next/prev 링크(`heap_vpid_next`)로 다음 page 를 찾는 체인 순회 구조라, page 를 잃으면 다음 목적지 포인터도 함께 잃는다 --- 9 곳이 하드 에러로 끝나고 1 곳(`heap_dump`)은 출력이 조용히 잘린다. WRITE latch 호출부는 lock-free 진입 조건을 만족하지 않아 첫 번째 행과 무관하고, 나머지 네 상황에는 그대로 해당한다.",
+      "sha256": "01eeb9de2a3603dded9c28f162de9271ffec65d2f6d8c6a6708d8aeff24d9065",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27263-C026",
+      "origin": "live-description",
+      "text": "`CUBRID develop e6ed61e87 (소스 빌드)`, Linux x86_64 debug 빌드. 아래 Repro 를 이 빌드에서 실행해 Actual Result 의 수치를 실측했다.",
+      "sha256": "b21b4cd01eab50babf5bb2a087a6414d200de7938645c29b20f2cfec3041880d",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27263-C027",
+      "origin": "live-description",
+      "text": "등록·해제 함수 자체에 로그를 넣어 vpid 별 순증감을 세고, `pgbuf_fix` 의 해제 지점에는 lock-free 경로를 거쳤는지 함께 남긴다. 삽입 지점을 앵커 문자열로 찾으므로 들여쓰기 차이에 영향받지 않는다. 진단 전용이라 병합하지 않는다.",
+      "sha256": "a0cfbd15df1f88ec0668833156e148182d7b687c7c5e976f946c6b5be1ae4497",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27263-C028",
+      "origin": "live-description",
+      "text": "``` bash\ncd <cubrid-source-root>\npython3 - <<'PY'\npath = \"src/storage/page_buffer.c\"\nsrc = open(path).read()",
+      "sha256": "83d920fce6527a5aaa4b4aa4874a5929b3146dc5173c1926a024778ee1f0d384",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C029",
+      "origin": "live-description",
+      "text": "def insert_before(anchor, text):\n    assert src.count(anchor) == 1, anchor\n    return src.replace(anchor, text + anchor, 1)",
+      "sha256": "9695717aa8136afb9f919b78f52b4b09df8f94dbfef36c0ba710c921e331176b",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C030",
+      "origin": "live-description",
+      "text": "def insert_after(anchor, text):\n    assert src.count(anchor) == 1, anchor\n    return src.replace(anchor, anchor + text, 1)",
+      "sha256": "43654bd2b79d38388b4c341611ac017b4af8e3de58600905d894fd020c18e806",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C031",
+      "origin": "live-description",
+      "text": "src = insert_before(\"bool retry = false;\", \"bool lockfree_fast_path = false;\\n  \")",
+      "sha256": "26c7ed9f80afadc74bd78151cddadaaa3a24547a222b6a1bcc5e7bbf72ddaa09",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C032",
+      "origin": "live-description",
+      "text": "src = insert_after(\"pgptr = pgbuf_lockfree_fix_ro (thread_p, vpid, fetch_mode);\",\n                   \"\\n      lockfree_fast_path = (pgptr != NULL);\")",
+      "sha256": "dde2ce48235e1b1acc7f615d34ce1eabdc8ae8b52106cf9fff92e96615819510",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C033",
+      "origin": "live-description",
+      "text": "src = insert_before(\"/* latch is obtained, no need for avoidance of dealloc */\",\n                    \"_er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 unreg-fix lockfree=%d vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                    \"                     (int) lockfree_fast_path, VPID_AS_ARGS (&bufptr->vpid),\\n\"\n                    \"                     bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);\\n      \")",
+      "sha256": "e71dc789891a187f058e20f5079bae48f1bd6c02886ca144cfc4f179305e96e6",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C034",
+      "origin": "live-description",
+      "text": "src = insert_before(\"(void) ATOMIC_INC_32 (&bcb->count_fix_and_avoid_dealloc, 1);\",\n                    \"_er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 register vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                    \"                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);\\n  \")",
+      "sha256": "3fc78f018620be32ccb5fe9c92b503452838e44e2363a937462e9b4c9e68155b",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C035",
+      "origin": "live-description",
+      "text": "src = insert_after(\"int count_crt;\",\n                   \"\\n  _er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 unregister vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                   \"                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);\")",
+      "sha256": "b09dd160b6ca4642eef218fb61244c516319fa7ea209a0bb66cd7e0e075fc883",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C036",
+      "origin": "live-description",
+      "text": "open(path, \"w\").write(src)\nprint(\"instrumented\")\nPY\n./build.sh -m debug",
+      "sha256": "0af764541b065c6512c1023dea6cc57e079492ed03bc97d2beb23fe4d8943af6",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C037",
+      "origin": "live-description",
+      "text": "`register` 와 `unregister` 로그는 보유 page 용 등록·해제(`:12639` 계열)까지 함께 잡지만, 그 쌍은 균형이 맞으므로 vpid 별 합계에는 영향을 주지 않는다. `unregister` 의 `avoid` 값은 감소 직전 값이라 0 이면 0 방어에 막힌 호출이고, `unreg-fix lockfree=1` 에 `avoid` 가 1 이상이면 살아 있는 남의 보호를 실제로 깎은 것이다.",
+      "sha256": "0fff5eb0653908becfc8a7bd85d37ce9f53f4fc0e675ecf0cfc11f63ea92d0e0",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27263-C038",
+      "origin": "live-description",
+      "text": "scan 세션이 `heap_next_internal` → `pgbuf_ordered_fix(OLD_PAGE_PREVENT_DEALLOC, READ)` 를 상시 태우고, UPDATE 세션의 WRITE latch 가 조건부 latch 충돌(회계 표 3 행의 등록 잔존 구간)을 만들어 도난 대상(살아 있는 \\\\+1)과 도둑(lock-free 해제)이 같은 page 에서 겹치게 한다.",
+      "sha256": "8a18595bcf0f1479d78a45a96654c8da5d56528dd046b868518eec4b12cadb3c",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27263-C039",
+      "origin": "live-description",
+      "text": "``` bash\ncubrid createdb --db-volume-size=200M --log-volume-size=100M testdb en_US.utf8",
+      "sha256": "81600fb7a77fda71601859a49ec76032fcb76dedac79bf0ba33a6826f5178356",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C040",
+      "origin": "live-description",
+      "text": "cubrid server start testdb",
+      "sha256": "820b4790e21d1559e8989097595e64c5bb94bf175310cd6c46bc167efe2d37e5",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C041",
+      "origin": "live-description",
+      "text": "csql -u dba testdb -c \"CREATE TABLE t (a INT PRIMARY KEY, b VARCHAR(200));\"\ncsql -u dba testdb -c \"\n  INSERT INTO t\n  SELECT ROWNUM, REPEAT('x', 200)\n  FROM db_class a, db_class b, db_class c LIMIT 100000;\"",
+      "sha256": "1a15d12f899950b6aa78aa33ef2077cb51b25940ad1764639012735e4e77120d",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C042",
+      "origin": "live-description",
+      "text": "``` bash\nLOG=$(ls -t $CUBRID/log/server/testdb_*.err | head -1)",
+      "sha256": "50dfdf4aa31e2b0c28350a78cd14da4980562e434dc75281653ff5a39b91b8a9",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C043",
+      "origin": "live-description",
+      "text": "grep -c 'CBRD-27263 unreg-fix lockfree=1' \"$LOG\"                     # 회계 표 1 행 실행 횟수\ngrep -cE 'CBRD-27263 unreg-fix lockfree=1 vpid=[0-9|]+ avoid=[1-9]' \"$LOG\"  # 그중 실제 도난 (감소 직전 관측값 기준)\ngrep -E 'CBRD-27263 unreg-fix lockfree=1 vpid=[0-9|]+ avoid=[1-9]' \"$LOG\" \\\n  | sed -E 's/.*vpid=([0-9|]+).*/\\1/' | sort | uniq -c               # 도난이 발생한 vpid 목록\ngrep -c 'CBRD-27263 unregister .* avoid=0' \"$LOG\"                    # 0 방어에 막힌 해제\n```",
+      "sha256": "a8e31b70d2a25a076ca906dc0474709ead00f81c550b3b23793cc6b4ca5677b1",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C044",
+      "origin": "live-description",
+      "text": "2 단계의 부하 강도는 조절해도 결함 경로 자체는 관측된다 --- updater 를 빼고 테이블을 수천 행으로 줄인 변형에서도 `unreg-fix lockfree=1` 은 수십 회 단위로 쌓인다. updater 는 도난(살아 있는 \\\\+1 과의 겹침)을 보기 위한 장치다.",
+      "sha256": "5f47a408cedc5eced0eb5191e944dd6fb972754aef601d9fd54c59e457605ac6",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27263-C045",
+      "origin": "live-description",
+      "text": "``` bash\ncsql -u dba testdb -c \"\n  CREATE TABLE u (a INT PRIMARY KEY, b VARCHAR(200));\n  INSERT INTO u SELECT ROWNUM, REPEAT('y', 200) FROM db_class a, db_class b, db_class c LIMIT 100000;\"",
+      "sha256": "f243c870aae2cbab2ef9f03eb21c06e6a6423eab0c8d79eaa130dd1de5358905",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27263-C046",
+      "origin": "live-description",
+      "text": "grep -n 'we told it not to\\|Candidate heap page\\|Assertion' $CUBRID/log/server/testdb_*.err\ncubrid server status\n```",
+      "sha256": "cb01a496abba570ee716a71621b5e78b5dbb1a157e85a838f129e1c7305971ab",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27263-C047",
+      "origin": "live-description",
+      "text": "-   3 단계 집계에서 순증감이 0 이 아닌 vpid 가 하나도 나오지 않는다. 회계 표의 5 가지 진입 상황 전부에서 등록과 해제가 짝을 이룬다.",
+      "sha256": "c517c63ab032c1c5ec776f4e5a0ecded67a1f967ba5ee792bd2ac2cc0210e2c1",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27263-C048",
+      "origin": "live-description",
+      "text": "-   `unreg-fix lockfree=1` 이 0 건이거나, 그 경로에서도 회계가 맞아 순증감이 0 이다. 특히 `avoid` 1 이상 상태의 lock-free 해제(도난)가 0 건이다.",
+      "sha256": "cff51bb83b1a4957394a5deff1d9ec1be688641a6b2bda8e982c5a6de307866f",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27263-C049",
+      "origin": "live-description",
+      "text": "-   4 단계에서 `page was deallocated an we told it not to!` 로그와 그에 딸린 debug 빌드 assert 가 발생하지 않는다.",
+      "sha256": "43dd2f31f658cae644be9e857143f808633b37b4e66d207eb23bf33378f69bdc",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27263-C050",
+      "origin": "live-description",
+      "text": "위 Repro 를 e6ed61e87 debug 빌드에서 실행한 실측이다.",
+      "sha256": "5278312a2bfc6717915a208b59b1b492d53cba95b93648dc903890baba212a41",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27263-C051",
+      "origin": "live-description",
+      "text": "| 측정 항목                                       | 값                                                                | 의미                                                                              |\n|-------------------------------------------------|-------------------------------------------------------------------|-----------------------------------------------------------------------------------|\n| `unreg-fix lockfree=1`                          | 40 회                                                             | 회계 표 1 행(등록 없는 해제)이 평범한 부하에서 상시 실행된다                      |\n| 그중 `avoid >= 1` (도난, 감소 직전 관측값 기준) | 7 회 (vpid 0\\|769, 0\\|4673) | 카운트 1 이상 상태의 감소 --- 0 방어 감수 선언 밖의 사건                          |\n| 실행 종료 후 순증감 != 0                        | vpid 0\\|769 net -1                             | 도난당한 피해자의 해제가 0 방어에 막혀(avoid=0 해제 39 회) 회계가 영구히 어긋났다 |",
+      "sha256": "01a4e189a24b1c98584474c3f14b297d4942c22df50c24aa6bd26a148c9d01c0",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27263-C052",
+      "origin": "live-description",
+      "text": "updater 없이 소형 테이블(5,625 행)로 줄인 3 단계 말미의 변형 실행에서도 등록 없는 해제가 23 회 나왔다. 4 단계의 최종 assert 는 \\\"도난 순간 × vacuum 의 empty page 회수 × 체인 재 fix\\\" 3중 경합이라 이번 실행에서는 재현되지 않았으나, 도난이 실측된 이상 발생은 확률의 문제다.",
+      "sha256": "2cf741f2d2153b7cf09743d0d4b87348a01840606cb001c04843c9e2ec0211b0",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27263-C053",
+      "origin": "live-description",
+      "text": "-   카운터가 0 인 채로 해제가 호출되면 0 방어가 매번 `er_log_debug` 를 남기므로, `er_log_debug` 를 켠 환경에서는 heap scan 핫 경로에서 디버그 로그가 반복 출력된다.",
+      "sha256": "abd25def88f04e7ea33ecc7088b41613d478c11cf95465c4f0a1eb783b87eaae",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27263-C054",
+      "origin": "live-description",
+      "text": "| 위치                                            | 내용                                                                                          |\n|-------------------------------------------------|-----------------------------------------------------------------------------------------------|\n| `page_buffer.c:12280-12296`                     | `pgbuf_ordered_fix` 의 latch 조건 결정과 1차 `pgbuf_fix` 시도 (원본 fetch mode 전달)          |\n| `page_buffer.c:12392-12396`                     | `has_dealloc_prevent_flag` 설정과 fetch mode 를 `OLD_PAGE` 로 재작성                          |\n| `page_buffer.c:12699-12704`, `:12847-12852`     | 요청 page 해제 두 지점                                                                        |\n| `page_buffer.c:12946`, `:12972-12998`           | `exit` 정리 --- `:12639` 로 등록한 보유 page 분만 되돌린다                                    |\n| `page_buffer.c:2311-2313`, `:2315-2328`         | lock-free 진입 조건과 `goto fast_path`                                                        |\n| `page_buffer.c:2425-2428`, `:2513-2517`         | `pgbuf_fix` 의 등록/해제 지점                                                                 |\n| `page_buffer.c:2440-2463`                       | 조건부 latch 실패 반환 --- 등록을 되돌리지 않는다                                             |\n| `page_buffer.c:7671-7734`, `:7689-7693`         | `pgbuf_lockfree_fix_ro` 전체와 성립 조건                                                      |\n| `page_buffer.c:16205-16209`, `:16217-16253`     | 등록/해제 구현, `:16226-16250` 이 0 방어, `:16232-16244` 가 위험 감수 주석                    |\n| `page_buffer.c:501-510`, `:535-540`, `:267-269` | `atomic_latch` 워드 구성과 `count_fix_and_avoid_dealloc` 2 용도 필드 정의                     |\n| `page_buffer.c:12639`, `:12883`, `:12994`       | 보유 page 용 대칭 등록/해제 (요청 page 분과 별개)                                             |\n| `page_buffer.c:14670-14683`                     | `pgbuf_has_prevent_dealloc` --- 보호 여부 조회 API                                            |\n| `vacuum.c:1850`, `heap_file.c:3383`             | 보호 카운트를 소비해 empty heap page 회수 여부를 결정하는 두 지점                             |\n| `heap_file.c:3395`                              | `pgbuf_has_any_waiters` → `assert (false)` --- 마커가 대기자보다 먼저 보인다는 vacuum 의 가정 |",
+      "sha256": "0db6a6718300474fe615e5245756b4b318d635859807fb0b1517fccbacd7c88c",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27263-C055",
+      "origin": "live-description",
+      "text": "전제 두 가지: (i) `OLD_PAGE_PREVENT_DEALLOC` 자체는 제거할 수 없다 --- 사용처 10 곳 전부가 체인 순회라 page 소실을 복구할 방법이 없고, 회수 억제라는 성능 무관 정합성 기능이다. (ii) 고칠 대상은 요청 page 마커의 회계뿐이다 (보유 page 마커는 건전).",
+      "sha256": "92e653e50df595eadfd09b6f057f522858b0d9f7eec10b21917a68db7db15891",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27263-C056",
+      "origin": "live-description",
+      "text": "| 순위 | 후보                                                                                                                                                                                                                                                                                                                                                                                          | 권장 이유 / 고려사항                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |\n|------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 1    | **분담 유지 + 깨진 세 조합 보정 (최소 수정)**: lock-free 경로 여부를 지역 플래그로 구분해 `:2513-2517` 해제를 건너뛰고, 행 4 의 `:2427` 미실행 상태를 ordered fix 로 전달하며, 행 5 의 `exit` 에 `has_dealloc_prevent_flag` 정리를 추가한다. `pgbuf_fix` 의 오류 출구를 \\\"조건부 latch 거절일 때만 \\\\+1 을 남긴다\\\" 로 정규화하고, 두 함수에 걸친 handshake 계약을 양쪽에 주석으로 명문화한다 | lock-free CAS 는 fix 와 READ latch 를 원자적으로 동시에 얻으므로(`:7694-7697`) 이 경로에는 마커가 지킬 \\\"latch 전 구간\\\" 자체가 없다 --- 카운터 불간섭이 의미론적으로 정확하다. 현재 1 행이 버그로 매번 실행하는 카운터 CAS 루프가 사라져 빠른 경로가 오늘보다 오히려 빨라진다. 일반 경로 등록이 그대로라 latch 대기 중 vacuum 후퇴 계약(`heap_file.c:3383`)도 보존된다. 대가는 handshake 부채 잔존 --- 계약 주석이 최소 조건이다                                                                                                                             |\n| 2    | **요청 page 마커를** `pgbuf_ordered_fix` **전담으로 (소유권 재배치)**: `pgbuf_fix` 는 이 fetch mode 에서 카운터를 건드리지 않게 하고, ordered fix 가 1차 시도 전에 직접 등록하며 성공·실패·`exit` 모든 출구에서 해제한다                                                                                                                                                                      | 진입 상황 5 가지가 한 함수 안에서 끝나 회계가 눈으로 확인된다. 대신 등록 시점이 문제다: 1차 시도 **전** 등록은 모든 PREVENT_DEALLOC 순회 hop 에 hash 조회 1 회 + 카운터 원자 연산을 얹고(lock-free 히트가 접촉하는 경합 캐시라인이 1 개에서 2 개로 --- CBRD-26242 가 없앤 패턴의 부분 부활) page 미상주 시 등록할 BCB 가 없는 경우의 조건부 회계가 필요하다. 반면 재정렬 진입 시점으로 늦추면 비용은 0 이지만 latch 대기 중 마커가 사라져 `heap_file.c:3383` 후퇴 계약이 깨진다(`:3395` assert). 채택하려면 전자 형태 + CBRD-26242 워크로드 재측정이 조건이다 |\n| 3    | **lock-free 빠른 경로 revert**: `:1123-1128`, `:2311-2330`, `:2498`, `:3140-3144`, `:7671-7776` 삭제 (\\\\\\~137 줄, 전부 `page_buffer.c` 내부)                                                                                                                                                                                                                                                  | 기계적으로 단순하고 위험이 가장 낮다. `atomic_latch` 는 빠른 경로 전유물이 아니라 42 개 함수가 쓰는 BCB latch 워드 자체이므로 유지된다 --- slow path 도 CAS 기반이라 CBRD-26425 개선분의 상당 부분은 남는다. 대신 hot 공유 READ page 의 무 mutex fix 를 잃어 CBRD-26242 병목을 다시 열고, 행 4·5 는 별도 보정이 여전히 필요하다. 수정 리뷰 일정이 촉박할 때의 안전판                                                                                                                                                                                          |\n| \\-   | (기각) `OLD_PAGE_PREVENT_DEALLOC 제거`                                                                                                                                                                                                                                                                                                                                                        | 전제 (i) 위반. 체인 순회 호출자에게 \\\"page 소실 후 재동기화\\\" 어휘 자체가 없다 --- `pgbuf_ordered_fix` 의 보유 page 재 fix 는 `OLD_PAGE` 하드코딩(`:12783`)이라 fetch mode 로도 우회 불가                                                                                                                                                                                                                                                                                                                                                                     |\n| \\-   | (기각) 카운터를 `atomic_latch` CAS 워드에 통합                                                                                                                                                                                                                                                                                                                                                | 이 결함에는 원자성 문제가 없다 --- 카운터 증감은 처음부터 원자적이었고, 실측된 비대칭 40 회는 경합 파손이 아니라 \\\\+1 코드를 실행하지 않은 결과다. 워드를 합쳐도 등록을 건너뛰는 `goto` 는 남는다. 대가는 `fcnt` 32→16 비트 축소와 latch 기계 전면 재검증                                                                                                                                                                                                                                                                                                     |",
+      "sha256": "36cfe38a4f6af24024a90acd434f9fe83892884f4641bf36c6033f64c8eaa59b",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27263-C057",
+      "origin": "live-description",
+      "text": "-   lock-free 경로가 성공하는 순간 READ latch 가 이미 손에 있으므로, 그 fix 건에 대해서는 latch 자체가 vacuum 을 막는다 (vacuum 의 page 제거는 대상 page WRITE latch 선행). 즉 1 행에서 등록을 생략한 것 자체는 무해하고, 해제만 실행하는 것이 결함이다.",
+      "sha256": "ba0364eba89310c9c3f43c35648613afe59ac4b3d036d9a42b0b4761d038f79e",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27263-C058",
+      "origin": "live-description",
+      "text": "-   `pgbuf_ordered_fix` 의 재정렬 경로로 진입하려면 1차 시도가 조건부 latch 로 실패해야 한다(`:12377-12386` 이 무조건 latch 실패를 걸러낸다). 이 경우 `:2427` 의 등록이 남아 `:12702`/`:12850` 의 해제와 짝이 맞으므로, 이 두 해제 지점을 무조건 비대칭으로 보면 안 된다.",
+      "sha256": "cd56941a83bb561f9a347f7ee7a3f4a71c3b191b454ca9ee4108d5e65a8e7151",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27263-C059",
+      "origin": "live-description",
+      "text": "-   보유 page 용 등록(`:12639`)은 `ordered_holders_info[i].prevent_dealloc` 로 추적되며 `:12883`, `:12994` 에서 해제되므로 요청 page 분과 섞이지 않는다.",
+      "sha256": "235e7f73315ef3d0c0e6aa6498765c362e634203478606e2b764bf3ac8398996",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27263-C060",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193 (이 이슈는 결함 N1). 결함 유입: CBRD-26425 (커밋 `58cef8e01`, PR #6704). 성능 배경: CBRD-26242. 같은 커밋의 선행 회귀: CBRD-27084.",
+      "sha256": "ea5330b5533034f7169c3042f3b8ede1d336dc73df2abc20f653d9af9bbeacd0",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27263-C061",
+      "origin": "live-description",
+      "text": "-   같은 `goto fast_path` 가 함께 건너뛰는 나머지 회계 두 건 --- `pgbuf_bcb_register_fix` (`:2395`, hot page 판정 과소 집계) 와 `had_holder` (`:2438`, debug 전용 fixed-at 추적 리셋) --- 은 이 이슈와 근본 원인이 같다. 본 수정 PR 에 포함하거나 EPIC 아래 별도 티켓으로 분리한다.",
+      "sha256": "f3621d9435875423aaf3248e338cb520eef6b8c4c9ce87cf0caab1e5dbd2a8a3",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27263-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: `OLD_PAGE_PREVENT_DEALLOC` fix 한 건이 dealloc 보호 카운터에 남기는 순증감을 어느 경로로 들어오든 항상 0 으로 만든다.",
+      "sha256": "3e2c67db5b71dc884df82adc27b843e505951f5d5caf8d7f9312db895cbbc453",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27263-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27263-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | `pgbuf_fix` 의 lock-free 빠른 경로가 dealloc 보호 카운터 등록(`page_buffer.c:2425-2428`)을 건너뛴 채 해제(`:2513-2517`)만 실행한다. 같은 성질의 짝 깨짐이 오류 경로 2 곳에 더 있어, 진입 상황 5 가지 중 3 가지에서 순증감이 0 이 아니다. 계측 빌드 실측으로 확인됐다 — 등록 없는 해제 40 회, 살아 있는 보호 감소 7 회, 종료 후 net -1 page 잔존 (상세는 Actual Result). |\n| **TO-BE (목표 상태 / 기대 동작)** | `OLD_PAGE_PREVENT_DEALLOC` 요청 한 건이 성공하든 실패하든, 어느 경로로 들어오든 `count_fix_and_avoid_dealloc` 하위 16 비트에 남기는 순증감이 0 이다. |\n| **영향** | 고객 장애 가능성 — 보호가 지워지면 vacuum 이 보호 중인 empty heap page 를 회수하고(`vacuum.c:1850`, `heap_file.c:3383`), 그 page 를 다시 fix 하던 스레드가 `pgbuf_ordered_fix` 의 `page was deallocated an we told it not to!` 경로(`:12816-12819`, debug 빌드는 `assert (false)`)로 떨어진다. 반대로 증가가 남으면 그 page 는 vacuum 회수 대상에서 영구히 빠진다. 결함 유입 커밋은 정식 유지보수 릴리스(v11.4.5, 2026-04-24)와 `release/11.4_hotfix` 에는 미포함이고 develop 빌드 태그 `v11.4.5.1898` 에만 들어 있다 — 해당 빌드의 외부 배포 여부만 확인되면, 다음 릴리스 전 수정으로 고객 노출 없이 끝난다. |",
+      "sha256": "e024aeec7af4a401de42c97de757cda70a860af04b2f2cdcf1b7946c28653972",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27263-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**: `TBD - 합의 미확인`. 후보 비교와 권장안은 아래 Additional Information 의 수정 방향 후보 표에 정리했다. 어느 쪽을 골라도 판정 기준은 위 TO-BE 한 줄이며, 회계 표의 5 가지 진입 상황이 모두 0 이 되어야 한다.",
+      "sha256": "8c34f23858d1a7743f950ffd052a8c2412f0fe81425c329c4d522280f4a6506e",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27263-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c` 의 `pgbuf_fix` (`:2207-2636`), `pgbuf_lockfree_fix_ro` (`:7671-7734`), `pgbuf_ordered_fix` (`:12206-13001`) 세 함수. 디스크 형식, 설정, 공개 함수 시그니처, 호출부는 그대로다 — `OLD_PAGE_PREVENT_DEALLOC` 사용처 10 곳은 전부 `pgbuf_ordered_fix` 를 거치므로 fix 계약 자체는 변하지 않는다.\n- **결함 출처**: lock-free 빠른 경로는 커밋 `58cef8e01` (CBRD-26425, PR #6704, 2026-01-14 병합) 이 도입했다. 목적은 CBRD-26242 (같은 page 동시 READ 시 `PGBUF_BCB_LOCK` mutex 병목, 64 core 4 배 개선 목표) 해소다. 도입 diff 는 `register/unregister_avoid_deallocation` 을 한 줄도 건드리지 않았다 — 등록 누락은 설계 판단이 아니라 실수다. 같은 `goto` 가 건너뛰는 다른 회계 두 건은 아래 Remarks 에. 같은 커밋의 회귀로는 CBRD-27084 (waiter_exists 미해제 무한 spin) 가 이미 있었다.\n- **관련 필드**: `count_fix_and_avoid_dealloc` (`:535-540`) 은 상위 16 비트가 hot page 판정용 fix 횟수, 하위 16 비트가 dealloc 보호 수인 2 용도 필드이고(`:267-269`), 이 이슈는 하위 16 비트만 다룬다. latch 상태를 담는 64 비트 CAS 워드 `atomic_latch` (`:501-510`) 와는 별개 필드다. 이 이슈는 부모 EPIC CBRD-27193 의 결함 N1 을 소유한다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "836dc6f437f931d5b12c1ee95fca12981d709fc18ab86efa59cb392c757bf115",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27263-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 에는 \"이 page 를 지금 쓰고 있으니 해제하지 말라\" 는 표시가 있다. fetch mode `OLD_PAGE_PREVENT_DEALLOC` 로 fix 하면 BCB (Buffer Control Block — frame 에 올라온 page 의 fix 수, latch 상태, dirty 여부를 보관하는 제어 블록) 의 `count_fix_and_avoid_dealloc` 하위 16 비트가 1 늘고, latch (page 단위 짧은 읽기/쓰기 잠금) 를 얻은 뒤 다시 1 줄어든다.",
+      "sha256": "92fd806eb6123c3999ef72061fd2c4cbb95ac9d3b77addbd14ac2d0b78c84a69",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27263-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "소비자는 vacuum (MVCC 에서 더 이상 보이지 않는 레코드 버전을 정리하는 백그라운드 작업) 쪽 두 곳이다. 이하 `vacuum.c` 는 `src/query/vacuum.c`, `heap_file.c` 는 `src/storage/heap_file.c` 다.",
+      "sha256": "ba1864adc2edc3ae1b8e0d452b81f5622cb059b09c5099e6854c23d2a72ffce6",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27263-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "vacuum_heap_page ()                                       vacuum.c:1581\n      └ 레코드가 1 개 이하로 남은 heap page 를 회수 후보로 본다\n           ├ pgbuf_has_prevent_dealloc (home_page) == false    vacuum.c:1850\n           └ heap_remove_page_on_vacuum ()\n                ├ 필요한 latch 를 모두 잡은 뒤 재확인            heap_file.c:3383\n                └ 두 확인이 모두 false 면 heap 파일에서 page 를 떼어낸다\n    ★ 보호 카운트가 0 으로 보이면 vacuum 은 회수해도 된다고 판단한다",
+      "sha256": "178565d5fcfdd617691b4ec7b356b036a1986625e1a1aeec5073ccd42ec6d9c5",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27263-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "이 마커가 지키는 구간은 두 개다. 첫째, `pgbuf_fix` 가 latch 를 얻기 전 대기하는 구간 — 스캐너가 등록(+1) 후 latch 대기에 들어가 있으면 vacuum 의 재확인(`heap_file.c:3383`)이 이 값을 보고 \"somebody was doing a heap scan\" 으로 판단해 정상적으로 물러난다. 마커 없이 대기자만 있으면 `heap_file.c:3395` 의 `pgbuf_has_any_waiters` → `assert (false)` (\"Unexpected page waiters\") 로 넘어간다 — vacuum 은 마커가 대기자보다 먼저 보인다는 가정 위에 서 있다. 둘째, `pgbuf_ordered_fix` (heap page 여러 장을 데드락 없이 잡도록 전역 순서에 따라 latch 를 재배열하는 fix 변형) 가 보유 page 를 전부 놓고 재정렬하는 구간이다.",
+      "sha256": "f35c7c4a8599df2b2f30c419e096f50e73a130cb2ddc25a39b0976c812ff22d7",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27263-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "마커는 소유자 기준으로도 두 종류다. 요청 page 용 등록(`:2427`, fetch mode 에 의존, 이하 요청 page 마커)과 보유 page 용 등록(`:12639`, fetch mode 와 무관하게 무조건, `:12883`/`:12994` 에서 해제)이며, **깨진 것은 요청 page 마커의 회계뿐이고 보유 page 쪽은 건전하다.**",
+      "sha256": "70b02f423524bba77a89b70b301307a90748af480b69f3ccf30c868e1cfc0695",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27263-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "이 fetch mode 를 외부에서 `pgbuf_fix` 로 직접 넘기는 호출부는 트리 전체에 하나도 없다. 전부 `pgbuf_ordered_fix` 로 들어온다. 그런데 그 안에서 요청 page 의 보호를 걸고 푸는 주체가 상황마다 달라진다.",
+      "sha256": "723dc1efad07c9b43cabcde2329f632e08c07c6c9e5afe9fbffba33b006110c2",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27263-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "pgbuf_ordered_fix (req_vpid, OLD_PAGE_PREVENT_DEALLOC, ...)          :12206\n      │\n      ├ latch 조건 결정: 보유 page 가 없거나 요청 page 만 보유면 무조건    :12280-12284\n      │\n      ├ 1차 시도: pgbuf_fix (req_vpid, fetch_mode 원본, latch 조건)       :12292-12296\n      │    ├ lock-free 빠른 경로 성공 -> 등록 건너뛰고 해제만 (-1)        :2315-2328 ★\n      │    ├ 일반 경로 성공 -> 등록(:2427) + 해제(:2516) = 0\n      │    └ 조건부 latch 충돌로 실패 -> 등록(:2427) 만 남기고 NULL       :2440-2463\n      │\n      ├ fetch_mode 를 OLD_PAGE 로 재작성, has_dealloc_prevent_flag = true :12392-12396\n      │    (여기부터 내부 pgbuf_fix 는 등록도 해제도 하지 않는다)\n      │\n      ├ 보유 page 들을 보호 등록(:12639) 후 unfix, 순서대로 재 fix\n      │\n      ├ 재 fix 성공 시 요청 page 해제 (-1)                    :12702 또는 :12850\n      └ 재정렬 중 오류로 exit -> 요청 page 해제 없음 (+1 잔존)   :12829 -> :12946 ★",
+      "sha256": "8e292ee6cbddaaf75ced5a578a6162fa4362c7ca667ceee22aa84cc6883a00e5",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "★ 는 짝이 깨지는 지점. exit 정리 루프(:12972-12998)는 :12639 로 등록한\n      \"보유 page\" 분만 되돌리고, has_dealloc_prevent_flag 는 보지 않는다.",
+      "sha256": "ee71f4f54778ed9623968d1bda0488303476c0f442f7570f31cbdddf2f13a49e",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27263-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "진입 상황별로 순증감을 세어 보면 5 가지 중 3 가지가 0 이 아니다.",
+      "sha256": "3f1f98958052a82532e8fc6b78b3b59ae40fa1cf53440cc3e3007a1f6321c6c0",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 진입 상황 | `:2427` 등록 | 해제 | 순증감 | 판정 |\n|---|---|---|---|---|\n| 1차 시도가 lock-free 빠른 경로로 성공 | 건너뜀 | `:2516` 실행 | -1 | 결함 — 남이 걸어 둔 보호를 감소 |\n| 1차 시도가 일반 경로로 성공 | +1 | `:2516` | 0 | 정상 |\n| 1차 시도가 조건부 latch 충돌로 실패 -> 재정렬 후 재 fix 성공 | +1 | `:12702` 또는 `:12850` | 0 | 정상, 단 두 함수에 걸친 암묵적 분담 |\n| 1차 시도가 `:2427` 도달 전 실패(BCB 확보·read 오류) -> 조건부라 재정렬 진행 | 없음 | `:12702` 또는 `:12850` | -1 | 결함 — 드문 오류 경로 |\n| 재정렬 도중 오류로 `exit` | +1 | 없음 | +1 | 결함 — 오류 exit 한정, 보호가 영구 잔존 |",
+      "sha256": "535577cf48ddfa40d984d1405eee8820bd253c0fbdb32671215927a50f0e49f1",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27263-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "세 번째 행이 이 코드의 유일한 안전판이다. 조건부 latch 실패로 반환할 때 `pgbuf_fix` 가 `:2427` 의 등록을 되돌리지 않고 남겨 두고(`:2440-2463`), `pgbuf_ordered_fix` 가 page 를 놓고 순서를 재정렬하는 동안 그 등록이 보호 역할을 하다가 재 fix 후 `:12702`/`:12850` 에서 풀린다. 의도된 handshake 로 보이지만 두 함수 어디에도 이 계약이 적혀 있지 않고, 그래서 나머지 세 조합이 조용히 깨져 있다.",
+      "sha256": "e03942e57604257e73b2cf085e987aba6cbdf546e35f8ad5442dffa22a69ae1f",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27263-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "첫 번째 행은 진입 조건이 겹치기 때문에 생긴다. `pgbuf_fix` 의 lock-free 진입 조건(`:2311-2313`)은 READ latch + `OLD_PAGE`/`OLD_PAGE_PREVENT_DEALLOC`/`OLD_PAGE_MAYBE_DEALLOCATED` + 무조건 latch 인데, `pgbuf_ordered_fix` 의 1차 시도가 원본 fetch mode 를 그대로 넘기므로(`:12292`, `:12295`) 세 조건이 동시에 성립한다. `pgbuf_lockfree_fix_ro` (`:7671-7734`) 전체에 등록 호출이 없고, 성공 시 `goto fast_path` 로 `:2425-2428` 을 건너뛴 뒤 `:2513-2517` 의 해제만 실행한다. 실제로 성립하려면 그 순간 page 가 READ latch 상태이고 fix 수가 1 이상이며 대기자가 없어야 하므로(`:7689-7693`), 같은 page 를 읽는 스레드가 이미 있거나 내가 그 page 를 이미 READ 로 들고 있는 경우다. 후자는 `:12280-12284` 의 \"요청 page 만 보유\" 조건과 정확히 겹친다.",
+      "sha256": "5e5722c6719c458aa42c3d43960da4d99f2276faa1933a9ebd2195f96f201bde",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27263-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "네 번째와 다섯 번째 행은 오류 경로에서만 생긴다. 1차 시도가 `:2427` 에 닿기도 전에 실패했는데(예: `pgbuf_claim_bcb_for_fix` 의 read 오류) 그 오류가 `:12349` 의 `ER_PB_BAD_PAGEID`/`ER_INTERRUPTED` 필터에 걸리지 않으면, 등록이 없는 상태로 `:12392` 를 지나 해제만 실행된다. 반대로 재정렬 중 어느 page 의 재 fix 가 실패해 `:12829` 로 빠지면 요청 page 의 해제 지점에 닿지 못하는데, `exit` 정리 루프는 `ordered_holders_info[i].prevent_dealloc` 만 보고 `has_dealloc_prevent_flag` 는 보지 않으므로 `:2427` 의 +1 이 그대로 남는다. 그 page 는 이후 vacuum 의 회수 대상에서 영구히 빠진다.",
+      "sha256": "0b8dbbdaee218364e0c10e6f3cf27e24e20a011766fbe77dd26d844866667653",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27263-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "카운터가 0 이면 `pgbuf_bcb_unregister_avoid_deallocation` 의 0 방어(조건 `:16226`, else 블록 `:16230-16250`)가 감소를 막고 디버그 로그만 남기므로 값이 음수로 깨지지는 않는다. 그 안의 주석(`:16232-16244`)은 \"`pgbuf_ordered_fix` 가 보유 page 를 전부 unfix 하는 동안 그 page 가 victim 이 될 수 있어 카운터 0 을 만날 수 있다\" 며 그 경우를 예상된 것으로 적고, 회피 설계가 더 위험하다는 이유로 `we prefer the existing risks` 라고 위험 감수를 선언한다.",
+      "sha256": "7dad227ccf385547957bc20ce93ea53f2ee9262b72378ec3c1fd3ceacf881122",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27263-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "> **요지**: 그 주석이 감수하겠다고 한 것은 \"내가 걸어 둔 마커가 사라진 0 케이스\" 뿐이다. 이 이슈가 문제로 삼는 것은 카운터가 1 이상인 상태에서 **다른 주체(vacuum 을 막으려고 보호를 걸어 둔 스레드)의 카운트를 감소시키는** 경우이고, 이때는 0 방어가 발동하지 않으므로 주석의 감수 선언 밖이다. 아래 Actual Result 의 실측에서 이 도난이 7 회 관측됐다.",
+      "sha256": "fec9d6b28f4bcd79f53c4b02e95c719e794884f9f04c661ea00e23cb27002386",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27263-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "`OLD_PAGE_PREVENT_DEALLOC` 사용처는 10 곳이며 전부 `pgbuf_ordered_fix` 로 수렴한다.",
+      "sha256": "db069348b2dcc13768dd9e51a37c5738f3e5cc471b64162ea41bc71ae3bd3cb1",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27263-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 호출부 | 경유 | latch |\n|---|---|---|\n| `heap_file.c:7572`, `7726` (`heap_next_internal`) | `heap_scan_pb_latch_and_fetch` 의 watcher (pgbuf_ordered_fix 가 재배열로 pgptr 가 바뀌어도 호출자가 따라갈 수 있게 쥐여 주는 page 추적 핸들) 분기 (`heap_file.c:957-968`) | READ |\n| `heap_file.c:9375`, `14366`, `14780`, `18923`, `19022` | 같은 분기 | READ |\n| `heap_file.c:17478` | 같은 분기 | WRITE |\n| `heap_file.c:8979`, `locator_sr.c:12788` | `pgbuf_ordered_fix` 직접 호출 | READ / WRITE |",
+      "sha256": "acbe8f5df1910bad287391786cac0fb557d089275475d3e3f9610ae9bf52b4e4",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27263-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "`heap_next_internal` 은 인덱스를 타지 않는 순차 heap scan 이라 상시 실행된다. 10 곳 모두 page 안의 next/prev 링크(`heap_vpid_next`)로 다음 page 를 찾는 체인 순회 구조라, page 를 잃으면 다음 목적지 포인터도 함께 잃는다 — 9 곳이 하드 에러로 끝나고 1 곳(`heap_dump`)은 출력이 조용히 잘린다. WRITE latch 호출부는 lock-free 진입 조건을 만족하지 않아 첫 번째 행과 무관하고, 나머지 네 상황에는 그대로 해당한다.",
+      "sha256": "669478ba04ca7218573140ebb76e8f9a5a13fe270db6d09ccf35264054540495",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27263-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "`CUBRID develop e6ed61e87 (소스 빌드)`, Linux x86_64 debug 빌드. 아래 Repro 를 이 빌드에서 실행해 Actual Result 의 수치를 실측했다.",
+      "sha256": "b21b4cd01eab50babf5bb2a087a6414d200de7938645c29b20f2cfec3041880d",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27263-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "등록·해제 함수 자체에 로그를 넣어 vpid 별 순증감을 세고, `pgbuf_fix` 의 해제 지점에는 lock-free 경로를 거쳤는지 함께 남긴다. 삽입 지점을 앵커 문자열로 찾으므로 들여쓰기 차이에 영향받지 않는다. 진단 전용이라 병합하지 않는다.",
+      "sha256": "a0cfbd15df1f88ec0668833156e148182d7b687c7c5e976f946c6b5be1ae4497",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27263-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "```bash\ncd <cubrid-source-root>\npython3 - <<'PY'\npath = \"src/storage/page_buffer.c\"\nsrc = open(path).read()",
+      "sha256": "dfd40746c8dc6b31bd5290511d09bf5d38a1385134113ae88d81ec24741cd3e2",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "def insert_before(anchor, text):\n    assert src.count(anchor) == 1, anchor\n    return src.replace(anchor, text + anchor, 1)",
+      "sha256": "9695717aa8136afb9f919b78f52b4b09df8f94dbfef36c0ba710c921e331176b",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "def insert_after(anchor, text):\n    assert src.count(anchor) == 1, anchor\n    return src.replace(anchor, anchor + text, 1)",
+      "sha256": "43654bd2b79d38388b4c341611ac017b4af8e3de58600905d894fd020c18e806",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "src = insert_before(\"bool retry = false;\", \"bool lockfree_fast_path = false;\\n  \")",
+      "sha256": "26c7ed9f80afadc74bd78151cddadaaa3a24547a222b6a1bcc5e7bbf72ddaa09",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "src = insert_after(\"pgptr = pgbuf_lockfree_fix_ro (thread_p, vpid, fetch_mode);\",\n                   \"\\n      lockfree_fast_path = (pgptr != NULL);\")",
+      "sha256": "dde2ce48235e1b1acc7f615d34ce1eabdc8ae8b52106cf9fff92e96615819510",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "src = insert_before(\"/* latch is obtained, no need for avoidance of dealloc */\",\n                    \"_er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 unreg-fix lockfree=%d vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                    \"                     (int) lockfree_fast_path, VPID_AS_ARGS (&bufptr->vpid),\\n\"\n                    \"                     bufptr->count_fix_and_avoid_dealloc & 0x0000FFFF);\\n      \")",
+      "sha256": "e71dc789891a187f058e20f5079bae48f1bd6c02886ca144cfc4f179305e96e6",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "src = insert_before(\"(void) ATOMIC_INC_32 (&bcb->count_fix_and_avoid_dealloc, 1);\",\n                    \"_er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 register vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                    \"                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);\\n  \")",
+      "sha256": "3fc78f018620be32ccb5fe9c92b503452838e44e2363a937462e9b4c9e68155b",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C094",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "src = insert_after(\"int count_crt;\",\n                   \"\\n  _er_log_debug (ARG_FILE_LINE, \\\"CBRD-27263 unregister vpid=%d|%d avoid=%d\\\\n\\\",\\n\"\n                   \"                 VPID_AS_ARGS (&bcb->vpid), bcb->count_fix_and_avoid_dealloc & 0x0000FFFF);\")",
+      "sha256": "b09dd160b6ca4642eef218fb61244c516319fa7ea209a0bb66cd7e0e075fc883",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C095",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "open(path, \"w\").write(src)\nprint(\"instrumented\")\nPY\n./build.sh -m debug",
+      "sha256": "0af764541b065c6512c1023dea6cc57e079492ed03bc97d2beb23fe4d8943af6",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C096",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "`register` 와 `unregister` 로그는 보유 page 용 등록·해제(`:12639` 계열)까지 함께 잡지만, 그 쌍은 균형이 맞으므로 vpid 별 합계에는 영향을 주지 않는다. `unregister` 의 `avoid` 값은 감소 직전 값이라 0 이면 0 방어에 막힌 호출이고, `unreg-fix lockfree=1` 에 `avoid` 가 1 이상이면 살아 있는 남의 보호를 실제로 깎은 것이다.",
+      "sha256": "0fff5eb0653908becfc8a7bd85d37ce9f53f4fc0e675ecf0cfc11f63ea92d0e0",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27263-C097",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "scan 세션이 `heap_next_internal` → `pgbuf_ordered_fix(OLD_PAGE_PREVENT_DEALLOC, READ)` 를 상시 태우고, UPDATE 세션의 WRITE latch 가 조건부 latch 충돌(회계 표 3 행의 등록 잔존 구간)을 만들어 도난 대상(살아 있는 +1)과 도둑(lock-free 해제)이 같은 page 에서 겹치게 한다.",
+      "sha256": "e4b7574a6e293d79ea8e9b9417822d7f1cc11b334640cd0e9da13d6526ffaf01",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27263-C098",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "```bash\ncubrid createdb --db-volume-size=200M --log-volume-size=100M testdb en_US.utf8",
+      "sha256": "9061f1a9f8d06dc731b3b1a174db9971abdb1a7f2e3ff37afa361704ab10cd78",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C099",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "cubrid server start testdb",
+      "sha256": "820b4790e21d1559e8989097595e64c5bb94bf175310cd6c46bc167efe2d37e5",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C100",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "csql -u dba testdb -c \"CREATE TABLE t (a INT PRIMARY KEY, b VARCHAR(200));\"\ncsql -u dba testdb -c \"\n  INSERT INTO t\n  SELECT ROWNUM, REPEAT('x', 200)\n  FROM db_class a, db_class b, db_class c LIMIT 100000;\"",
+      "sha256": "1a15d12f899950b6aa78aa33ef2077cb51b25940ad1764639012735e4e77120d",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C101",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "```bash\nLOG=$(ls -t $CUBRID/log/server/testdb_*.err | head -1)",
+      "sha256": "bb3112695e6448233d3e7442ff0a9a3bf26b4086c3ffa5646c7c85e037516a51",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C102",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "grep -c 'CBRD-27263 unreg-fix lockfree=1' \"$LOG\"                     # 회계 표 1 행 실행 횟수\ngrep -cE 'CBRD-27263 unreg-fix lockfree=1 vpid=[0-9|]+ avoid=[1-9]' \"$LOG\"  # 그중 실제 도난 (감소 직전 관측값 기준)\ngrep -E 'CBRD-27263 unreg-fix lockfree=1 vpid=[0-9|]+ avoid=[1-9]' \"$LOG\" \\\n  | sed -E 's/.*vpid=([0-9|]+).*/\\1/' | sort | uniq -c               # 도난이 발생한 vpid 목록\ngrep -c 'CBRD-27263 unregister .* avoid=0' \"$LOG\"                    # 0 방어에 막힌 해제\n```",
+      "sha256": "a8e31b70d2a25a076ca906dc0474709ead00f81c550b3b23793cc6b4ca5677b1",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27263-C103",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "2 단계의 부하 강도는 조절해도 결함 경로 자체는 관측된다 — updater 를 빼고 테이블을 수천 행으로 줄인 변형에서도 `unreg-fix lockfree=1` 은 수십 회 단위로 쌓인다. updater 는 도난(살아 있는 +1 과의 겹침)을 보기 위한 장치다.",
+      "sha256": "7affc8da82b1576e666fc5a5a6f0cc2bb9b995ef9934008003fb9795143de5f1",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27263-C104",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "```bash\ncsql -u dba testdb -c \"\n  CREATE TABLE u (a INT PRIMARY KEY, b VARCHAR(200));\n  INSERT INTO u SELECT ROWNUM, REPEAT('y', 200) FROM db_class a, db_class b, db_class c LIMIT 100000;\"",
+      "sha256": "f909003c6dc6a75419e9e5b0bf822bedaa0f78ca0ccda1e95b70aaa0355a266f",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27263-C105",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "grep -n 'we told it not to\\|Candidate heap page\\|Assertion' $CUBRID/log/server/testdb_*.err\ncubrid server status\n```",
+      "sha256": "cb01a496abba570ee716a71621b5e78b5dbb1a157e85a838f129e1c7305971ab",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27263-C106",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "- 3 단계 집계에서 순증감이 0 이 아닌 vpid 가 하나도 나오지 않는다. 회계 표의 5 가지 진입 상황 전부에서 등록과 해제가 짝을 이룬다.\n- `unreg-fix lockfree=1` 이 0 건이거나, 그 경로에서도 회계가 맞아 순증감이 0 이다. 특히 `avoid` 1 이상 상태의 lock-free 해제(도난)가 0 건이다.\n- 4 단계에서 `page was deallocated an we told it not to!` 로그와 그에 딸린 debug 빌드 assert 가 발생하지 않는다.",
+      "sha256": "dfcbfe6ba23d0034e8677f4c5389e39d86252f979fdb2c4ef4489b3120ed1f66",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27263-C107",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "위 Repro 를 e6ed61e87 debug 빌드에서 실행한 실측이다.",
+      "sha256": "5278312a2bfc6717915a208b59b1b492d53cba95b93648dc903890baba212a41",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27263-C108",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 측정 항목 | 값 | 의미 |\n|---|---|---|\n| `unreg-fix lockfree=1` | 40 회 | 회계 표 1 행(등록 없는 해제)이 평범한 부하에서 상시 실행된다 |\n| 그중 `avoid >= 1` (도난, 감소 직전 관측값 기준) | 7 회 (vpid 0\\|769, 0\\|4673) | 카운트 1 이상 상태의 감소 — 0 방어 감수 선언 밖의 사건 |\n| 실행 종료 후 순증감 != 0 | vpid 0\\|769 net -1 | 도난당한 피해자의 해제가 0 방어에 막혀(avoid=0 해제 39 회) 회계가 영구히 어긋났다 |",
+      "sha256": "acfaaf5480f97952c552f5abe66a2e08b14cd34686245442d42d82be9dc1fc18",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27263-C109",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "updater 없이 소형 테이블(5,625 행)로 줄인 3 단계 말미의 변형 실행에서도 등록 없는 해제가 23 회 나왔다. 4 단계의 최종 assert 는 \"도난 순간 × vacuum 의 empty page 회수 × 체인 재 fix\" 3중 경합이라 이번 실행에서는 재현되지 않았으나, 도난이 실측된 이상 발생은 확률의 문제다.",
+      "sha256": "f80285740b2342bf97e91a30b93a42fedeb8fb1e47ebc86f05de8c8b663598e2",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27263-C110",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "- 카운터가 0 인 채로 해제가 호출되면 0 방어가 매번 `er_log_debug` 를 남기므로, `er_log_debug` 를 켠 환경에서는 heap scan 핫 경로에서 디버그 로그가 반복 출력된다.",
+      "sha256": "a78586d3fca8a04eeb36bb008b7c0d2b19e00cfd85de8756e6fa73ca98f41bab",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27263-C111",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 위치 | 내용 |\n|---|---|\n| `page_buffer.c:12280-12296` | `pgbuf_ordered_fix` 의 latch 조건 결정과 1차 `pgbuf_fix` 시도 (원본 fetch mode 전달) |\n| `page_buffer.c:12392-12396` | `has_dealloc_prevent_flag` 설정과 fetch mode 를 `OLD_PAGE` 로 재작성 |\n| `page_buffer.c:12699-12704`, `:12847-12852` | 요청 page 해제 두 지점 |\n| `page_buffer.c:12946`, `:12972-12998` | `exit` 정리 — `:12639` 로 등록한 보유 page 분만 되돌린다 |\n| `page_buffer.c:2311-2313`, `:2315-2328` | lock-free 진입 조건과 `goto fast_path` |\n| `page_buffer.c:2425-2428`, `:2513-2517` | `pgbuf_fix` 의 등록/해제 지점 |\n| `page_buffer.c:2440-2463` | 조건부 latch 실패 반환 — 등록을 되돌리지 않는다 |\n| `page_buffer.c:7671-7734`, `:7689-7693` | `pgbuf_lockfree_fix_ro` 전체와 성립 조건 |\n| `page_buffer.c:16205-16209`, `:16217-16253` | 등록/해제 구현, `:16226-16250` 이 0 방어, `:16232-16244` 가 위험 감수 주석 |\n| `page_buffer.c:501-510`, `:535-540`, `:267-269` | `atomic_latch` 워드 구성과 `count_fix_and_avoid_dealloc` 2 용도 필드 정의 |\n| `page_buffer.c:12639`, `:12883`, `:12994` | 보유 page 용 대칭 등록/해제 (요청 page 분과 별개) |\n| `page_buffer.c:14670-14683` | `pgbuf_has_prevent_dealloc` — 보호 여부 조회 API |\n| `vacuum.c:1850`, `heap_file.c:3383` | 보호 카운트를 소비해 empty heap page 회수 여부를 결정하는 두 지점 |\n| `heap_file.c:3395` | `pgbuf_has_any_waiters` → `assert (false)` — 마커가 대기자보다 먼저 보인다는 vacuum 의 가정 |",
+      "sha256": "3df47ae2c6acf3557a62893b5d8cab4b0eeeb9f6e6246ea481167c2aef857395",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27263-C112",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "전제 두 가지: (i) `OLD_PAGE_PREVENT_DEALLOC` 자체는 제거할 수 없다 — 사용처 10 곳 전부가 체인 순회라 page 소실을 복구할 방법이 없고, 회수 억제라는 성능 무관 정합성 기능이다. (ii) 고칠 대상은 요청 page 마커의 회계뿐이다 (보유 page 마커는 건전).",
+      "sha256": "c94a4666d950c773aa2e846190d849c8d6695ab533f4865b46d11ba60f6c1472",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27263-C113",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "| 순위 | 후보 | 권장 이유 / 고려사항 |\n|---|---|---|\n| 1 | **분담 유지 + 깨진 세 조합 보정 (최소 수정)**: lock-free 경로 여부를 지역 플래그로 구분해 `:2513-2517` 해제를 건너뛰고, 행 4 의 `:2427` 미실행 상태를 ordered fix 로 전달하며, 행 5 의 `exit` 에 `has_dealloc_prevent_flag` 정리를 추가한다. `pgbuf_fix` 의 오류 출구를 \"조건부 latch 거절일 때만 +1 을 남긴다\" 로 정규화하고, 두 함수에 걸친 handshake 계약을 양쪽에 주석으로 명문화한다 | lock-free CAS 는 fix 와 READ latch 를 원자적으로 동시에 얻으므로(`:7694-7697`) 이 경로에는 마커가 지킬 \"latch 전 구간\" 자체가 없다 — 카운터 불간섭이 의미론적으로 정확하다. 현재 1 행이 버그로 매번 실행하는 카운터 CAS 루프가 사라져 빠른 경로가 오늘보다 오히려 빨라진다. 일반 경로 등록이 그대로라 latch 대기 중 vacuum 후퇴 계약(`heap_file.c:3383`)도 보존된다. 대가는 handshake 부채 잔존 — 계약 주석이 최소 조건이다 |\n| 2 | **요청 page 마커를 `pgbuf_ordered_fix` 전담으로 (소유권 재배치)**: `pgbuf_fix` 는 이 fetch mode 에서 카운터를 건드리지 않게 하고, ordered fix 가 1차 시도 전에 직접 등록하며 성공·실패·`exit` 모든 출구에서 해제한다 | 진입 상황 5 가지가 한 함수 안에서 끝나 회계가 눈으로 확인된다. 대신 등록 시점이 문제다: 1차 시도 **전** 등록은 모든 PREVENT_DEALLOC 순회 hop 에 hash 조회 1 회 + 카운터 원자 연산을 얹고(lock-free 히트가 접촉하는 경합 캐시라인이 1 개에서 2 개로 — CBRD-26242 가 없앤 패턴의 부분 부활) page 미상주 시 등록할 BCB 가 없는 경우의 조건부 회계가 필요하다. 반면 재정렬 진입 시점으로 늦추면 비용은 0 이지만 latch 대기 중 마커가 사라져 `heap_file.c:3383` 후퇴 계약이 깨진다(`:3395` assert). 채택하려면 전자 형태 + CBRD-26242 워크로드 재측정이 조건이다 |\n| 3 | **lock-free 빠른 경로 revert**: `:1123-1128`, `:2311-2330`, `:2498`, `:3140-3144`, `:7671-7776` 삭제 (~137 줄, 전부 `page_buffer.c` 내부) | 기계적으로 단순하고 위험이 가장 낮다. `atomic_latch` 는 빠른 경로 전유물이 아니라 42 개 함수가 쓰는 BCB latch 워드 자체이므로 유지된다 — slow path 도 CAS 기반이라 CBRD-26425 개선분의 상당 부분은 남는다. 대신 hot 공유 READ page 의 무 mutex fix 를 잃어 CBRD-26242 병목을 다시 열고, 행 4·5 는 별도 보정이 여전히 필요하다. 수정 리뷰 일정이 촉박할 때의 안전판 |\n| - | (기각) `OLD_PAGE_PREVENT_DEALLOC 제거` | 전제 (i) 위반. 체인 순회 호출자에게 \"page 소실 후 재동기화\" 어휘 자체가 없다 — `pgbuf_ordered_fix` 의 보유 page 재 fix 는 `OLD_PAGE` 하드코딩(`:12783`)이라 fetch mode 로도 우회 불가 |\n| - | (기각) 카운터를 `atomic_latch` CAS 워드에 통합 | 이 결함에는 원자성 문제가 없다 — 카운터 증감은 처음부터 원자적이었고, 실측된 비대칭 40 회는 경합 파손이 아니라 +1 코드를 실행하지 않은 결과다. 워드를 합쳐도 등록을 건너뛰는 `goto` 는 남는다. 대가는 `fcnt` 32→16 비트 축소와 latch 기계 전면 재검증 |",
+      "sha256": "c9e0674e4c5516f01bb87e62bf7ca484713429954d21bb27308f8fb082834f45",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27263-C114",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "- lock-free 경로가 성공하는 순간 READ latch 가 이미 손에 있으므로, 그 fix 건에 대해서는 latch 자체가 vacuum 을 막는다 (vacuum 의 page 제거는 대상 page WRITE latch 선행). 즉 1 행에서 등록을 생략한 것 자체는 무해하고, 해제만 실행하는 것이 결함이다.\n- `pgbuf_ordered_fix` 의 재정렬 경로로 진입하려면 1차 시도가 조건부 latch 로 실패해야 한다(`:12377-12386` 이 무조건 latch 실패를 걸러낸다). 이 경우 `:2427` 의 등록이 남아 `:12702`/`:12850` 의 해제와 짝이 맞으므로, 이 두 해제 지점을 무조건 비대칭으로 보면 안 된다.\n- 보유 page 용 등록(`:12639`)은 `ordered_holders_info[i].prevent_dealloc` 로 추적되며 `:12883`, `:12994` 에서 해제되므로 요청 page 분과 섞이지 않는다.",
+      "sha256": "d5c7f950332a4a84d1df1901c2ab0f514fc1956808ccd65f9d68be20df4c4545",
+      "disposition_group": 35
+    },
+    {
+      "id": "CBRD-27263-C115",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md",
+      "text": "- 부모 EPIC: CBRD-27193 (이 이슈는 결함 N1). 결함 유입: CBRD-26425 (커밋 `58cef8e01`, PR #6704). 성능 배경: CBRD-26242. 같은 커밋의 선행 회귀: CBRD-27084.\n- 같은 `goto fast_path` 가 함께 건너뛰는 나머지 회계 두 건 — `pgbuf_bcb_register_fix` (`:2395`, hot page 판정 과소 집계) 와 `had_holder` (`:2438`, debug 전용 fixed-at 추적 리셋) — 은 이 이슈와 근본 원인이 같다. 본 수정 PR 에 포함하거나 EPIC 아래 별도 티켓으로 분리한다.",
+      "sha256": "ccffbd3c9e9aa329f271d77d2330a6eee7d7428007de8d469844d4472ab7646a",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27263-C116",
+      "origin": "comment:4775856",
+      "text": "추가 분석\r\nhttps://github.com/vimkim/my-cubrid-docs/blob/main/pgbuf-analysis/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md",
+      "sha256": "6e9c20962fcc70744d88c2bb61cd9792cb2ee8ba6d3b32b0877aa6cb1ed14c2a",
+      "disposition_group": 36
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "Universal per-VPID net-zero replaced with request-owned registration/release within one BCB residency. Replacement can reset the counter, and zero guard makes an unmatched release a no-op at zero.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        63
+      ],
+      "disposition": "non-substantive",
+      "reason": "Opening-field label only; replacement retains the four required fields.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "Composite summary rebuilt from pinned current source. Historical 40/7/net -1 preserved as attributed observations; not successful foreign-marker theft or persistent negative state proof. Permanent vacuum exclusion and zero customer exposure removed. Historical release inclusion scoped to e6ed61e investigation, not current release state.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2283",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2377-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L153-L184"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        65
+      ],
+      "disposition": "corrected",
+      "reason": "Implementation remains TBD; options are unselected. Five-path net-zero criterion corrected for zero guard and BCB residency; additional initial failure exits are included.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12350-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12954-L13008"
+      ]
+    },
+    {
+      "ids": [
+        5
+      ],
+      "disposition": "corrected",
+      "reason": "Current affected functions and ten external call sites retained, but future no-format/no-config/no-public-signature/no-caller-change guarantees removed because no implementation is selected.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12286-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L7636-L7655"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Introduction commit verified as 58cef8e01fcf121acbe3a35b7249deda54217532. Intentional versus accidental attribution removed; 64-core 4x goal is not a fast-path measurement and is omitted. CBRD-27084 causal history not carried forward without independent primary verification. Field facts and scope from local combined variant retained.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/58cef8e01fcf121acbe3a35b7249deda54217532",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L186-L212",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L478-L517"
+      ]
+    },
+    {
+      "ids": [
+        7
+      ],
+      "disposition": "retained",
+      "reason": "Separate atomic_latch and packed hotness/deallocation field retained with current pinned lines. Parent relation retained; historical N1 label is only navigation and not a durable technical property.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L267-L269",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L478-L517"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "Background retained but generic claim that every PREVENT_DEALLOC fix increments then decrements is limited to ordinary success, since fast success bypasses registration and failures do not all release.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2283",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2377-L2469"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        68
+      ],
+      "disposition": "retained",
+      "reason": "Two vacuum-side consumers and MVCC vacuum context retained with source paths and pinned lines.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/vacuum.c#L1842-L1861",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L3431-L3465"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        69
+      ],
+      "disposition": "corrected",
+      "reason": "Two checks retained; zero count described as permitting further deallocation consideration, not sufficient proof of actual reclamation. Empty/reusable checks, latches, waiter checks and races remain relevant. Decorative star removed.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/vacuum.c#L1842-L1861",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L3431-L3465"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        70
+      ],
+      "disposition": "retained",
+      "reason": "Protection while waiting for latch and while unfixing/reordering retained. Unexpected-waiter assert distinguished from proof of observed engine failure.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2377-L2415",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12633-L12652",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L3447-L3465"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        59,
+        71
+      ],
+      "disposition": "corrected",
+      "reason": "Request-page and held-page ownership separated. Held registration has paired success/exit cleanup but that does not prove complete concurrency health, especially across eviction.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12633-L12652",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12883-L12891",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12980-L13008",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16244-L16300"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        23,
+        72,
+        82
+      ],
+      "disposition": "retained",
+      "reason": "Search of pinned source confirms ten external PREVENT_DEALLOC call sites, all direct ordered fix or non-null-watcher helper calls. Current source examples and helper route retained.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L1019-L1040",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L7636-L7655",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L9047-L9054",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/locator_sr.c#L12751-L12755"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        16,
+        17,
+        73,
+        75,
+        76
+      ],
+      "disposition": "corrected",
+      "reason": "Flow/table retained in current form. Fast path is a release invocation, not always -1; error reachability is analysis; leaked marker lasts at most until relevant BCB reset/reuse, not forever. Initial post-registration direct exits are included beyond the old five-row framing.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2283",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2377-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12350-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12954-L13008",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        74
+      ],
+      "disposition": "retained",
+      "reason": "Exit cleanup tracks only ordered_holders_info.prevent_dealloc, not outstanding request-page flag. Retained as source fact.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12954-L13008"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        58,
+        77
+      ],
+      "disposition": "corrected",
+      "reason": "Normal conditional-latch failure handoff retained. It is not the only safety mechanism, and conditional initial failure can precede registration; no undocumented intent or exclusive-latch-failure guarantee is assumed.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2377-L2415",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12350-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12707-L12712",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12855-L12860"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        78
+      ],
+      "disposition": "retained",
+      "reason": "Fast entry, required READ/fcnt/waiter/VPID state, original fetch forwarding and registration bypass retained with current lines; no frequency claim added.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2283",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7703-L7715",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12286-L12304"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        79
+      ],
+      "disposition": "corrected",
+      "reason": "Pre-registration error and post-registration exit concerns retained as control-flow deductions. Natural production error reachability and consequences left to analysis; permanent exclusion claim removed because eviction/reset exists.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2317-L2379",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12350-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12804-L12837",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12980-L13008",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16281-L16300"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        80
+      ],
+      "disposition": "corrected",
+      "reason": "Zero guard and existing replacement-risk comment retained as source statements. The comment is not adopted as a quantified risk estimate or proof that every zero case is legitimate; owner identity is not stored.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16264"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        37,
+        81,
+        96
+      ],
+      "disposition": "corrected",
+      "reason": "Positive value printed before atomic work does not prove successful decrement or live-marker ownership. Seven observations remain historical; no forensic claim that seven protected requests were actually robbed. VPID aggregate must distinguish replacement and successful atomic updates.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L119-L127",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L153-L159",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        83
+      ],
+      "disposition": "corrected",
+      "reason": "Old line-number table replaced with current call-route summary and immutable representative links. All ten call sites were inspected; WRITE sites excluded from fast READ path. Full historic table is navigation, not a runtime reachability proof.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L1019-L1040",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L7636-L7655",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L9047-L9054",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L18166-L18173",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/locator_sr.c#L12751-L12755"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        84
+      ],
+      "disposition": "corrected",
+      "reason": "Heap-chain traversal and concrete scan error consequence retained. Unmeasured always/frequent exposure and historical nine-hard-errors/one-truncated-output universal classification omitted pending per-caller review. No current production failure is asserted.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L7636-L7655",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L9611-L9629"
+      ]
+    },
+    {
+      "ids": [
+        26,
+        50,
+        85,
+        107
+      ],
+      "disposition": "retained",
+      "reason": "e6ed61e87 Linux x86_64 debug execution remains an attributed historical build, resolved source SHA e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e. Current f6cac312 is explicitly source-only analysis.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md#L88-L256",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L1-L4",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L119-L159"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        38,
+        86,
+        97
+      ],
+      "disposition": "corrected",
+      "reason": "Historical diagnostic approach and scan/update workload intent retained; current proposal records request identity, BCB residency/reset and successful atomic effects, rather than treating pre-operation logs as proof. No claim that load deterministically creates stolen protection.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L119-L136",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        39,
+        40,
+        41,
+        42,
+        43,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        98,
+        99,
+        100,
+        101,
+        102
+      ],
+      "disposition": "removed",
+      "reason": "Raw anchor-patching, DB startup/table setup and pre-CAS grep aggregation recipe not carried forward as a current reproducible proof: instrumented commit/raw logs were not available, and the old aggregate cannot prove ownership or successful CAS. Historical configuration/workload/numbers and immutable evidence are retained separately; current runtime test is explicitly proposed, not executed.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L119-L168",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300"
+      ]
+    },
+    {
+      "ids": [
+        44,
+        52,
+        103,
+        109
+      ],
+      "disposition": "corrected",
+      "reason": "Small 5625-row variant/23 unmatched-release observations and failure to reach final assert preserved as historical reports. Inevitability/probability-only assurance removed; final vacuum/refix collision still requires engine evidence.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27263-pgbuf-lockfree-avoid-dealloc-asymmetry_e6ed61e_claude.md#L256",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L179-L184"
+      ]
+    },
+    {
+      "ids": [
+        45,
+        46,
+        104,
+        105
+      ],
+      "disposition": "removed",
+      "reason": "Incomplete impact-demo shell fragments and log-grep commands replaced with attributed impact workload and explicit no-final-assert result. Full current runtime setup/assets and meaningful ownership verdict require analysis.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L161-L184"
+      ]
+    },
+    {
+      "ids": [
+        47,
+        48,
+        49,
+        106
+      ],
+      "disposition": "corrected",
+      "reason": "Acceptance replaced per-VPID zero sums and absence in one finite run with observable request-owned accounting, residency-aware atomic verdicts, path coverage and separated impact reachability. Existing eviction semantics prevent universal aggregate inference.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16230-L16300",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L179-L184"
+      ]
+    },
+    {
+      "ids": [
+        51,
+        108
+      ],
+      "disposition": "corrected",
+      "reason": "All reported values retained (40;7;VPIDs;net -1;39 zero logs) with attribution to historical e6ed61e report. No successful theft/permanent state/typical-frequency inference.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L153-L159"
+      ]
+    },
+    {
+      "ids": [
+        53,
+        110
+      ],
+      "disposition": "retained",
+      "reason": "Zero guard can emit diagnostic logs when debug logging is enabled; repeated unwanted-release logging is a possible observability cost, not a measured performance regression.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16242-L16261"
+      ]
+    },
+    {
+      "ids": [
+        54,
+        111
+      ],
+      "disposition": "non-substantive",
+      "reason": "Duplicated source-location/reference-only tables replaced by immutable current source links attached to the corresponding substantive claims. Their technical content is reviewed in the other groups.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c"
+      ]
+    },
+    {
+      "ids": [
+        55,
+        112
+      ],
+      "disposition": "corrected",
+      "reason": "Protection need retained for current chain/watcher contract; absolute removal impossibility and blanket healthy-held-marker assurance replaced by requirements to preserve caller contract and distinguish held-page cleanup from concurrency proof.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L7636-L7655",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L9611-L9629",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12633-L12652",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16244-L16300"
+      ]
+    },
+    {
+      "ids": [
+        56,
+        113
+      ],
+      "disposition": "corrected",
+      "reason": "Three substantive options retained with tradeoffs; rankings, safest/no-cost/faster guarantees, unsupported exact revert counts and fixed cache-line/bit-width architecture claims omitted. Marker removal/word merge are not automatic solutions; final selection remains ANALYSIS.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md#L214-L329",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16217-L16264"
+      ]
+    },
+    {
+      "ids": [
+        57
+      ],
+      "disposition": "retained",
+      "reason": "Successful fast path holds READ latch; missing temporary marker registration itself distinguished from improper common release. Later vacuum/refix collision is an unproven consequence, not immediate reclamation.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7703-L7715",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/heap_file.c#L3431-L3465"
+      ]
+    },
+    {
+      "ids": [
+        60,
+        61,
+        115
+      ],
+      "disposition": "corrected",
+      "reason": "Parent relation and verified introducing commit retained. Same skipped hotness/debug bookkeeping identified for separate impact assessment; no automatic same-PR commitment. Historical CBRD-27084 and unverified performance result claims not carried forward.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/58cef8e01fcf121acbe3a35b7249deda54217532",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2347-L2390"
+      ]
+    },
+    {
+      "ids": [
+        114
+      ],
+      "disposition": "corrected",
+      "reason": "Combined local duplicate of fast latch, conditional handoff and held-marker observations. Preserved with explicit pre-registration-error exception and no blanket concurrency-health claim.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7703-L7715",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12350-L12404",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12633-L12652",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12980-L13008"
+      ]
+    },
+    {
+      "ids": [
+        116
+      ],
+      "disposition": "non-substantive",
+      "reason": "Single live comment is an additional-analysis reference only. Read in full; its historical report is cited through verified immutable relocated docs commit, replacing obsolete moving path.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/10-CBRD-27263-repro-proof-and-solutions.md"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

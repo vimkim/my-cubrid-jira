@@ -1,0 +1,926 @@
+{
+  "issue": "CBRD-27356",
+  "reviewer": "/root",
+  "report_sha256": "cb5833e27f82f5fb4e4076a217d989b508b1e937dbd0bb57683ae81cf560e5a1",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27356-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 사용자 트랜잭션의 lock timeout과 page latch(메모리 page의 동시 접근을 보호하는 내부 잠금) 정책을 분리하여, 호출자가 지정한 latch 획득 방식이 트랜잭션의 lock 대기 설정에 따라 바뀌지 않도록 한다.",
+      "sha256": "f7d47e19a64f2f67d159b26304a1255af449315196c0cb0471a0186fbe0e5e63",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27356-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                |\n|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | transaction의 zero-wait 상태가 호출자가 명시한 page-latch 획득 조건보다 우선할 수 있다. 실제 대기에는 별도 기본값 300,000ms를 사용하지만 대기 진입과 만료 후 처리는 transaction lock 정책과 분리되어 있지 않다.     |\n| **TO-BE (목표 상태 / 기대 동작)** | transaction lock timeout은 lock manager가 관리하고, page latch는 호출자가 명시한 blocking, nonblocking 또는 순서 조정 재시도 정책에 따라 동작한다. 내부 장기 대기 감시는 사용자 lock timeout과 독립적으로 관리한다. |\n| **영향**                          | 설계 의도 훼손 --- 상위 transaction 정책이 page-buffer 내부 동시성 제어의 의미를 바꾸므로, 같은 문제를 막기 위한 호출부별 예외가 늘어나고 내부 deadlock 회피 계약도 불명확해진다.                                   |",
+      "sha256": "24622e1d0023fb1f7b678a6f47124c5e18c54cc4a2f32371ef68ecf379aaabe7",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27356-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: CBRD-27198/PR #7630이 다루는 국소 증상과 별도로 공통 근본 문제를 이 이슈에서 해결한다. 호출자가 전달한 `PGBUF_LATCH_CONDITION` 을 page-buffer 대기 진입의 기준으로 만들고, transaction의 `LOG_TDES::wait_msecs` 를 암묵적으로 참조하지 않는다. 현재 300초 동작은 경고·치명적 latch 정지·buffer frame 확보 정지·기존 positive-policy cutoff의 네 역할로 분리한다. 분리 직후 치명적 latch 정지, buffer frame 확보 정지, positive-policy 호환 cutoff는 각각 300초를 유지하고 경고값은 계측으로 정한다. latch-order 검증과 계측 후 마지막 호환 cutoff를 제거하며, 1초는 일반 latch 실패 timeout으로 사용하지 않는다. 세부 API 이름과 호환 기간은 `TBD - ANALYSIS 단계에서 결정` 한다.",
+      "sha256": "3160b6b6b6f447bbd3ba599d2410905868e7fcbf9ece5cf9d129fb9425e43574",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C005",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: 주요 후보는 `src/storage/page_buffer.c`, `src/storage/page_buffer.h`, `src/transaction/log_impl.h`, `src/transaction/lock_manager.c`, `src/storage/disk_manager.c`, `src/storage/bestspace.cpp`, `src/storage/btree.c`, `src/base/system_parameter.c` 다. object lock의 공개 `lock_timeout` 동작과 디스크 형식은 유지 대상이며, page-buffer 내부 API와 오류 분류, 진단 통계는 변경될 수 있다.",
+      "sha256": "4b997ce7928fe3c0f6742a891acf8473e246b60400dca2ab3e3542ad265b2d9a",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27356-C006",
+      "origin": "live-description",
+      "text": "-   **기준 revision**: 관련 PR #7630의 HEAD `bd5c43cfc1a0fadc55bea0d3b9eea0a69c83ea65` 를 기준으로 한다. 직접 소스 추적은 로컬 `d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530` 에서 수행했으며, 이후 PR 변경은 주석 수정과 literal `0` 을 `LK_ZERO_WAIT` 로 바꾼 것뿐이라 분석 대상 동작은 같다.",
+      "sha256": "b910c908f14eac6b48b89a24dc4309a6c598e9c168d678f535d4fce591b36382",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27356-C007",
+      "origin": "live-description",
+      "text": "`lock` 은 트랜잭션 사이의 논리 객체 접근을 조정하며 충돌 시 statement 또는 transaction 수준의 오류로 복구할 수 있다. 반면 page latch는 buffer pool에 고정된 page 내용의 read/write 순서를 짧게 조정한다. BCB(Buffer Control Block --- 메모리에 올라온 page의 fix 수와 latch 상태를 관리하는 제어 블록)는 이 상태를 담지만, BCB 자체의 제어 정보와 대기열은 별도의 mutex·atomic 연산으로 보호한다. latch 보유 중에는 부분 갱신이나 다른 latch 보유가 겹칠 수 있으므로, 사용자 lock 대기 상태로 latch의 진입과 실패 정책까지 결정하면 내부 불변식이 상위 설정에 따라 달라진다.",
+      "sha256": "762ad4e2275046a41fca6fe003703f2644c22421ca37d27f430bf74c5cb7a7f3",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C008",
+      "origin": "live-description",
+      "text": "CUBRID의 공개 `lock_timeout` 은 transaction lock 대기 시간을 설정한다. `LOG_TDES::wait_msecs` 도 소스에서 \\\"locks\\\"를 위한 값으로 정의되어 있다. 그러나 page-buffer 경로는 이 값을 latch 대기 진입과 만료 결과에 함께 사용한다.",
+      "sha256": "fddc2f3dc333c30dacbfd4285459133c6d090f7185e74c246a7a7321d31daeee",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C009",
+      "origin": "live-description",
+      "text": "[대기 진입 결정]\n    lock_timeout -> LOG_TDES::wait_msecs -> pgbuf_find_current_wait_msecs()\n      -> pgbuf_fix_internal()\n           PGBUF_UNCONDITIONAL_LATCH\n             -> PGBUF_CONDITIONAL_LATCH  ★ zero/force-zero이면 암묵적 변경\n                  -> busy이면 즉시 거절하며 queue/timed sleep에 들어가지 않음",
+      "sha256": "ea56b11aa7cb978cd9f394c9dbc907243fe9329369e8d1518c3ab5c291c9524f",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C010",
+      "origin": "live-description",
+      "text": "[queue에 들어간 별도 대기 경로]\n    pgbuf_timed_sleep()\n      -> zero/force-zero -> 0ms (이 경로에 도달한 경우)\n      -> 그 외          -> page_latch_timeout_in_msecs(기본 300,000ms)\n      -> 만료 후         -> transaction 상태별 오류·중단 처리",
+      "sha256": "be06543ea118c6c4e5fe4c7d32d3df315c28a3270f6436597ab5c01e3b1931fd",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C011",
+      "origin": "live-description",
+      "text": "따라서 positive `lock_timeout` 값이 latch 대기 시간을 직접 정하는 것은 아니다. latch 대기 시간은 숨은 `page_latch_timeout_in_msecs` 를 사용한다. 결합 지점은 숫자가 아니라 다음 두 정책이다.",
+      "sha256": "b9446b1fd485fabd3025ad5372ffba2380b6eb7a687817f01f7d3ab45e87d09e",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C012",
+      "origin": "live-description",
+      "text": "1.  `LK_ZERO_WAIT` 와 `LK_FORCE_ZERO_WAIT` 가 unconditional latch 요청을 conditional로 바꾼다.",
+      "sha256": "21d8c8a8f971c8930a063084098c8158a02b4782bb460346ee14dc2fbec5a881",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C013",
+      "origin": "live-description",
+      "text": "2.  같은 300초가 지나도 inactive transaction은 대기를 다시 시작하고, active positive-policy transaction은 복구 가능한 `ER_LK_PAGE_TIMEOUT` 을 받는다. active infinite-policy 경로는 `ER_PAGE_LATCH_TIMEDOUT` 을 설정하고 debug assert를 거쳐 unilateral abort로 분류된다. 즉 현재 코드는 하나의 명확한 치명적 정지 감시가 아니라 서로 다른 제어 흐름을 한 값에 묶고 있다.",
+      "sha256": "29c7159fa10510549aa7996d4a658c42cb6e99d5ebd661bd95fa8cdd48d7495f",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C014",
+      "origin": "live-description",
+      "text": "PR #7630은 `disk_get_volheader_internal()` 과 `disk_stab_cursor_fix()` 에서 thread-local override를 사용해 zero/force-zero 상태를 infinite wait처럼 보이게 한다. 이는 CBRD-27198에서 확인된 temp volume header 및 sector table 경합을 두 호출 경로에서 우회하지만, 다른 `pgbuf_fix()` 호출부에는 같은 결합이 남는다. 또한 `LK_ZERO_WAIT` 는 사용자가 설정할 수 있는 no-wait 정책인 반면 `LK_FORCE_ZERO_WAIT` 는 best-space와 B-tree 등이 latch 순환을 피하려고 임시로 설치하는 내부 정책이다. 현재 PR처럼 둘을 모두 무시할 때의 안전성, volume header를 잡은 채 sector table을 기다리면서 생기는 연쇄 대기 가능성, 필요한 regression test는 CBRD-27198 범위에서 별도로 확인해야 한다.",
+      "sha256": "2e15173a7716018c96a681ca9df70b1c4fd2df30ece8a815605d0562da3f7fa1",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27356-C015",
+      "origin": "live-description",
+      "text": "| DBMS         | 사용자 lock timeout                                                                                    | 내부 latch 대기                                                                                                    | 장기 정지 감시                                                                                                        |\n|--------------|--------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|\n| PostgreSQL   | `lock_timeout` 은 heavyweight object lock 획득에 적용                                                  | `LWLock`(Lightweight Lock)과 buffer content lock은 이 값을 참조하지 않으며 conditional API와 ordering/retry를 사용 | stuck spinlock의 약 1분 PANIC은 watchdog(정상 진행이 멈췄다고 판단하는 내부 감시 장치)이며 transaction timeout이 아님 |\n| MySQL/InnoDB | `innodb_lock_wait_timeout` 은 record/table lock, `lock_wait_timeout` 은 MDL(Metadata Lock)에 각각 적용 | page rw-lock과 mutex는 transaction lock timeout을 참조하지 않음                                                    | semaphore wait 경고와 치명적 중단 기준은 내부 stall 진단이며 복구 가능한 lock timeout이 아님                          |\n| CUBRID       | `lock_timeout` 이 `LOG_TDES::wait_msecs` 에 저장됨                                                     | 대기 시간은 별도 300초지만 admission과 만료 처리가 `wait_msecs` 를 참조                                            | 같은 300초 설정이 latch와 BCB victim progress 감시에 함께 사용됨                                                      |",
+      "sha256": "8af81d9124937843d506ae991a4acc7ab143c573e6f847e7836f8f2dc447e942",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27356-C016",
+      "origin": "live-description",
+      "text": "PostgreSQL의 `deadlock_timeout` 기본 1초와 InnoDB timeout daemon의 약 1초 주기는 deadlock 검사 시점 또는 polling 해상도다. 둘 다 page latch를 1초 뒤 실패시키는 정책이 아니다. CUBRID의 1초 `deadlock_detection_interval_in_secs` 역시 같은 범주이므로 latch acquisition deadline의 선례로 사용할 수 없다.",
+      "sha256": "24f1af614ce514de257a1864390e98560cc3508c9e25ac705e7a59bcacb4baf2",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27356-C017",
+      "origin": "live-description",
+      "text": "| 항목                 | 변경 전                                                                                              | 변경 후                                                                                         |\n|----------------------|------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|\n| `lock_timeout`       | object lock 대기뿐 아니라 page latch 대기 진입과 만료 결과에도 간접 영향                             | object lock 대기에만 적용                                                                       |\n| page latch 대기 진입 | 명시한 `PGBUF_LATCH_CONDITION` 이 transaction wait 상태에 따라 바뀔 수 있음                          | caller가 전달한 latch 정책을 그대로 적용                                                        |\n| nonblocking 획득     | `LK_FORCE_ZERO_WAIT` 를 transaction에 임시 설정하여 latch 동작을 유도하는 호출부가 존재              | page-buffer의 명시적인 try/ordered-retry 인터페이스 사용                                        |\n| 내부 장기 대기       | 하나의 300초 설정이 latch 만료와 BCB victim progress(buffer frame 재사용 후보 확보 진행)를 함께 제어 | 경고, 치명적 latch 정지, BCB progress 정지, positive-policy 호환 cutoff를 서로 다른 역할로 관리 |\n| 1초 정책             | page latch와 무관한 deadlock detection 기본값                                                        | latch 실패 timeout으로 도입하지 않음                                                            |",
+      "sha256": "7a82246c6f782b1b691191399ebc1db88cf94c7e252608954430a34d280822cd",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C018",
+      "origin": "live-description",
+      "text": "디스크 형식과 SQL 문법 변경은 없다. 공개 parameter 추가 여부, 기존 positive `lock_timeout` 에서 발생하던 recoverable page-latch cutoff의 제거 시점, 기존 오류 코드 호환성은 `TBD - ANALYSIS 단계에서 결정` 한다.",
+      "sha256": "9ebe49179704a1974fe94f44d4e441a6ee6415aeeab2ff2060d58453629aff5a",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27356-C019",
+      "origin": "live-description",
+      "text": "page buffer가 latch 획득과 대기·오류 불변식을 함께 소유하도록 `pgbuf_fix`/`pgbuf_ordered_fix` 경계를 정리한다. 아래 이름은 의미를 설명하기 위한 예시이며 확정 API가 아니다.",
+      "sha256": "9dc59aee1223233b8973f54d93ccab92533e179f1e76b370bdb101cf6ccf5562",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C020",
+      "origin": "live-description",
+      "text": "| 동작          | 의미                                                   | 실패 처리                                               |\n|---------------|--------------------------------------------------------|---------------------------------------------------------|\n| wait          | caller가 latch order를 보장했으므로 획득할 때까지 대기 | interrupt 가능한 안전 지점과 fatal watchdog을 별도 정의 |\n| try           | queue에 들어가지 않고 즉시 시도                        | timeout 오류를 만들지 않고 would-block 결과 반환        |\n| ordered retry | 순서 위반 가능성이 있는 latch를 release/reorder/refix  | page buffer가 정해진 순서로 재시도                      |",
+      "sha256": "c87c38b7e69de0dc5795fbffcecd9dbdb412d6a5b0282e38000418ef120f7398",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C021",
+      "origin": "live-description",
+      "text": "`LOG_TDES::wait_msecs` 는 lock manager 내부 정책으로 제한하고, page buffer는 이를 조회해 latch condition을 바꾸지 않는다. 사용자 작업 전체에 deadline이 필요하다면 상위 operation이 명시적인 deadline을 전달해야 하며 transaction 구현 상태를 page buffer가 암묵적으로 읽지 않는다.",
+      "sha256": "2acd7244153e9483a11679fe1d16bbe4b23722c0b131c57cd5ff73151b1e3f6f",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C022",
+      "origin": "live-description",
+      "text": "1.  `pgbuf_fix_internal()`, `pgbuf_timed_sleep()`, `pgbuf_ordered_fix()` 가 `wait_msecs` 를 참조하는 지점과 `xlogtb_reset_wait_msecs(LK_FORCE_ZERO_WAIT)` 호출부를 전수 조사한다.",
+      "sha256": "86fdfa327b6367820231ff084f72580c39dbb1b4cbc4693c2c9dccb65649d990",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27356-C023",
+      "origin": "live-description",
+      "text": "2.  `PGBUF_LATCH_CONDITION` 을 대기 진입의 단일 기준으로 만들고, blocking과 nonblocking 결과를 명확히 구분한다.",
+      "sha256": "93938a32fae10fc0a0686c47365e45e5fdaf3d9db8e09e537b651abd74ec3f21",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C024",
+      "origin": "live-description",
+      "text": "3.  best-space, B-tree/heap 및 disk metadata 호출부를 wait, try, ordered retry 중 하나로 분류해 이전한다. volume header와 sector table을 함께 잡는 경로는 latch order와 연쇄 대기(convoy)를 별도 검증한다.",
+      "sha256": "dd5799c0f4140541674cf3499e42591a87c4947e77df42bd076356cfa2603b6d",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C025",
+      "origin": "live-description",
+      "text": "4.  `page_latch_timeout_in_msecs` 가 담당하던 역할을 warning/telemetry, fatal dead-latch watchdog, BCB victim progress watchdog, positive-policy recoverable compatibility cutoff로 나눈다. 기존 동작을 보존하기 위해 fatal watchdog, BCB progress watchdog, positive-policy compatibility cutoff는 처음에 각각 300초를 유지한다. warning threshold는 제어 흐름을 바꾸지 않으며 계측값으로 별도 결정한다.",
+      "sha256": "176a174531af1fc2b64ac0d6d72cbe1967d9fa003f32a6564a2446dd37e0fbd6",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C026",
+      "origin": "live-description",
+      "text": "5.  운영과 stress workload에서 대기 분포를 수집하고 latch-order 검증을 마친 뒤 positive-policy 호환 cutoff를 이 이슈에서 제거한다. fatal threshold와 BCB progress threshold의 후속 조정은 각각의 장애 감지·재시작 정책과 buffer 확보 분포를 근거로 결정하며, 300초를 고유하게 옳은 값으로 간주하지 않는다.",
+      "sha256": "8a5932da9b4f040cecf8091cb6b57d2be0c855a4df69f74de759528c308d72b3",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C027",
+      "origin": "live-description",
+      "text": "| 검증               | 확인할 결과                                                                                                                                                  |\n|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 정책 조합          | `{LK_ZERO_WAIT, LK_FORCE_ZERO_WAIT, positive, infinite}` 와 `{conditional, unconditional}` 조합별 queue 여부, 반환값, error stack이 명시한 latch 정책과 일치 |\n| disk metadata 경합 | volume header 또는 sector table을 의도적으로 경합시켜 CBRD-27198 증상 없이 진행하고 partial reservation을 정확히 정리                                        |\n| force-zero 회귀    | best-space와 B-tree/heap의 내부 nonblocking 경로가 예상치 못한 대기나 오류를 만들지 않음                                                                     |\n| object lock 격리   | `lock_timeout=0` 인 충돌 object lock은 계속 즉시 실패                                                                                                        |\n| watchdog 분리      | latch warning, fatal latch, inactive rearm, BCB victim progress 결과를 독립적으로 발생·집계                                                                  |\n| 오류 주입          | 각 wait 단계의 interrupt와 오류에서 latch ownership, waiter 제거, rollback이 보존됨                                                                          |",
+      "sha256": "fbb92b4cc37d18633b1d917e1042f0573941c65cf71a5d7c99bd2fdb05a2b38b",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C028",
+      "origin": "live-description",
+      "text": "수집할 telemetry는 acquisition symbol, page type, latch mode별 wait histogram과 queue length, wait 시작 시 보유 중인 latch 목록, volume-header hold time, conditional failure/ordered retry 횟수, warning/fatal/BCB watchdog 횟수를 포함한다.",
+      "sha256": "d4c8256544899d0441ce8902721a778899b9af6d6e3a9d613654b843bb186308",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27356-C029",
+      "origin": "live-description",
+      "text": "-   [ ] `pgbuf_fix_internal()` 은 `LOG_TDES::wait_msecs` 를 근거로 caller의 `PGBUF_LATCH_CONDITION` 을 변경하지 않는다.",
+      "sha256": "6739cdb7afc60f5db157ccf85c426105a52df40bebdcbac4702e7f0d9c5c403e",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C030",
+      "origin": "live-description",
+      "text": "-   [ ] 같은 명시적 latch 정책에 대해 `pgbuf_timed_sleep()` 의 대기 시간과 만료 오류 분류가 `LOG_TDES::wait_msecs` 의 zero, positive, infinite 값에 따라 달라지지 않는다.",
+      "sha256": "adde782c478d47c332462feb997107f60c02f7e89bd2f8f02074ada18438d9f2",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C031",
+      "origin": "live-description",
+      "text": "-   [ ] `pgbuf_ordered_fix()` 의 retry/unwind 판단은 transaction wait 상태가 아니라 명시적인 try 또는 ordered-retry 정책에 따른다.",
+      "sha256": "3afa14f329d486cfba8ede84564b485e8f9713dfe3cf0ea27bc7aa131d8fad7a",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C032",
+      "origin": "live-description",
+      "text": "-   [ ] public `LK_ZERO_WAIT` 가 unconditional page-latch 요청을 conditional로 바꾸지 않으며, `lock_timeout=0` 의 object lock은 계속 즉시 실패한다.",
+      "sha256": "36ca40f87451838a9b248d6d14b68723411a60d6d790b6252d74aa2508931b69",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C033",
+      "origin": "live-description",
+      "text": "-   [ ] engine-internal `LK_FORCE_ZERO_WAIT` 호출부는 명시적인 try 또는 ordered-retry 정책으로 이전되고, 이전과 동등하게 queue에 들어가지 않으며 불필요한 timeout error를 남기지 않는다.",
+      "sha256": "287490576009268f469920ba0a243e6c250bf3b9b3e18b4e322b4a3dd1de45ca",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C034",
+      "origin": "live-description",
+      "text": "-   [ ] `{LK_ZERO_WAIT, LK_FORCE_ZERO_WAIT, positive, infinite}` 와 `{conditional, unconditional}` 의 정책 조합별 queue 여부, 반환값, error stack을 deterministic test로 확인한다.",
+      "sha256": "edfa80d08838b26ddd15d2961a8764f04bf2407d4e1d4490aa96312a98a40319",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C035",
+      "origin": "live-description",
+      "text": "-   [ ] positive와 infinite `lock_timeout` 의 object lock 동작이 기존과 같음을 회귀 테스트로 확인한다.",
+      "sha256": "8c8fd3ec0fd147a36b71ab830ff0e730bc61454de443cc0c7556c84f07530124",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C036",
+      "origin": "live-description",
+      "text": "-   [ ] disk volume header/sector table 경합과 best-space/B-tree force-zero 경로를 deterministic test로 검증한다.",
+      "sha256": "83c8927b5b821a1d70926670de22afb1bece115fb8157f8bc592763b7dbed80d",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C037",
+      "origin": "live-description",
+      "text": "-   [ ] latch warning, fatal dead-latch watchdog, BCB victim progress watchdog의 설정과 통계가 서로 구분된다.",
+      "sha256": "22ef105c82f2692a334b1622f2c10532ba43b9303b128d9131aaa21fb1b1e8c6",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C038",
+      "origin": "live-description",
+      "text": "-   [ ] 1초 값이 page latch의 recoverable acquisition deadline으로 사용되지 않는다.",
+      "sha256": "3dd6fae59dca2ca5d06f1fa49209cf16c73036a3eec28387505d6903e07446e5",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C039",
+      "origin": "live-description",
+      "text": "-   [ ] fatal dead-latch watchdog, BCB victim progress watchdog, positive-policy compatibility cutoff는 분리 시점에 각각 300초로 유지하고, warning threshold는 제어 흐름을 바꾸지 않는 별도 계측값으로 정의한다.",
+      "sha256": "43e2dfe4b25296eaf2385964605594183139c84a4de889f079f1de75c5a63275",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C040",
+      "origin": "live-description",
+      "text": "-   [ ] latch-order 검증과 대기 telemetry 수집을 완료한 뒤 transaction policy에서 파생된 positive-policy page-latch cutoff를 제거한다.",
+      "sha256": "0d3fe7eff1c481346aa2ea7778201da842c41ce4382dd5cdc95b71fc48a5d58d",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C041",
+      "origin": "live-description",
+      "text": "-   [ ] 오류 코드 호환성 전환 방안을 문서화한다.",
+      "sha256": "fb8f6e3b321e6e6fb4fdc325eeff44356b3d3b508c45ee9b116cefd43adc1ba0",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C042",
+      "origin": "live-description",
+      "text": "-   [ ] latch wait histogram과 보유/대기 관계를 이용해 threshold 조정 근거를 수집할 수 있다.",
+      "sha256": "2db2f9eb7e97a6fdde66b186d92ae665aa14b9a59d3bf5d7017c1fb8e04e91d2",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C043",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria를 충족한다.",
+      "sha256": "f2f535117bca6614c370af71fb720d0bb4102dd49416a50a9bda85f1e1fc71bd",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27356-C044",
+      "origin": "live-description",
+      "text": "-   [ ] CUBRID debug/release 빌드와 관련 unit, SQL, shell regression test를 통과한다.",
+      "sha256": "83eaad5900c87b7870555d1be2ac90107979796297215daef458b6012803f51f",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C045",
+      "origin": "live-description",
+      "text": "-   [ ] concurrency stress와 오류 주입 테스트에서 latch 누수, 무한 대기, 예상하지 않은 transaction abort가 없다.",
+      "sha256": "1d7d155a6f7864adef767e022e8f4edae22e250a63ea5c5a63c8cafd6456c931",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C046",
+      "origin": "live-description",
+      "text": "-   [ ] 공개 parameter 또는 오류 의미가 바뀌면 CUBRID manual과 release note를 함께 갱신한다.",
+      "sha256": "0f8b208c552c187ad7b68d349da0f1e71b17c3204294c5b14b3aa9f37b9fe825",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C047",
+      "origin": "live-description",
+      "text": "-   [ ] CBRD-27193 EPIC과 CBRD-27198의 관련 링크 및 후속 상태를 최신으로 유지한다.",
+      "sha256": "8168e613b328809a1b0a7eed8321241ee304bfc27ad3a0bf58313639d51f00c5",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27356-C048",
+      "origin": "live-description",
+      "text": "1.  명시적인 page-latch API를 기존 `PGBUF_LATCH_CONDITION` 확장으로 구현할지, wait/try/ordered-retry 함수를 분리할지: `TBD - ANALYSIS 단계에서 결정`.",
+      "sha256": "7af6fa9136abbf7cceb10b997b7e969144d54d6072b315fdc0160fcad14b0c13",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C049",
+      "origin": "live-description",
+      "text": "2.  active transaction의 기존 300초 recoverable cutoff를 어느 release까지 호환 동작으로 유지할지: `TBD - 합의 미확인`.",
+      "sha256": "268ef0f037bb1586fb324e50a7a7016c6ffc762d355ae2d344f879cba69e8bb5",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C050",
+      "origin": "live-description",
+      "text": "3.  warning threshold의 초기값과 300초로 분리한 fatal/BCB threshold의 후속 조정값을 얼마로 정할지: production-like workload의 wait histogram과 운영 장애 감지 정책을 기준으로 결정한다.",
+      "sha256": "0dc377b1df87db8873f51bdc860279f3564f3ef44a9b30a4c540f5b55b9f692b",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C051",
+      "origin": "live-description",
+      "text": "4.  volume header를 잡은 채 sector table을 기다리는 경로가 허용 가능한 ordering인지, release/retry로 바꿔야 하는지: latch-order audit 후 결정한다.",
+      "sha256": "cc5ce4b2856c6876eff1cc6c2ff4e4721a9dac532a7b952852563e9e06b94215",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27356-C052",
+      "origin": "live-description",
+      "text": "5.  watchdog 설정을 공개 system parameter로 제공할지 내부 진단값으로 유지할지: `TBD - 합의 미확인`.",
+      "sha256": "cbb0e521c0e80668d1ae0ee65f3ef77f7cefff523589011535944b0dd0f25a62",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C053",
+      "origin": "live-description",
+      "text": "-   Parent EPIC: [CBRD-27193](http://jira.cubrid.org/browse/CBRD-27193)",
+      "sha256": "fd9082a64f74a6e634d67facc99134534a7badc73afe9cf1966134e22dd4a297",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C054",
+      "origin": "live-description",
+      "text": "-   관련 오류: [CBRD-27198](http://jira.cubrid.org/browse/CBRD-27198)",
+      "sha256": "267e52e475695e0418ed2cc64cc441d01cc5b333e6c72d039d8d7e9d87c20e00",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C055",
+      "origin": "live-description",
+      "text": "-   관련 PR: [CUBRID/cubrid#7630](https://github.com/CUBRID/cubrid/pull/7630)",
+      "sha256": "b1ab083f512091921582480c6f1e5d2cb23c8a70e52921fd6f6e942f1f3f6948",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C056",
+      "origin": "live-description",
+      "text": "-   근거 보고서: [Lock timeout versus latch timeout: CUBRID, PostgreSQL, and MySQL/InnoDB](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md)",
+      "sha256": "985ac7c0668bf7fd327e70f8f4709ca7151e3e4f11dca88a8d385f6c4fd354ee",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C057",
+      "origin": "live-description",
+      "text": "-   CUBRID `LOG_TDES::wait_msecs`: [`src/transaction/log_impl.h`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/transaction/log_impl.h#L474-L487)",
+      "sha256": "acf1c329d57e7994e2d2423fbf2214a526fec42d12b4aa4c4ed9adef44bbeba0",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C058",
+      "origin": "live-description",
+      "text": "-   CUBRID latch admission: [`src/storage/page_buffer.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/storage/page_buffer.c#L2160-L2236)",
+      "sha256": "83f4a86ac10eb9aaf64799b08016c8e1f982cbf02c94f6c6b34a5d2358c0c604",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C059",
+      "origin": "live-description",
+      "text": "-   CUBRID latch wait/expiry: [`src/storage/page_buffer.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/storage/page_buffer.c#L7213-L7378)",
+      "sha256": "f267299603882fa2410ed14ae3007e5cc263faf148410ca000e8aa7b29cd5c94",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C060",
+      "origin": "live-description",
+      "text": "-   CUBRID hidden latch parameter: [`src/base/system_parameter.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/base/system_parameter.c#L5340-L5351)",
+      "sha256": "76ba4cebaab3590b4e2d37115733f6c896559db94c97744678351d1499e09c28",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C061",
+      "origin": "live-description",
+      "text": "PR #7630에는 CBRD-27198의 증상 완화와 별개로, transaction lock timeout과 page latch 정책의 근본 분리를 CBRD-27356에서 추적한다는 내용을 연결한다. PR comment 게시 시점은 PR 담당자와의 협의에 따른다.",
+      "sha256": "b51c8677db119f2d07111abbd346c79c80cfe09dcb3ae975323a9188d7584635",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27356-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "**이슈 수행 목적**: 사용자 트랜잭션의 lock timeout과 page latch(메모리 page의 동시 접근을 보호하는 내부 잠금) 정책을 분리하여, 호출자가 지정한 latch 획득 방식이 트랜잭션의 lock 대기 설정에 따라 바뀌지 않도록 한다.",
+      "sha256": "f7d47e19a64f2f67d159b26304a1255af449315196c0cb0471a0186fbe0e5e63",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27356-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "| 구분 | 내용 |\n|------|------|\n| **AS-IS (현재 동작 / 배경)** | transaction의 zero-wait 상태가 호출자가 명시한 page-latch 획득 조건보다 우선할 수 있다. 실제 대기에는 별도 기본값 300,000ms를 사용하지만 대기 진입과 만료 후 처리는 transaction lock 정책과 분리되어 있지 않다. |\n| **TO-BE (목표 상태 / 기대 동작)** | transaction lock timeout은 lock manager가 관리하고, page latch는 호출자가 명시한 blocking, nonblocking 또는 순서 조정 재시도 정책에 따라 동작한다. 내부 장기 대기 감시는 사용자 lock timeout과 독립적으로 관리한다. |\n| **영향** | 설계 의도 훼손 — 상위 transaction 정책이 page-buffer 내부 동시성 제어의 의미를 바꾸므로, 같은 문제를 막기 위한 호출부별 예외가 늘어나고 내부 deadlock 회피 계약도 불명확해진다. |",
+      "sha256": "bc117fdf749ac53eab2c6cb4802f6fa6748a9448acb541918b1f80d196d96d66",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27356-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "**이슈 수행 방안**: CBRD-27198/PR #7630이 다루는 국소 증상과 별도로 공통 근본 문제를 이 이슈에서 해결한다. 호출자가 전달한 `PGBUF_LATCH_CONDITION`을 page-buffer 대기 진입의 기준으로 만들고, transaction의 `LOG_TDES::wait_msecs`를 암묵적으로 참조하지 않는다. 현재 300초 동작은 경고·치명적 latch 정지·buffer frame 확보 정지·기존 positive-policy cutoff의 네 역할로 분리한다. 분리 직후 치명적 latch 정지, buffer frame 확보 정지, positive-policy 호환 cutoff는 각각 300초를 유지하고 경고값은 계측으로 정한다. latch-order 검증과 계측 후 마지막 호환 cutoff를 제거하며, 1초는 일반 latch 실패 timeout으로 사용하지 않는다. 세부 API 이름과 호환 기간은 `TBD - ANALYSIS 단계에서 결정`한다.",
+      "sha256": "73b62b87a5572d8b0fe5eedbc1205b0ed412e8fe0c18f34b1a90df093a5c795e",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "- **변경 범위 / 영향**: 주요 후보는 `src/storage/page_buffer.c`, `src/storage/page_buffer.h`, `src/transaction/log_impl.h`, `src/transaction/lock_manager.c`, `src/storage/disk_manager.c`, `src/storage/bestspace.cpp`, `src/storage/btree.c`, `src/base/system_parameter.c`다. object lock의 공개 `lock_timeout` 동작과 디스크 형식은 유지 대상이며, page-buffer 내부 API와 오류 분류, 진단 통계는 변경될 수 있다.\n- **기준 revision**: 관련 PR #7630의 HEAD `bd5c43cfc1a0fadc55bea0d3b9eea0a69c83ea65`를 기준으로 한다. 직접 소스 추적은 로컬 `d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530`에서 수행했으며, 이후 PR 변경은 주석 수정과 literal `0`을 `LK_ZERO_WAIT`로 바꾼 것뿐이라 분석 대상 동작은 같다.",
+      "sha256": "86df51036e860232b4347fef8f806dd918db166fc1fad260710b7037771aa42c",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27356-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "`lock`은 트랜잭션 사이의 논리 객체 접근을 조정하며 충돌 시 statement 또는 transaction 수준의 오류로 복구할 수 있다. 반면 page latch는 buffer pool에 고정된 page 내용의 read/write 순서를 짧게 조정한다. BCB(Buffer Control Block — 메모리에 올라온 page의 fix 수와 latch 상태를 관리하는 제어 블록)는 이 상태를 담지만, BCB 자체의 제어 정보와 대기열은 별도의 mutex·atomic 연산으로 보호한다. latch 보유 중에는 부분 갱신이나 다른 latch 보유가 겹칠 수 있으므로, 사용자 lock 대기 상태로 latch의 진입과 실패 정책까지 결정하면 내부 불변식이 상위 설정에 따라 달라진다.",
+      "sha256": "263ffa3b2add705b4b4ad2b9194cd39c7007460ce21beaa991155ac4a71e315d",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "CUBRID의 공개 `lock_timeout`은 transaction lock 대기 시간을 설정한다. `LOG_TDES::wait_msecs`도 소스에서 \"locks\"를 위한 값으로 정의되어 있다. 그러나 page-buffer 경로는 이 값을 latch 대기 진입과 만료 결과에 함께 사용한다.",
+      "sha256": "4ff7318a7e8fe395398677ada8c3d5b8eb940447c54fafdb79f08056014363bd",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "```\n[대기 진입 결정]\nlock_timeout -> LOG_TDES::wait_msecs -> pgbuf_find_current_wait_msecs()\n  -> pgbuf_fix_internal()\n       PGBUF_UNCONDITIONAL_LATCH\n         -> PGBUF_CONDITIONAL_LATCH  ★ zero/force-zero이면 암묵적 변경\n              -> busy이면 즉시 거절하며 queue/timed sleep에 들어가지 않음",
+      "sha256": "5603e8e477aacf25586521ce4a48a9c7c057d9ae7b6e1474635b707c52142e0b",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "[queue에 들어간 별도 대기 경로]\npgbuf_timed_sleep()\n  -> zero/force-zero -> 0ms (이 경로에 도달한 경우)\n  -> 그 외          -> page_latch_timeout_in_msecs(기본 300,000ms)\n  -> 만료 후         -> transaction 상태별 오류·중단 처리\n```",
+      "sha256": "44a5023371050e656de5b70a51b801063c5ba5a14338e76c2bac65d6466a2bf1",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "따라서 positive `lock_timeout` 값이 latch 대기 시간을 직접 정하는 것은 아니다. latch 대기 시간은 숨은 `page_latch_timeout_in_msecs`를 사용한다. 결합 지점은 숫자가 아니라 다음 두 정책이다.",
+      "sha256": "0e1e3733230428328d89e107c6f02b085a69d9f70c59a49fa032fc66c9e85f38",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27356-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "1. `LK_ZERO_WAIT`와 `LK_FORCE_ZERO_WAIT`가 unconditional latch 요청을 conditional로 바꾼다.\n2. 같은 300초가 지나도 inactive transaction은 대기를 다시 시작하고, active positive-policy transaction은 복구 가능한 `ER_LK_PAGE_TIMEOUT`을 받는다. active infinite-policy 경로는 `ER_PAGE_LATCH_TIMEDOUT`을 설정하고 debug assert를 거쳐 unilateral abort로 분류된다. 즉 현재 코드는 하나의 명확한 치명적 정지 감시가 아니라 서로 다른 제어 흐름을 한 값에 묶고 있다.",
+      "sha256": "25cea32de7d7d5e8a0c4dd7a1f1de96c01b4dfb598d18eb31611431683486ce4",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27356-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "PR #7630은 `disk_get_volheader_internal()`과 `disk_stab_cursor_fix()`에서 thread-local override를 사용해 zero/force-zero 상태를 infinite wait처럼 보이게 한다. 이는 CBRD-27198에서 확인된 temp volume header 및 sector table 경합을 두 호출 경로에서 우회하지만, 다른 `pgbuf_fix()` 호출부에는 같은 결합이 남는다. 또한 `LK_ZERO_WAIT`는 사용자가 설정할 수 있는 no-wait 정책인 반면 `LK_FORCE_ZERO_WAIT`는 best-space와 B-tree 등이 latch 순환을 피하려고 임시로 설치하는 내부 정책이다. 현재 PR처럼 둘을 모두 무시할 때의 안전성, volume header를 잡은 채 sector table을 기다리면서 생기는 연쇄 대기 가능성, 필요한 regression test는 CBRD-27198 범위에서 별도로 확인해야 한다.",
+      "sha256": "a3a63bdb669be0a937e2e014bdc590e8798769423537167857f10afcb72a8196",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27356-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "| DBMS | 사용자 lock timeout | 내부 latch 대기 | 장기 정지 감시 |\n|------|----------------------|-----------------|----------------|\n| PostgreSQL | `lock_timeout`은 heavyweight object lock 획득에 적용 | `LWLock`(Lightweight Lock)과 buffer content lock은 이 값을 참조하지 않으며 conditional API와 ordering/retry를 사용 | stuck spinlock의 약 1분 PANIC은 watchdog(정상 진행이 멈췄다고 판단하는 내부 감시 장치)이며 transaction timeout이 아님 |\n| MySQL/InnoDB | `innodb_lock_wait_timeout`은 record/table lock, `lock_wait_timeout`은 MDL(Metadata Lock)에 각각 적용 | page rw-lock과 mutex는 transaction lock timeout을 참조하지 않음 | semaphore wait 경고와 치명적 중단 기준은 내부 stall 진단이며 복구 가능한 lock timeout이 아님 |\n| CUBRID | `lock_timeout`이 `LOG_TDES::wait_msecs`에 저장됨 | 대기 시간은 별도 300초지만 admission과 만료 처리가 `wait_msecs`를 참조 | 같은 300초 설정이 latch와 BCB victim progress 감시에 함께 사용됨 |",
+      "sha256": "e970fdc6a72d8c47542a5a44dd567fa0ab99e0a7c10fcadfd93b67e01117b9b6",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27356-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "PostgreSQL의 `deadlock_timeout` 기본 1초와 InnoDB timeout daemon의 약 1초 주기는 deadlock 검사 시점 또는 polling 해상도다. 둘 다 page latch를 1초 뒤 실패시키는 정책이 아니다. CUBRID의 1초 `deadlock_detection_interval_in_secs` 역시 같은 범주이므로 latch acquisition deadline의 선례로 사용할 수 없다.",
+      "sha256": "24f1af614ce514de257a1864390e98560cc3508c9e25ac705e7a59bcacb4baf2",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27356-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "| 항목 | 변경 전 | 변경 후 |\n|------|---------|---------|\n| `lock_timeout` | object lock 대기뿐 아니라 page latch 대기 진입과 만료 결과에도 간접 영향 | object lock 대기에만 적용 |\n| page latch 대기 진입 | 명시한 `PGBUF_LATCH_CONDITION`이 transaction wait 상태에 따라 바뀔 수 있음 | caller가 전달한 latch 정책을 그대로 적용 |\n| nonblocking 획득 | `LK_FORCE_ZERO_WAIT`를 transaction에 임시 설정하여 latch 동작을 유도하는 호출부가 존재 | page-buffer의 명시적인 try/ordered-retry 인터페이스 사용 |\n| 내부 장기 대기 | 하나의 300초 설정이 latch 만료와 BCB victim progress(buffer frame 재사용 후보 확보 진행)를 함께 제어 | 경고, 치명적 latch 정지, BCB progress 정지, positive-policy 호환 cutoff를 서로 다른 역할로 관리 |\n| 1초 정책 | page latch와 무관한 deadlock detection 기본값 | latch 실패 timeout으로 도입하지 않음 |",
+      "sha256": "0ee4a5aa765bcca316795cf16baf97fc59b395ccc3e5d875d75ad8814494dfe1",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "디스크 형식과 SQL 문법 변경은 없다. 공개 parameter 추가 여부, 기존 positive `lock_timeout`에서 발생하던 recoverable page-latch cutoff의 제거 시점, 기존 오류 코드 호환성은 `TBD - ANALYSIS 단계에서 결정`한다.",
+      "sha256": "cfff9e1490d2365bc1c56eb529c90451ad1786d2c7a03ad71b2ac3d5c72b465c",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27356-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "page buffer가 latch 획득과 대기·오류 불변식을 함께 소유하도록 `pgbuf_fix`/`pgbuf_ordered_fix` 경계를 정리한다. 아래 이름은 의미를 설명하기 위한 예시이며 확정 API가 아니다.",
+      "sha256": "9dc59aee1223233b8973f54d93ccab92533e179f1e76b370bdb101cf6ccf5562",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "| 동작 | 의미 | 실패 처리 |\n|------|------|-----------|\n| wait | caller가 latch order를 보장했으므로 획득할 때까지 대기 | interrupt 가능한 안전 지점과 fatal watchdog을 별도 정의 |\n| try | queue에 들어가지 않고 즉시 시도 | timeout 오류를 만들지 않고 would-block 결과 반환 |\n| ordered retry | 순서 위반 가능성이 있는 latch를 release/reorder/refix | page buffer가 정해진 순서로 재시도 |",
+      "sha256": "7bebcd41a1472b86f481b4bd8ab9ca30cfe651c5fa5ca50d4785dca711547667",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "`LOG_TDES::wait_msecs`는 lock manager 내부 정책으로 제한하고, page buffer는 이를 조회해 latch condition을 바꾸지 않는다. 사용자 작업 전체에 deadline이 필요하다면 상위 operation이 명시적인 deadline을 전달해야 하며 transaction 구현 상태를 page buffer가 암묵적으로 읽지 않는다.",
+      "sha256": "b466b15c266e7f90f7b7f99abfdda11da6aaebae22827d33c7e6e5dabff12f2e",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "1. `pgbuf_fix_internal()`, `pgbuf_timed_sleep()`, `pgbuf_ordered_fix()`가 `wait_msecs`를 참조하는 지점과 `xlogtb_reset_wait_msecs(LK_FORCE_ZERO_WAIT)` 호출부를 전수 조사한다.\n2. `PGBUF_LATCH_CONDITION`을 대기 진입의 단일 기준으로 만들고, blocking과 nonblocking 결과를 명확히 구분한다.\n3. best-space, B-tree/heap 및 disk metadata 호출부를 wait, try, ordered retry 중 하나로 분류해 이전한다. volume header와 sector table을 함께 잡는 경로는 latch order와 연쇄 대기(convoy)를 별도 검증한다.\n4. `page_latch_timeout_in_msecs`가 담당하던 역할을 warning/telemetry, fatal dead-latch watchdog, BCB victim progress watchdog, positive-policy recoverable compatibility cutoff로 나눈다. 기존 동작을 보존하기 위해 fatal watchdog, BCB progress watchdog, positive-policy compatibility cutoff는 처음에 각각 300초를 유지한다. warning threshold는 제어 흐름을 바꾸지 않으며 계측값으로 별도 결정한다.\n5. 운영과 stress workload에서 대기 분포를 수집하고 latch-order 검증을 마친 뒤 positive-policy 호환 cutoff를 이 이슈에서 제거한다. fatal threshold와 BCB progress threshold의 후속 조정은 각각의 장애 감지·재시작 정책과 buffer 확보 분포를 근거로 결정하며, 300초를 고유하게 옳은 값으로 간주하지 않는다.",
+      "sha256": "f565dc9a8fd1cc1c6102380d2da054c98a0ac280a73587730e70c56d593ca885",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "| 검증 | 확인할 결과 |\n|------|-------------|\n| 정책 조합 | `{LK_ZERO_WAIT, LK_FORCE_ZERO_WAIT, positive, infinite}`와 `{conditional, unconditional}` 조합별 queue 여부, 반환값, error stack이 명시한 latch 정책과 일치 |\n| disk metadata 경합 | volume header 또는 sector table을 의도적으로 경합시켜 CBRD-27198 증상 없이 진행하고 partial reservation을 정확히 정리 |\n| force-zero 회귀 | best-space와 B-tree/heap의 내부 nonblocking 경로가 예상치 못한 대기나 오류를 만들지 않음 |\n| object lock 격리 | `lock_timeout=0`인 충돌 object lock은 계속 즉시 실패 |\n| watchdog 분리 | latch warning, fatal latch, inactive rearm, BCB victim progress 결과를 독립적으로 발생·집계 |\n| 오류 주입 | 각 wait 단계의 interrupt와 오류에서 latch ownership, waiter 제거, rollback이 보존됨 |",
+      "sha256": "9ac0bbadd6f0a5351e7f46143d6c543367c7ed0b6c56a81ac9e2e8b0b585fff0",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "수집할 telemetry는 acquisition symbol, page type, latch mode별 wait histogram과 queue length, wait 시작 시 보유 중인 latch 목록, volume-header hold time, conditional failure/ordered retry 횟수, warning/fatal/BCB watchdog 횟수를 포함한다.",
+      "sha256": "d4c8256544899d0441ce8902721a778899b9af6d6e3a9d613654b843bb186308",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27356-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "- [ ] `pgbuf_fix_internal()`은 `LOG_TDES::wait_msecs`를 근거로 caller의 `PGBUF_LATCH_CONDITION`을 변경하지 않는다.\n- [ ] 같은 명시적 latch 정책에 대해 `pgbuf_timed_sleep()`의 대기 시간과 만료 오류 분류가 `LOG_TDES::wait_msecs`의 zero, positive, infinite 값에 따라 달라지지 않는다.\n- [ ] `pgbuf_ordered_fix()`의 retry/unwind 판단은 transaction wait 상태가 아니라 명시적인 try 또는 ordered-retry 정책에 따른다.\n- [ ] public `LK_ZERO_WAIT`가 unconditional page-latch 요청을 conditional로 바꾸지 않으며, `lock_timeout=0`의 object lock은 계속 즉시 실패한다.\n- [ ] engine-internal `LK_FORCE_ZERO_WAIT` 호출부는 명시적인 try 또는 ordered-retry 정책으로 이전되고, 이전과 동등하게 queue에 들어가지 않으며 불필요한 timeout error를 남기지 않는다.\n- [ ] `{LK_ZERO_WAIT, LK_FORCE_ZERO_WAIT, positive, infinite}`와 `{conditional, unconditional}`의 정책 조합별 queue 여부, 반환값, error stack을 deterministic test로 확인한다.\n- [ ] positive와 infinite `lock_timeout`의 object lock 동작이 기존과 같음을 회귀 테스트로 확인한다.\n- [ ] disk volume header/sector table 경합과 best-space/B-tree force-zero 경로를 deterministic test로 검증한다.\n- [ ] latch warning, fatal dead-latch watchdog, BCB victim progress watchdog의 설정과 통계가 서로 구분된다.\n- [ ] 1초 값이 page latch의 recoverable acquisition deadline으로 사용되지 않는다.\n- [ ] fatal dead-latch watchdog, BCB victim progress watchdog, positive-policy compatibility cutoff는 분리 시점에 각각 300초로 유지하고, warning threshold는 제어 흐름을 바꾸지 않는 별도 계측값으로 정의한다.\n- [ ] latch-order 검증과 대기 telemetry 수집을 완료한 뒤 transaction policy에서 파생된 positive-policy page-latch cutoff를 제거한다.\n- [ ] 오류 코드 호환성 전환 방안을 문서화한다.\n- [ ] latch wait histogram과 보유/대기 관계를 이용해 threshold 조정 근거를 수집할 수 있다.",
+      "sha256": "0f8e9d0f95d48b103e5a1861e319e39ec670caade4f650ac3787f5fe75bc6edc",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "- [ ] 위 Acceptance Criteria를 충족한다.\n- [ ] CUBRID debug/release 빌드와 관련 unit, SQL, shell regression test를 통과한다.\n- [ ] concurrency stress와 오류 주입 테스트에서 latch 누수, 무한 대기, 예상하지 않은 transaction abort가 없다.\n- [ ] 공개 parameter 또는 오류 의미가 바뀌면 CUBRID manual과 release note를 함께 갱신한다.\n- [ ] CBRD-27193 EPIC과 CBRD-27198의 관련 링크 및 후속 상태를 최신으로 유지한다.",
+      "sha256": "2b4e8518796b4bf6e202f81d1df79ff9abef82a84bbf94f30bdf466fdf606d50",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27356-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "1. 명시적인 page-latch API를 기존 `PGBUF_LATCH_CONDITION` 확장으로 구현할지, wait/try/ordered-retry 함수를 분리할지: `TBD - ANALYSIS 단계에서 결정`.\n2. active transaction의 기존 300초 recoverable cutoff를 어느 release까지 호환 동작으로 유지할지: `TBD - 합의 미확인`.\n3. warning threshold의 초기값과 300초로 분리한 fatal/BCB threshold의 후속 조정값을 얼마로 정할지: production-like workload의 wait histogram과 운영 장애 감지 정책을 기준으로 결정한다.\n4. volume header를 잡은 채 sector table을 기다리는 경로가 허용 가능한 ordering인지, release/retry로 바꿔야 하는지: latch-order audit 후 결정한다.\n5. watchdog 설정을 공개 system parameter로 제공할지 내부 진단값으로 유지할지: `TBD - 합의 미확인`.",
+      "sha256": "72eeb40b7e735182b49ed01735cca7edf031f6494ffd0d7150b5a5cc4b23031a",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27356-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "- Parent EPIC: [CBRD-27193](http://jira.cubrid.org/browse/CBRD-27193)\n- 관련 오류: [CBRD-27198](http://jira.cubrid.org/browse/CBRD-27198)\n- 관련 PR: [CUBRID/cubrid#7630](https://github.com/CUBRID/cubrid/pull/7630)\n- 근거 보고서: [Lock timeout versus latch timeout: CUBRID, PostgreSQL, and MySQL/InnoDB](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md)\n- CUBRID `LOG_TDES::wait_msecs`: [`src/transaction/log_impl.h`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/transaction/log_impl.h#L474-L487)\n- CUBRID latch admission: [`src/storage/page_buffer.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/storage/page_buffer.c#L2160-L2236)\n- CUBRID latch wait/expiry: [`src/storage/page_buffer.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/storage/page_buffer.c#L7213-L7378)\n- CUBRID hidden latch parameter: [`src/base/system_parameter.c`](https://github.com/CUBRID/cubrid/blob/d9ceb5317c4d5bf15d2bcd2e89c08c2db9de3530/src/base/system_parameter.c#L5340-L5351)",
+      "sha256": "93372b4de34fbb9c8ee412db2b2afbcd5f723f498b0afef3206debf59f105080",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27356-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27356-separate-lock-timeout-from-page-latch-policy_bd5c43c_codex.md",
+      "text": "PR #7630에는 CBRD-27198의 증상 완화와 별개로, transaction lock timeout과 page latch 정책의 근본 분리를 CBRD-27356에서 추적한다는 내용을 연결한다. PR comment 게시 시점은 PR 담당자와의 협의에 따른다.",
+      "sha256": "b51c8677db119f2d07111abbd346c79c80cfe09dcb3ae975323a9188d7584635",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27356-C089",
+      "origin": "comment:4776561",
+      "text": "참고: CBRD-27486 검증 중, 이 이슈의 AS-IS(트랜잭션의 zero-wait가 호출자의 UNCONDITIONAL latch를 CONDITIONAL로 바꿈)가 서버 abort로 이어지는 사례를 확인해 남긴다. 이 이슈의 범위라 따로 등록하지 않았다.",
+      "sha256": "ee632bbb08797eb188070f7ff97748b04ab27fbb4618633aa09c84f88b5462cb",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27356-C090",
+      "origin": "comment:4776561",
+      "text": "*재현* (debug 빌드. 11.5.0.2623-8787dec(develop e1c3db198에 무관한 조인 커밋 1개)와 CBRD-27486 수정 빌드(099afcf) 모두 같음)\n* 128M DB에서 두 세션이 아래를 동시에 5회 반복한다. 세션 A만 {{set transaction lock timeout 0;}} 이고 세션 B는 기본값이며, 테이블 이름은 세션과 회차마다 다르다.\n{code:sql}\ncreate table ta_<n> (a int, b varchar(300));\ninsert into ta_<n> select rownum, repeat('x', 300) from db_class a, db_class b, db_class c limit 60000;\ncreate index i_ta_<n> on ta_<n> (a);\ndrop table ta_<n>;\n{code}\n* 결과: 8787dec는 10/10 회차, 099afcf는 8/14 회차에서 서버가 abort했다. 두 세션 모두 기본 lock timeout이면 5/5 이상 없었다. insert만 반복하면 abort 없이 세션 A만 -76으로 실패했다.",
+      "sha256": "f8b4d255bfa245bf9c34e452e5a98c7d3a847ce1a3d8ebfd39ff7b626e41eb4c",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27356-C091",
+      "origin": "comment:4776561",
+      "text": "*abort 지점*\n커밋 때 postpone된 DROP TABLE 단계의 UNCONDITIONAL page fix가 세션 A의 zero-wait 때문에 조건부로 바뀌고, -76(ER_LK_PAGE_TIMEOUT)으로 거부된 뒤 {{assert (false)}} 에 닿는다.\n* {{vacuum_add_dropped_file}} (src/query/vacuum.c:5927): {{vacuum_fix_dropped_entries_page (thread_p, &vpid, PGBUF_LATCH_WRITE)}} 가 NULL을 반환\n* {{log_execute_run_postpone}} (src/transaction/log_manager.c:8648): {{pgbuf_fix_if_not_deallocated (..., PGBUF_UNCONDITIONAL_LATCH, ...)}}가 실패",
+      "sha256": "bf027211787bce4b54648c397d1ce727188372f6786c20a37cab8bdb351734de",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27356-C092",
+      "origin": "comment:4776561",
+      "text": "release 빌드에서 재현되는지는 확인하지 않았다. 세션 A의 다른 -76 실패(heap, catalog, btree, {{bestspace::shard::allocate_verify_actual_space}} 등)는 lock_timeout 0의 현재 의미대로다.",
+      "sha256": "a9a65fc42af03febbff6f496a0e805a2e8bb83df2b5fb226bb19f19e2d16c548",
+      "disposition_group": 16
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        7,
+        8,
+        11,
+        12,
+        62,
+        67,
+        68,
+        71
+      ],
+      "disposition": "retained",
+      "reason": "Preserved policy-boundary problem, transaction lock versus page latch terms, and verified distinction between positive lock_timeout and internal latch sleep interval; duplicate local variant grouped with live description.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_impl.h#L476-L486",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2228-L2237",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7256-L7275"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        63
+      ],
+      "disposition": "non-substantive",
+      "reason": "Empty reason-field labels; replaced by a complete four-field opening, with no factual claim discarded.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "Original AS-IS/TO-BE summary preserved as evidence and desired contract outcome, but explicit API policy is not treated as an agreed implementation. Impact now includes attributed debug-abort evidence and release uncertainty.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2228-L2237"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        17,
+        19,
+        20,
+        21,
+        23,
+        24,
+        25,
+        26,
+        29,
+        30,
+        31,
+        32,
+        33,
+        37,
+        38,
+        39,
+        40,
+        48,
+        49,
+        50,
+        52,
+        65,
+        76,
+        78,
+        79,
+        80,
+        81,
+        84,
+        86
+      ],
+      "disposition": "corrected",
+      "reason": "Live and duplicate local design units preselected wait/try/ordered-retry APIs, authoritative latch-argument semantics, four separate controls, initial 300-second cutoffs and later removal, and categorical exclusion of 1-second policy. Preserved their motivation, caller audit, compatibility and validation questions; moved all unagreed API/threshold/control split/migration decisions to ANALYSIS and outcome-based acceptance. Existing caller-error handling is also evaluated rather than asserting that a full redesign is necessary.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16914-L16948",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7256-L7413",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8211-L8218",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        6,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Candidate files are investigation scope rather than promised edits. Replaced stale PR-head/current-behavior baseline with pinned f6cac312; historical d9ceb53/bd5c43c and developer runtime builds remain separate identities.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16914-L16948",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L2606-L2669",
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        10,
+        13,
+        69,
+        70,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "Updated flow to thread-local override first, then transaction state, with missing-TDES zero fallback. Preserved admission/expiry distinction, inactive rearm and positive/infinite branches; explicitly included current zero/force-zero queued timeout error setting and debug-assert versus subsequent abort handling.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16914-L16948",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2228-L2237",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7256-L7413"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        73
+      ],
+      "disposition": "corrected",
+      "reason": "Replaced stale wording about the current PR with verified existing pgbuf_force_latch_wait at the two disk metadata fixes, restoration of thread-local override and preservation of positive/infinite values. Broader safety/order/convoy questions remain ANALYSIS; no assertion that all unconditional requests are infallible, especially given current latch-refusal taxonomy.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5328-L5363",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L3230-L3241",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L3508-L3519",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L199-L209",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4432-L4445"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        16,
+        74,
+        75
+      ],
+      "disposition": "corrected",
+      "reason": "Preserved verified CUBRID timer-sharing facts and distinction between detector interval and latch acquisition deadline. Condensed unrefreshed peer-version details into an attributed historical survey link; PostgreSQL/InnoDB timing values are not normative grounds for choosing CUBRID policy.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L5414-L5425",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L1368-L1377",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/lock_manager.c#L6090-L6119",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8211-L8218",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        77
+      ],
+      "disposition": "corrected",
+      "reason": "Preserved disk-format/SQL syntax scope and compatibility questions without guaranteeing zero effects before implementation selection; public parameters and error semantics remain ANALYSIS decisions.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7339-L7413"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        51
+      ],
+      "disposition": "retained",
+      "reason": "Preserved survey of fix/sleep/ordered-fix and temporary-wait users, plus volume-header/sector-table ordering and convoy question. Current thread-local API names replace stale transaction-wide reset examples in final report.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/bestspace.cpp#L672-L702",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/btree.c#L22639-L22659",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L3508-L3519"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        34,
+        35,
+        36,
+        41,
+        42,
+        44,
+        45,
+        46,
+        82,
+        85
+      ],
+      "disposition": "corrected",
+      "reason": "Preserved policy matrix, object-lock compatibility, disk and force-zero regression, ownership/waiter cleanup, error compatibility and appropriate debug/release verification. Rewrote blanket suite lists, watchdog tests and unlimited no-hang/no-abort claims as proportionate outcome-based checks after ANALYSIS, without prescribing unselected controls.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/bestspace.cpp#L672-L702",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/btree.c#L22639-L22659",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L12369-L12383"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        83
+      ],
+      "disposition": "corrected",
+      "reason": "Preserved telemetry and ownership/order measurements as candidates, not an agreed mandatory instrumentation implementation or thresholds prerequisite.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        43
+      ],
+      "disposition": "non-substantive",
+      "reason": "Redundant template item requiring acceptance criteria to be met; replaced by substantive Definition of done.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        47
+      ],
+      "disposition": "corrected",
+      "reason": "Preserved actual parent/related-issue boundaries and completion evidence; removed obligation to mutate related issue statuses/links as part of this description-only work.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://jira.cubrid.org/browse/CBRD-27198"
+      ]
+    },
+    {
+      "ids": [
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        87
+      ],
+      "disposition": "non-substantive",
+      "reason": "Reference-only units, including grouped local duplicate references. Parent/related issue links retained; code links refreshed to f6cac312 and historical documents pinned to fd2e244 instead of mutable main.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27198/research/lock-vs-latch-timeout-survey_d9ceb53_codex.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2228-L2237"
+      ]
+    },
+    {
+      "ids": [
+        61,
+        88
+      ],
+      "disposition": "removed",
+      "reason": "Stale instruction to add or coordinate a PR comment is outside the user-authorized description-only scope. No renewed triage or PR comment is sent; related PR remains contextual evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/pull/7630"
+      ]
+    },
+    {
+      "ids": [
+        89,
+        90,
+        91,
+        92
+      ],
+      "disposition": "retained",
+      "reason": "Preserved complete attributed 2026-09-29 developer report: discovery during CBRD-27486 verification, 128M/two-session workload, builds 8787dec and 099afcf, abort counts 10/10 and 8/14, default/default at least 5/5 without issue, insert-only -76 without abort, reported vacuum/postpone assert sites, release untested and other -76 failures distinguished. Added unknown aggregate-versus-five-iteration relation and did not convert report into an independent current reproduction.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/vacuum.c#L614-L620",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/vacuum.c#L5914-L5929",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L8643-L8657"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

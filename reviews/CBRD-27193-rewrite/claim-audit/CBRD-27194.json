@@ -1,0 +1,1043 @@
+{
+  "issue": "CBRD-27194",
+  "reviewer": "/root",
+  "report_sha256": "14f9e96e2d9dffc0a7dbb072a7d830abb32c056a3a30e2baf0e71210bd7da175",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27194-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 버퍼매니저 초기화 실패 시 발생하는 문제 (우선 순위 낮음): page buffer 초기화·종료 경로에 남은 위생 결함 3건을 없애, 부팅이 실패하는 순간에도 정의된 동작만 남게 한다.",
+      "sha256": "606de35edc0b00df9ef02a12503d49ab0e7fa9083955e1ffbf032a45d86208cf",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27194-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C003",
+      "origin": "live-description",
+      "text": "-   **AS-IS (현재 동작 / 배경)**: 세 지점이 각자 자기 자료구조와 어긋나 있다.",
+      "sha256": "6c4abb24fc62d4165d690649f391ff54b809a15469079b4c8cb56a7887a1eed3",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27194-C004",
+      "origin": "live-description",
+      "text": "| 위치                           | 어긋난 점                                                                                                                                                                                                |\n|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `page_buffer.c:1626`           | `memset` 의 크기 인자가 대상 타입 `PGBUF_DIRECT_VICTIM` (24바이트) 이 아니라 이름이 비슷한 `PGBUF_VICTIM_CANDIDATE_LIST` (16바이트) 라, 마지막 필드 `waiter_threads_low_priority` 가 0 초기화에서 빠진다 |\n| `page_buffer.c:5851` + `:1980` | 한 번의 초기화 실패에서 `Aout_mutex` 를 두 번 `pthread_mutex_destroy` 한다 --- 이미 파괴한 mutex 를 다시 파괴하는 정의되지 않은 동작이다                                                                 |\n| `page_buffer.c:13949`          | quota 비활성 시 원소 개수가 0 이어서 `malloc (0)` 이 되고, 그 반환값이 부팅 성공 여부를 결정한다                                                                                                         |",
+      "sha256": "bf7b1ec2e73142e06f0acca33f459d49ac03634f329da817f061d16b414c28a1",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27194-C005",
+      "origin": "live-description",
+      "text": "-   **TO-BE (목표 상태 / 기대 동작)**: memset 은 대상 타입의 크기를 쓰고, `Aout_mutex` 파괴는 finalize 한 곳만 수행하며, 원소 개수가 0 이면 할당을 건너뛴다.",
+      "sha256": "4b704b7a7b919bc77008a0241cc959abb468e4280055c51cc035c83d1cd2e12f",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27194-C006",
+      "origin": "live-description",
+      "text": "-   **영향**: 기술 부채 --- 세 건 모두 정상 부팅에서는 드러나지 않고 실패 경로에서만 발현한다. 예컨대 `data_aout_ratio` 를 켠 서버가 AOUT hash 생성 중 메모리 부족을 만나면, 남겨야 할 진단은 `ER_OUT_OF_VIRTUAL_MEMORY` 하나인데 그 위에 mutex 이중 파괴가 겹쳐 원인 추적을 흐린다.",
+      "sha256": "cef8773c142ff637ed018728b694dc6096345d0dc91b33e52c5cddb5d8a0b761",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27194-C007",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C008",
+      "origin": "live-description",
+      "text": "| 대상           | 수정                                                                                                                                                                                          |\n|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `:1626` memset | 크기 인자를 `sizeof (PGBUF_DIRECT_VICTIM)` 으로 바꾼다                                                                                                                                        |\n| `:5851`        | 초기화 실패 경로의 `pthread_mutex_destroy` 를 제거해 파괴 소유권을 `pgbuf_finalize` (`:1980`) 하나로 몬다. finalize 가 조건 없이 destroy 하는 현재 형태와 일관된다                            |\n| `:13949`       | `PGBUF_PRIVATE_LRU_COUNT` 가 0 이면 할당을 건너뛰고 포인터를 NULL 로 둔다. 이후 사용처(`:13964-13967` 의 private 인덱스 루프)는 private LRU 가 없으면 돌지 않으므로 추가 가드는 필요하지 않다 |\n| 부수 정리      | `:13954-13955` 의 `er_set` 이 `private_lru_session_cnt` 실패를 알리면서 크기로 `PGBUF_TOTAL_LRU_COUNT` 를 넘긴다. 같은 블록이라 함께 `PGBUF_PRIVATE_LRU_COUNT` 로 고친다 (동작 무영향)        |",
+      "sha256": "9018e846dea29b5c71e7a34f0998bb5824bd8038a5ee2d9f11a41be610eee5c8",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27194-C009",
+      "origin": "live-description",
+      "text": "초기화 중간 실패 경로 전반의 자원 소유권 점검을 이 이슈 범위에 포함한다.",
+      "sha256": "16493ed09f73ad0287221989651d666be38adbd172f809fd0293a98a1707c36b",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27194-C010",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c` 한 파일이며 세 지점 모두 부팅·종료 시점 코드다. 정상 경로의 동작과 성능은 바뀌지 않고, 디스크 형식·설정·통계·외부 interface 도 그대로다. memset 지점은 `#if defined (SERVER_MODE)` 안에 있어 서버 빌드 전용이고, `malloc (0)` 지점은 standalone (SA_MODE) 빌드에서 quota 가 항상 비활성(`:13920`)이라 매 실행 해당된다. QA 관점의 관측 지점은 정상 부팅이 아니라 부팅 실패 주입이다.",
+      "sha256": "dcfdc192c13851892ef5f55dcedc56ed7d8ae89ecb6c48c803ae1b0a62e0d965",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27194-C011",
+      "origin": "live-description",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 D2 와 N6 이다. 기존 본문(스크린샷 스텁)을 이 내용으로 교체하며, 원래 D2 만 다루던 범위를 같은 계열 결함 N6 까지로 넓힌다.",
+      "sha256": "b6bb1fdf3f2cfdde3b8470ca0e224335cd67c9c283e471d39be46369da54c481",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27194-C012",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 의 부팅 경로는 `pgbuf_initialize` (`:1602`) 하나에서 시작해, 실패하면 자기 자신이 `pgbuf_finalize` (`:1881`) 를 불러 정리한 뒤 오류를 올린다(`:1867-1870`). 즉 초기화 실패 정리는 finalize 가 전담하는 구조다. 아래 세 지점이 그 구조와 어긋난다.",
+      "sha256": "0694ed5a2257b63f508ce975757480a7e66f6b2b9bdeeda1e5ef3fb17b40b392",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27194-C013",
+      "origin": "live-description",
+      "text": "`direct_victims` 는 victim (재사용할 수 있는 buffer frame) 을 기다리는 스레드에게 BCB (Buffer Control Block --- frame 에 올라온 page 의 제어 블록) 를 직접 넘겨주는 장치이고, 포인터 3개로 이루어진다.",
+      "sha256": "28769f525dff824e742a5bc0fa2bec94a0ef5ab9392b03072a6d22db0dd151be",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27194-C014",
+      "origin": "live-description",
+      "text": "struct pgbuf_direct_victim                                    :745-752\n      PGBUF_BCB **bcb_victims;                     [ 0..7]   <- memset 대상\n      circular_queue<THREAD_ENTRY *> *waiter_threads_high_priority;\n                                                   [ 8..15]  <- memset 대상\n      circular_queue<THREAD_ENTRY *> *waiter_threads_low_priority;\n                                                   [16..23]  ★ 덮이지 않음",
+      "sha256": "0515d186647b434bf74af37d3fcf9dc379fa4837ade95556974b90e6fc76debf",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C015",
+      "origin": "live-description",
+      "text": "`:1626` 이 크기 인자로 준 `PGBUF_VICTIM_CANDIDATE_LIST` 는 victim 후보 목록의 원소 타입(`PGBUF_BCB *` + `VPID`)으로 24바이트가 아니라 16바이트다. 이름이 비슷해 생긴 혼동으로 보인다.",
+      "sha256": "ec89f0c4cf55225ad9ca6f4f780ee888e065d90e997a8601534887d5535053d5",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C016",
+      "origin": "live-description",
+      "text": "지금 실제 피해가 없는 이유는 두 겹이다 --- `pgbuf_Pool` 이 static 전역이라 첫 초기화에서는 세 필드가 모두 0 이고, 재초기화 경로(`logtb_define_trantable_log_latch` 가 기존 테이블을 발견하면 `logtb_undefine_trantable` -\\> `pgbuf_finalize` 를 먼저 수행한다, `src/transaction/log_tran_table.c:423-425`, `:591`) 에서도 finalize 가 `:2026`, `:2031` 에서 두 큐 포인터를 NULL 로 되돌린다. 그러나 초기화 코드가 \\\"구조체 전체를 0 으로 둔다\\\"고 선언하면서 실제로는 3분의 2만 덮는 상태라, 필드를 하나 추가하거나 순서를 바꾸는 순간 finalize 의 `delete` 대상(`:2028-2032`)이 쓰레기 포인터가 된다. 한 단어 수정으로 이 위험을 없애는 편이 낫다.",
+      "sha256": "0f910ac43843710b22c35ea3c47911a5fb06b263e371bb8bcd2b121206a471a3",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27194-C017",
+      "origin": "live-description",
+      "text": "AOUT (2Q 교체 정책에서 main queue 에서 밀려난 page 식별자의 이력을 보관하는 queue) 초기화는 `pgbuf_initialize_aout_list` (`:5758`) 가 담당한다.",
+      "sha256": "af3418927cc459a02499bd593a40952a065592c1f9dd2165b6a23a0381551ae3",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27194-C018",
+      "origin": "live-description",
+      "text": "pgbuf_initialize                                                 :1602\n      └ pgbuf_initialize_aout_list                                   :1726\n           pthread_mutex_init (&list->Aout_mutex)                     :5775\n           if (aout_ratio <= 0) return NO_ERROR   <- 기본값 0.0 이면 여기서 끝  :5777-5782\n           malloc bufarray            실패 -> return (destroy 안 함)   :5787-5792\n           malloc aout_buf_ht         실패 -> goto error_return        :5814-5819\n           mht_create                 실패 -> goto error_return        :5825-5830\n         error_return:\n           pthread_mutex_destroy (&list->Aout_mutex)   ★ 1차 파괴      :5851\n           return ER_FAILED\n      goto error                                                     :1728\n    error:\n      pgbuf_finalize                                                 :1869\n        pthread_mutex_destroy (&Aout_mutex)          ★ 2차 파괴       :1980",
+      "sha256": "c4defae8f9e74a853cc83f51d633d08b0573973db3eceedc793b1a01896c2f0e",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27194-C019",
+      "origin": "live-description",
+      "text": "같은 함수 안에서도 규칙이 갈린다 --- `bufarray` 할당 실패는 destroy 없이 반환하고(`:5791`), `error_return` 만 destroy 한다. finalize 는 조건 없이 destroy 하므로, 초기화 실패 경로에서 destroy 를 빼는 쪽이 규칙을 하나로 만든다. 발현 조건은 `data_aout_ratio` (기본 0.0 이라 AOUT 자체가 기본 비활성) 를 켠 상태에서 hash 배열 할당이나 `mht_create` 가 실패하는 경우이며, 그래서 지금까지 드러나지 않았다.",
+      "sha256": "81b7a43f4feadd9c4b2fbb0fc17a35ba5edd007ddc89cf03560aef4d0b76f495",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27194-C020",
+      "origin": "live-description",
+      "text": "`pgbuf_initialize_page_quota` (`:13931`) 는 배열 두 개를 할당하고 각각 NULL 이면 부팅을 실패시킨다.",
+      "sha256": "32f8547724380aebf105781bf14ad809b8cfad8eef77509ae7ed7714aa0438c9",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27194-C021",
+      "origin": "live-description",
+      "text": "| 할당                                           | 원소 개수                                                | 개수가 0 이 될 수 있는가                                                                     |\n|------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------------------------------------------|\n| `lru_victim_flush_priority_per_lru` (`:13939`) | `PGBUF_TOTAL_LRU_COUNT` = shared + private               | 아니다. shared LRU 개수는 항상 1 이상이다                                                    |\n| `private_lru_session_cnt` (`:13949`)           | `PGBUF_PRIVATE_LRU_COUNT` = `quota.num_private_LRU_list` | 그렇다. `num_private_chains=0` 이면 0 이고(`:13905-13908`), SA_MODE 는 항상 0 이다(`:13920`) |",
+      "sha256": "42c9c522c0f128ccaa345b04dec6baf3c5103fbb5ba1ba4bd45c3466260338e1",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27194-C022",
+      "origin": "live-description",
+      "text": "glibc 는 `malloc (0)` 에 대해 free 가능한 유일 포인터를 돌려주므로 현재 플랫폼에서는 통과한다. 반환값이 NULL 인 구현에서는 아무 문제 없는 설정이 메모리 부족으로 오인돼 서버가 뜨지 않는다. 개수가 0 이면 할당을 건너뛰는 것이 의미상으로도 맞다 --- 이어지는 초기화 루프(`:13960-13968`)는 private LRU 인덱스에만 접근하므로 private 이 없으면 이 배열을 만지지 않는다.",
+      "sha256": "671573b6a85c9279eec3c8036af3c1aca30720475f3fb5c3038e4ab340e71a42",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27194-C023",
+      "origin": "live-description",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). Fedora 44 / GCC 16.1.1, `cmake --preset debug` 로 만든 debug 빌드에서 확인했다.",
+      "sha256": "34d8b352212eadfccd5774ed4e049abdd59b4dda608940fc7e2c752c7521bda2",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27194-C024",
+      "origin": "live-description",
+      "text": "세 결함 모두 정상 부팅에서는 증상이 없어, 크기 불일치는 디버그 정보로 직접 확인하고 나머지 두 건은 도달 경로를 소스로 확인한다. 명령은 CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "e68c043954cf7cfa40e198c079a463948396174db6c50e0380e28b624bab816c",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27194-C025",
+      "origin": "live-description",
+      "text": "``` bash\n# 1) memset 크기 불일치: 두 타입의 실제 크기를 오브젝트 파일의 디버그 정보에서 읽는다\ncmake --preset debug\ncmake --build build_preset_debug --target cub_server\ngdb -nx -q -batch \\\n  -ex 'print sizeof (struct pgbuf_direct_victim)' \\\n  -ex 'print sizeof (struct pgbuf_victim_candidate_list)' \\\n  build_preset_debug/cubrid/CMakeFiles/cubrid.dir/__/src/storage/page_buffer.c.o",
+      "sha256": "39c0dd0c6d89388d3ed2a4522cd710533cf418d79cc67905de73f75a64afd419",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27194-C026",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C027",
+      "origin": "live-description",
+      "text": "``` bash\n# 2) Aout_mutex 이중 destroy 경로 확인\nsed -n '5775,5776p'   src/storage/page_buffer.c   # 초기화에서 mutex_init\nsed -n '5835,5853p'   src/storage/page_buffer.c   # 실패 경로의 1차 destroy\nsed -n '1726,1729p'   src/storage/page_buffer.c   # 실패 시 goto error\nsed -n '1867,1870p'   src/storage/page_buffer.c   # error 라벨이 pgbuf_finalize 호출\nsed -n '1980p'        src/storage/page_buffer.c   # finalize 의 2차 destroy",
+      "sha256": "beaf4a49da0b1e393619e58953699f7bb4a57739f602d541c31701c5e6a31eb5",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27194-C028",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C029",
+      "origin": "live-description",
+      "text": "``` bash\n# 3) malloc(0) 의존 확인\nsed -n '13949,13957p' src/storage/page_buffer.c   # private_lru_session_cnt 할당과 NULL 판정\nsed -n '13905,13908p' src/storage/page_buffer.c   # num_private_chains=0 이면 개수 0\nsed -n '13918,13921p' src/storage/page_buffer.c   # SA_MODE 는 항상 0",
+      "sha256": "eb33fab51c20cf5567d10928c77e76ad309b44f5c79c4e4950bcab6f2d2ede96",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27194-C030",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C031",
+      "origin": "live-description",
+      "text": "-   1 단계: `memset` 이 대상 타입 `PGBUF_DIRECT_VICTIM` 의 크기(24바이트)를 쓰므로 구조체 세 필드가 모두 0 으로 초기화된다.",
+      "sha256": "b2d9baba0b54790ecfa76572a569bc9362e0ee284c667efe1c93b02a2f6d126f",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27194-C032",
+      "origin": "live-description",
+      "text": "-   2 단계: 하나의 mutex 는 최대 한 번만 파괴된다. AOUT 초기화가 실패해도 남는 진단은 `ER_OUT_OF_VIRTUAL_MEMORY` 뿐이다.",
+      "sha256": "b94d8e93760febef6c6767c97a667bfe1ca938327d2ee73ec29e8598ba5569b0",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27194-C033",
+      "origin": "live-description",
+      "text": "-   3 단계: 원소 개수가 0 이면 할당을 시도하지 않으므로, allocator 의 크기 0 처리 방식과 무관하게 부팅이 성공한다.",
+      "sha256": "d581c81df82a35864417a13d84a84de7f2ddea9d62212b310bcf74256334d8ce",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27194-C034",
+      "origin": "live-description",
+      "text": "1 단계 출력은 다음과 같아 8바이트가 초기화에서 빠지는 것이 확인된다.",
+      "sha256": "84129fce17b61efb0d460f21aa29a7ee633bdbdb30acaf2149448e9eb78ddee8",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C035",
+      "origin": "live-description",
+      "text": "$1 = 24\n    $2 = 16",
+      "sha256": "2772a067fb009d67c8ef939f0b8795b8900fe5d67334e60df6cd875727259330",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C036",
+      "origin": "live-description",
+      "text": "2 단계의 다섯 발췌를 이으면 `pgbuf_initialize_aout_list` 의 `error_return` -\\> `pgbuf_initialize` 의 `error` -\\> `pgbuf_finalize` 순으로 같은 `Aout_mutex` 가 두 번 파괴되는 경로가 그대로 드러난다.",
+      "sha256": "a4d1ab92dbd1e86fb561f9e6ff43390f6a5f1f3eca1ed1ec033c7cfa95f8543a",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27194-C037",
+      "origin": "live-description",
+      "text": "3 단계에서 `num_private_chains=0` 또는 standalone 실행이면 `PGBUF_PRIVATE_LRU_COUNT` 가 0 이므로 `malloc (0)` 이 호출되고, 그 반환값이 부팅 성공 여부를 결정한다.",
+      "sha256": "1598d4b25bfb80db033564903589daed3217d0943763e539c6a9921caeffabe9",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27194-C038",
+      "origin": "live-description",
+      "text": "-   세 건은 위치가 다르지만 모두 초기화·종료 위생 문제이고 각각 한두 줄 수정이라 하나의 PR 로 묶는다. 되돌릴 필요가 생겨도 정상 경로 동작 변화가 없어 revert 단위가 단순하다.",
+      "sha256": "e215f279ebe7fdc6009450b3f37768308ef91d41f382dab477310913adf8adc5",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27194-C039",
+      "origin": "live-description",
+      "text": "-   AOUT 이 기본 비활성인 근본 원인(`data_aout_ratio` 기본값 0.0)은 기존 CBRD-20741 과 연결돼 있어 이 이슈에서 다루지 않는다.",
+      "sha256": "1f644e2f270bcf13ea28fc6acd1ddf2ca1f2d67f5b5e28cb34559fda5bdc8c53",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27194-C040",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A4 항목이다.",
+      "sha256": "2a5a245299e9eeee2d47db0cbe808bd7918aa7eabd92aaeca4d56fc4fd21799f",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27194-C041",
+      "origin": "live-description",
+      "text": "| 위치                                                       | 내용                                                            |\n|------------------------------------------------------------|-----------------------------------------------------------------|\n| `page_buffer.c:1602-1871`                                  | `pgbuf_initialize` --- 실패 시 `pgbuf_finalize` 호출 구조       |\n| `page_buffer.c:745-752`                                    | `PGBUF_DIRECT_VICTIM` 정의 (포인터 3개)                         |\n| `page_buffer.c:841-845`                                    | `PGBUF_VICTIM_CANDIDATE_LIST` 정의 (memset 이 잘못 참조한 타입) |\n| `page_buffer.c:2013-2038`                                  | finalize 의 `direct_victims` 정리                               |\n| `page_buffer.c:5758-5855`                                  | `pgbuf_initialize_aout_list` --- mutex init 과 실패 경로        |\n| `page_buffer.c:13931-13984`                                | `pgbuf_initialize_page_quota` --- 두 배열 할당                  |\n| `src/transaction/log_tran_table.c:423-425`, `:494`, `:591` | 재초기화 시 finalize 선행 경로                                  |",
+      "sha256": "7aa76ebda188085f36ba726a201c609023de94015a0b096779ced458a4f11707",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27194-C042",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: page buffer 초기화·종료 경로에 남은 위생 결함 3건을 없애, 부팅이 실패하는 순간에도 정의된 동작만 남게 한다.",
+      "sha256": "81b5dd0c1e35c4c0cdfd671efec874d6983e6f591a45b6f629256504c2013a59",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27194-C043",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C044",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "- **AS-IS (현재 동작 / 배경)**: 세 지점이 각자 자기 자료구조와 어긋나 있다.",
+      "sha256": "6cfd4d6cc0730d36e4131e65cef94bdfca0b48235a229ac10c8462536e3505ee",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27194-C045",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "| 위치 | 어긋난 점 |\n|---|---|\n| `page_buffer.c:1626` | `memset` 의 크기 인자가 대상 타입 `PGBUF_DIRECT_VICTIM` (24바이트) 이 아니라 이름이 비슷한 `PGBUF_VICTIM_CANDIDATE_LIST` (16바이트) 라, 마지막 필드 `waiter_threads_low_priority` 가 0 초기화에서 빠진다 |\n| `page_buffer.c:5851` + `:1980` | 한 번의 초기화 실패에서 `Aout_mutex` 를 두 번 `pthread_mutex_destroy` 한다 — 이미 파괴한 mutex 를 다시 파괴하는 정의되지 않은 동작이다 |\n| `page_buffer.c:13949` | quota 비활성 시 원소 개수가 0 이어서 `malloc (0)` 이 되고, 그 반환값이 부팅 성공 여부를 결정한다 |",
+      "sha256": "b5ea386eb57b50d02d8ec842d904df80bc9fafc2061f8d934a08766cf9544768",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27194-C046",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "- **TO-BE (목표 상태 / 기대 동작)**: memset 은 대상 타입의 크기를 쓰고, `Aout_mutex` 파괴는 finalize 한 곳만 수행하며, 원소 개수가 0 이면 할당을 건너뛴다.\n- **영향**: 기술 부채 — 세 건 모두 정상 부팅에서는 드러나지 않고 실패 경로에서만 발현한다. 예컨대 `data_aout_ratio` 를 켠 서버가 AOUT hash 생성 중 메모리 부족을 만나면, 남겨야 할 진단은 `ER_OUT_OF_VIRTUAL_MEMORY` 하나인데 그 위에 mutex 이중 파괴가 겹쳐 원인 추적을 흐린다.",
+      "sha256": "96f298f822d65752e2bfcf1f8553f9f39d8c73c5dcea286aee331aebee993393",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27194-C047",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27194-C048",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "| 대상 | 수정 |\n|---|---|\n| `:1626` memset | 크기 인자를 `sizeof (PGBUF_DIRECT_VICTIM)` 으로 바꾼다 |\n| `:5851` | 초기화 실패 경로의 `pthread_mutex_destroy` 를 제거해 파괴 소유권을 `pgbuf_finalize` (`:1980`) 하나로 몬다. finalize 가 조건 없이 destroy 하는 현재 형태와 일관된다 |\n| `:13949` | `PGBUF_PRIVATE_LRU_COUNT` 가 0 이면 할당을 건너뛰고 포인터를 NULL 로 둔다. 이후 사용처(`:13964-13967` 의 private 인덱스 루프)는 private LRU 가 없으면 돌지 않으므로 추가 가드는 필요하지 않다 |\n| 부수 정리 | `:13954-13955` 의 `er_set` 이 `private_lru_session_cnt` 실패를 알리면서 크기로 `PGBUF_TOTAL_LRU_COUNT` 를 넘긴다. 같은 블록이라 함께 `PGBUF_PRIVATE_LRU_COUNT` 로 고친다 (동작 무영향) |",
+      "sha256": "516b707646e3965556f440b06e779f89c9982613fa6da00b41e7f2b5f9602149",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27194-C049",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "초기화 중간 실패 경로 전반의 자원 소유권 점검을 이 이슈 범위에 포함한다.",
+      "sha256": "16493ed09f73ad0287221989651d666be38adbd172f809fd0293a98a1707c36b",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27194-C050",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c` 한 파일이며 세 지점 모두 부팅·종료 시점 코드다. 정상 경로의 동작과 성능은 바뀌지 않고, 디스크 형식·설정·통계·외부 interface 도 그대로다. memset 지점은 `#if defined (SERVER_MODE)` 안에 있어 서버 빌드 전용이고, `malloc (0)` 지점은 standalone (SA_MODE) 빌드에서 quota 가 항상 비활성(`:13920`)이라 매 실행 해당된다. QA 관점의 관측 지점은 정상 부팅이 아니라 부팅 실패 주입이다.",
+      "sha256": "197b11a40aa3d96a93ed776287a8edddaa498f3333723d65ede449721e01aef3",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27194-C051",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 D2 와 N6 이다. 기존 본문(스크린샷 스텁)을 이 내용으로 교체하며, 원래 D2 만 다루던 범위를 같은 계열 결함 N6 까지로 넓힌다.",
+      "sha256": "b6bb1fdf3f2cfdde3b8470ca0e224335cd67c9c283e471d39be46369da54c481",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27194-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 의 부팅 경로는 `pgbuf_initialize` (`:1602`) 하나에서 시작해, 실패하면 자기 자신이 `pgbuf_finalize` (`:1881`) 를 불러 정리한 뒤 오류를 올린다(`:1867-1870`). 즉 초기화 실패 정리는 finalize 가 전담하는 구조다. 아래 세 지점이 그 구조와 어긋난다.",
+      "sha256": "4efbfa34f9aeee883a9ef982f2afa3d8f6e4d407b28ee33a5aadfc19def83e32",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27194-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "`direct_victims` 는 victim (재사용할 수 있는 buffer frame) 을 기다리는 스레드에게 BCB (Buffer Control Block — frame 에 올라온 page 의 제어 블록) 를 직접 넘겨주는 장치이고, 포인터 3개로 이루어진다.",
+      "sha256": "cc7fdf492461b0e355f0e644b29547ee90a10390b8d75f27f9ab506adc4a6948",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27194-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```\nstruct pgbuf_direct_victim                                    :745-752\n  PGBUF_BCB **bcb_victims;                     [ 0..7]   <- memset 대상\n  circular_queue<THREAD_ENTRY *> *waiter_threads_high_priority;\n                                               [ 8..15]  <- memset 대상\n  circular_queue<THREAD_ENTRY *> *waiter_threads_low_priority;\n                                               [16..23]  ★ 덮이지 않음\n```",
+      "sha256": "a52130d37389747f0270a95271f3d15e5393bb2f422540fc147f76a4f5e70a3d",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "`:1626` 이 크기 인자로 준 `PGBUF_VICTIM_CANDIDATE_LIST` 는 victim 후보 목록의 원소 타입(`PGBUF_BCB *` + `VPID`)으로 24바이트가 아니라 16바이트다. 이름이 비슷해 생긴 혼동으로 보인다.",
+      "sha256": "ec89f0c4cf55225ad9ca6f4f780ee888e065d90e997a8601534887d5535053d5",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "지금 실제 피해가 없는 이유는 두 겹이다 — `pgbuf_Pool` 이 static 전역이라 첫 초기화에서는 세 필드가 모두 0 이고, 재초기화 경로(`logtb_define_trantable_log_latch` 가 기존 테이블을 발견하면 `logtb_undefine_trantable` -> `pgbuf_finalize` 를 먼저 수행한다, `src/transaction/log_tran_table.c:423-425`, `:591`) 에서도 finalize 가 `:2026`, `:2031` 에서 두 큐 포인터를 NULL 로 되돌린다. 그러나 초기화 코드가 \"구조체 전체를 0 으로 둔다\"고 선언하면서 실제로는 3분의 2만 덮는 상태라, 필드를 하나 추가하거나 순서를 바꾸는 순간 finalize 의 `delete` 대상(`:2028-2032`)이 쓰레기 포인터가 된다. 한 단어 수정으로 이 위험을 없애는 편이 낫다.",
+      "sha256": "026a8921ad8edb35168904e63a748036b1260510a495159a4fc04bec8be1f0b7",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27194-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "AOUT (2Q 교체 정책에서 main queue 에서 밀려난 page 식별자의 이력을 보관하는 queue) 초기화는 `pgbuf_initialize_aout_list` (`:5758`) 가 담당한다.",
+      "sha256": "af3418927cc459a02499bd593a40952a065592c1f9dd2165b6a23a0381551ae3",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27194-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```\npgbuf_initialize                                                 :1602\n  └ pgbuf_initialize_aout_list                                   :1726\n       pthread_mutex_init (&list->Aout_mutex)                     :5775\n       if (aout_ratio <= 0) return NO_ERROR   <- 기본값 0.0 이면 여기서 끝  :5777-5782\n       malloc bufarray            실패 -> return (destroy 안 함)   :5787-5792\n       malloc aout_buf_ht         실패 -> goto error_return        :5814-5819\n       mht_create                 실패 -> goto error_return        :5825-5830\n     error_return:\n       pthread_mutex_destroy (&list->Aout_mutex)   ★ 1차 파괴      :5851\n       return ER_FAILED\n  goto error                                                     :1728\nerror:\n  pgbuf_finalize                                                 :1869\n    pthread_mutex_destroy (&Aout_mutex)          ★ 2차 파괴       :1980\n```",
+      "sha256": "c079643823bc448bdb7dfddaaacadcbd003ab167f9980548f19ba83093a761c4",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27194-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "같은 함수 안에서도 규칙이 갈린다 — `bufarray` 할당 실패는 destroy 없이 반환하고(`:5791`), `error_return` 만 destroy 한다. finalize 는 조건 없이 destroy 하므로, 초기화 실패 경로에서 destroy 를 빼는 쪽이 규칙을 하나로 만든다. 발현 조건은 `data_aout_ratio` (기본 0.0 이라 AOUT 자체가 기본 비활성) 를 켠 상태에서 hash 배열 할당이나 `mht_create` 가 실패하는 경우이며, 그래서 지금까지 드러나지 않았다.",
+      "sha256": "a052f59f07ec8c3a3b32a1b2e90f3aad6db5d81e498cf2373b52ae9a5fee22fd",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27194-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "`pgbuf_initialize_page_quota` (`:13931`) 는 배열 두 개를 할당하고 각각 NULL 이면 부팅을 실패시킨다.",
+      "sha256": "32f8547724380aebf105781bf14ad809b8cfad8eef77509ae7ed7714aa0438c9",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27194-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "| 할당 | 원소 개수 | 개수가 0 이 될 수 있는가 |\n|---|---|---|\n| `lru_victim_flush_priority_per_lru` (`:13939`) | `PGBUF_TOTAL_LRU_COUNT` = shared + private | 아니다. shared LRU 개수는 항상 1 이상이다 |\n| `private_lru_session_cnt` (`:13949`) | `PGBUF_PRIVATE_LRU_COUNT` = `quota.num_private_LRU_list` | 그렇다. `num_private_chains=0` 이면 0 이고(`:13905-13908`), SA_MODE 는 항상 0 이다(`:13920`) |",
+      "sha256": "d9a6bd100e84776cd210a34e7257cad3320d33f3a4e967f72bedf01045edbdd0",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27194-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "glibc 는 `malloc (0)` 에 대해 free 가능한 유일 포인터를 돌려주므로 현재 플랫폼에서는 통과한다. 반환값이 NULL 인 구현에서는 아무 문제 없는 설정이 메모리 부족으로 오인돼 서버가 뜨지 않는다. 개수가 0 이면 할당을 건너뛰는 것이 의미상으로도 맞다 — 이어지는 초기화 루프(`:13960-13968`)는 private LRU 인덱스에만 접근하므로 private 이 없으면 이 배열을 만지지 않는다.",
+      "sha256": "e54c5d6a90f619bcbeba54272720e99bc9d9ae79ce950a468fb80ea012a66f4f",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27194-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). Fedora 44 / GCC 16.1.1, `cmake --preset debug` 로 만든 debug 빌드에서 확인했다.",
+      "sha256": "34d8b352212eadfccd5774ed4e049abdd59b4dda608940fc7e2c752c7521bda2",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27194-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "세 결함 모두 정상 부팅에서는 증상이 없어, 크기 불일치는 디버그 정보로 직접 확인하고 나머지 두 건은 도달 경로를 소스로 확인한다. 명령은 CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "e68c043954cf7cfa40e198c079a463948396174db6c50e0380e28b624bab816c",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27194-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```bash\n# 1) memset 크기 불일치: 두 타입의 실제 크기를 오브젝트 파일의 디버그 정보에서 읽는다\ncmake --preset debug\ncmake --build build_preset_debug --target cub_server\ngdb -nx -q -batch \\\n  -ex 'print sizeof (struct pgbuf_direct_victim)' \\\n  -ex 'print sizeof (struct pgbuf_victim_candidate_list)' \\\n  build_preset_debug/cubrid/CMakeFiles/cubrid.dir/__/src/storage/page_buffer.c.o",
+      "sha256": "d6e28ce1049f010dcce12e05d5424e260da83e83b642ac2d5063d8ff9d79146f",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27194-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```bash\n# 2) Aout_mutex 이중 destroy 경로 확인\nsed -n '5775,5776p'   src/storage/page_buffer.c   # 초기화에서 mutex_init\nsed -n '5835,5853p'   src/storage/page_buffer.c   # 실패 경로의 1차 destroy\nsed -n '1726,1729p'   src/storage/page_buffer.c   # 실패 시 goto error\nsed -n '1867,1870p'   src/storage/page_buffer.c   # error 라벨이 pgbuf_finalize 호출\nsed -n '1980p'        src/storage/page_buffer.c   # finalize 의 2차 destroy",
+      "sha256": "99b8c7994bf57aea52f03c8572929d96c22754c2cd5e93a6bba3311dc91e9ba3",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27194-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```bash\n# 3) malloc(0) 의존 확인\nsed -n '13949,13957p' src/storage/page_buffer.c   # private_lru_session_cnt 할당과 NULL 판정\nsed -n '13905,13908p' src/storage/page_buffer.c   # num_private_chains=0 이면 개수 0\nsed -n '13918,13921p' src/storage/page_buffer.c   # SA_MODE 는 항상 0\n```",
+      "sha256": "aac9c586dfa110572f6520370a1b92f7be71a2b0d1acafbdc43bd43d28b6c318",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27194-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "- 1 단계: `memset` 이 대상 타입 `PGBUF_DIRECT_VICTIM` 의 크기(24바이트)를 쓰므로 구조체 세 필드가 모두 0 으로 초기화된다.\n- 2 단계: 하나의 mutex 는 최대 한 번만 파괴된다. AOUT 초기화가 실패해도 남는 진단은 `ER_OUT_OF_VIRTUAL_MEMORY` 뿐이다.\n- 3 단계: 원소 개수가 0 이면 할당을 시도하지 않으므로, allocator 의 크기 0 처리 방식과 무관하게 부팅이 성공한다.",
+      "sha256": "e1f3db7ab31de808bcdd0e712934c9e3f587429a384b540f903b342d83ac9a83",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27194-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "1 단계 출력은 다음과 같아 8바이트가 초기화에서 빠지는 것이 확인된다.",
+      "sha256": "84129fce17b61efb0d460f21aa29a7ee633bdbdb30acaf2149448e9eb78ddee8",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "```\n$1 = 24\n$2 = 16\n```",
+      "sha256": "354e5a56640fd6c26d4ecc5dc585fe6c1d4ecaaf3dce76b7b79c9728e1dd4b7a",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27194-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "2 단계의 다섯 발췌를 이으면 `pgbuf_initialize_aout_list` 의 `error_return` -> `pgbuf_initialize` 의 `error` -> `pgbuf_finalize` 순으로 같은 `Aout_mutex` 가 두 번 파괴되는 경로가 그대로 드러난다.",
+      "sha256": "6e2196a436c140a460f38ea0deb24d36a2440034db28e6e99c85dbdbafe6c4f7",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27194-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "3 단계에서 `num_private_chains=0` 또는 standalone 실행이면 `PGBUF_PRIVATE_LRU_COUNT` 가 0 이므로 `malloc (0)` 이 호출되고, 그 반환값이 부팅 성공 여부를 결정한다.",
+      "sha256": "1598d4b25bfb80db033564903589daed3217d0943763e539c6a9921caeffabe9",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27194-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "- 세 건은 위치가 다르지만 모두 초기화·종료 위생 문제이고 각각 한두 줄 수정이라 하나의 PR 로 묶는다. 되돌릴 필요가 생겨도 정상 경로 동작 변화가 없어 revert 단위가 단순하다.\n- AOUT 이 기본 비활성인 근본 원인(`data_aout_ratio` 기본값 0.0)은 기존 CBRD-20741 과 연결돼 있어 이 이슈에서 다루지 않는다.\n- 부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A4 항목이다.",
+      "sha256": "7d9d4694f989d5981e1df3f796758dbddf7e13f443be5a543050bb7cbc71c9fa",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27194-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md",
+      "text": "| 위치 | 내용 |\n|---|---|\n| `page_buffer.c:1602-1871` | `pgbuf_initialize` — 실패 시 `pgbuf_finalize` 호출 구조 |\n| `page_buffer.c:745-752` | `PGBUF_DIRECT_VICTIM` 정의 (포인터 3개) |\n| `page_buffer.c:841-845` | `PGBUF_VICTIM_CANDIDATE_LIST` 정의 (memset 이 잘못 참조한 타입) |\n| `page_buffer.c:2013-2038` | finalize 의 `direct_victims` 정리 |\n| `page_buffer.c:5758-5855` | `pgbuf_initialize_aout_list` — mutex init 과 실패 경로 |\n| `page_buffer.c:13931-13984` | `pgbuf_initialize_page_quota` — 두 배열 할당 |\n| `src/transaction/log_tran_table.c:423-425`, `:494`, `:591` | 재초기화 시 finalize 선행 경로 |",
+      "sha256": "e75cbf7a67ab0207c8f6d2b7dd50a8f86e4cb0fdb5d0b1ba246db1c6cb362390",
+      "disposition_group": 31
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        2,
+        7,
+        26,
+        28,
+        30,
+        43,
+        47
+      ],
+      "disposition": "non-substantive",
+      "reason": "Summary headings and isolated code fences; replaced by the current skill structure. No independent technical claim.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        1,
+        42
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the initialization/finalization purpose, remove ungrounded low-priority framing and the promise that only three tiny fixes exhaust the lifetime problem. Include caller and partial-failure boundaries.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        44
+      ],
+      "disposition": "retained",
+      "reason": "The three original areas remain supported at the pinned source; detailed limitations are stated in the report.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        45
+      ],
+      "disposition": "corrected",
+      "reason": "Retain wrong sizeof, conditional duplicate AOUT destruction and zero-count allocation. Historical byte counts are attributed rather than presented as newly measured; AOUT production reachability is limited by forced disablement.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/09-issue-proposals.md#L72-L80"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        46
+      ],
+      "disposition": "corrected",
+      "reason": "Replace prescribed fixes and the blanket failure-only/no-normal-impact interpretation with observable lifetime and empty-array outcomes. A single finalizer owner is not sufficient without initialization-state and caller analysis.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        6
+      ],
+      "disposition": "corrected",
+      "reason": "Potential diagnostic interference is a risk rather than an observed symptom. Empty private arrays can occur during ordinary startup; current AOUT tuning forces ratio zero. Do not promise the sole diagnostic will be ER_OUT_OF_VIRTUAL_MEMORY.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        48
+      ],
+      "disposition": "corrected",
+      "reason": "Keep error-size mismatch and intended invariants; move implementation choice to ANALYSIS. Remove claims that deleting one destroy is a complete fix, no additional guard is needed, or diagnostic-size correction has no behavioral impact.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14481-L14574",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        49
+      ],
+      "disposition": "retained",
+      "reason": "Partial-initialization resource ownership audit remains in scope and is substantiated with helper/caller paths.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5527-L5567",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        50
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve server-only direct-victim code and SA zero-private configuration. Remove guaranteed one-file/no-normal-behavior/no-performance/interface effects and failure-injection-only framing before the design and tests exist.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L96-L103"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        51
+      ],
+      "disposition": "corrected",
+      "reason": "Retain parent CBRD-27193 and bounded lifetime assignment. Remove obsolete parent table labels D2/N6/A4 and screenshot/body replacement editorial history.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        52
+      ],
+      "disposition": "corrected",
+      "reason": "pgbuf_initialize does call finalize on error, but finalize is not the exclusive cleanup owner: BCB/AOUT helpers clean resources themselves and logtb may finalize again.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1820-L1829",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5527-L5567",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        53
+      ],
+      "disposition": "retained",
+      "reason": "Direct victim hands reusable BCB state to waiting threads; definition has three pointer fields.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        15,
+        34,
+        35,
+        54,
+        55,
+        69,
+        70
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the type mismatch and historical 24/16-byte values as attributed prior-build evidence. Remove ABI-independent field-offset diagram, current-run output framing, and guessed naming-confusion root cause.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L816-L822",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/09-issue-proposals.md#L72-L80",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md#L100-L158"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        56
+      ],
+      "disposition": "corrected",
+      "reason": "Retain static-zero and NULL-reset mitigations. Remove the unproved immediate garbage-delete prediction after any field/layout change and blanket no-current-harm assertion. Current boot-manager reuse means not every transaction-table redefine finalizes/reinitializes the pool.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L816-L822",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1978-L1991",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1130-L1140"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        57
+      ],
+      "disposition": "retained",
+      "reason": "AOUT history structure initialization belongs to pgbuf_initialize_aout_list; no change to the AOUT activation policy is claimed.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5774-L5788",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L615-L625"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        58
+      ],
+      "disposition": "corrected",
+      "reason": "Retain init, malloc and mht_create failure-control-flow sequence with pinned line refs. Explicitly limit duplicate-destroy deduction to reaching AOUT active initialization; current tuning disables it.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5774-L5788",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1820-L1829",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        59
+      ],
+      "disposition": "corrected",
+      "reason": "Retain different helper cleanup rules for bufarray failure versus error_return. Remove the selected one-line solution and invented explanation for why it had never appeared; record missing runtime evidence and forced ratio zero.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        60
+      ],
+      "disposition": "retained",
+      "reason": "Page quota allocates two arrays and returns allocation failure on NULL; currently verified in pinned source.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        61
+      ],
+      "disposition": "retained",
+      "reason": "Retain shared+private macro relationship, nonzero shared LRU in valid initialization, and zero private LRU settings/SA configuration. Updated pinned references.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1025-L1033",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5706-L5724"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "Retain conditional NULL-return startup failure and private-only initialization loop. Remove a newly verified current-glibc success claim and the guarantee that no additional consumer-contract checks are needed; examine all array consumers in ANALYSIS.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14481-L14574"
+      ]
+    },
+    {
+      "ids": [
+        23,
+        63
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve e6ed61e87/Fedora 44/GCC 16.1.1/debug as an attributed original-body build report. Explicitly separate it from current pinned-source static review; no new runtime build is claimed.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/09-issue-proposals.md#L72-L80",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md#L100-L158"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "Remove all-three-only-on-failure and current-runtime-verification framing. Distinguish source inspection, historical sizeof observation, unexecuted injection plans, and ordinary zero-private startup.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/09-issue-proposals.md#L72-L80"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        65
+      ],
+      "disposition": "corrected",
+      "reason": "Replace old line/object-path-dependent GDB recipe with pinned git-show source checks; retain historical sizes separately and leave new ABI/build measurement as unexecuted.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/09-issue-proposals.md#L72-L80",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27194-pgbuf-init-finalize-hygiene_e6ed61e_claude.md#L100-L158"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Replace stale sed line numbers and data_aout_ratio=0.1-only injection recipe. Current tuning forces zero, so prove effective positive ratio/support path or mark a test-only override before injecting AOUT hash failure.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1820-L1829"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "Retain zero-count source inspection with pinned updated line references and state that no runtime NULL-return allocator test was run.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        32,
+        33,
+        68
+      ],
+      "disposition": "corrected",
+      "reason": "Replace chosen sizeof/finalizer-only/no-other-error/bootstrap-success prescriptions with ABI-independent complete initialization, valid exactly-once cleanup per lifetime, empty-configuration validity and accurate original diagnostics. Other startup errors may still occur.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        36,
+        71
+      ],
+      "disposition": "corrected",
+      "reason": "Retain source-level duplicate-destroy path, but current paths include forced-off AOUT and possible additional caller finalization. No engine destruction count or crash is asserted.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1820-L1829"
+      ]
+    },
+    {
+      "ids": [
+        37,
+        72
+      ],
+      "disposition": "retained",
+      "reason": "Zero private count reaches malloc(0); NULL is treated as failure. This is a static conditional result, not a new platform failure observation.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718"
+      ]
+    },
+    {
+      "ids": [
+        38,
+        73
+      ],
+      "disposition": "corrected",
+      "reason": "Keep a bounded lifetime work unit and parent relationship. Remove guaranteed one/two-line one-PR scope, unchanged normal path, trivial revert, obsolete A4 reference and unsupported priority ranking; CBRD-20741 is current forced-disable context.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        39
+      ],
+      "disposition": "corrected",
+      "reason": "CBRD-20741 connection is explicit in source, but current code forces AOUT ratio zero rather than merely supplying a default. Activation policy remains outside this issue.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10235-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L3506-L3517"
+      ]
+    },
+    {
+      "ids": [
+        40
+      ],
+      "disposition": "corrected",
+      "reason": "Retain parent relationship; remove stale A4 table identity. Parent link is issue metadata, with technical child boundary defined from lifetime evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995"
+      ]
+    },
+    {
+      "ids": [
+        41,
+        74
+      ],
+      "disposition": "non-substantive",
+      "reason": "Reference-only tables are superseded by verified immutable full-SHA code links at current line ranges; their technical facts are accounted for by the associated substantive inventory units.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5794-L5860",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1895-L1939",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13910-L13933",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L13949-L13995",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1978-L1991",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": [],
+  "attachment_claim_groups": [
+    {
+      "ids": [
+        "CBRD-27194-A1020015-C001"
+      ],
+      "disposition": "retained",
+      "reason": "Screenshot wrong-sizeof code snippet and SERVER_MODE boundary agree with pinned source. Retain as historical code analysis, not runtime evidence. Screenshot inspected directly; attached 2026-08-06T17:41:29+0900.",
+      "evidence": [
+        "http://jira.cubrid.org/secure/attachment/1020015/image-2026-08-06-17-41-28-760.png",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601"
+      ]
+    },
+    {
+      "ids": [
+        "CBRD-27194-A1020015-C002"
+      ],
+      "disposition": "corrected",
+      "reason": "Screenshot gives 24-byte destination/16-byte size and an uncovered low-priority pointer. Preserve historical ABI-specific explanation; current report does not claim fresh sizeof output or an uninitialized runtime pointer solely from incomplete memset.",
+      "evidence": [
+        "http://jira.cubrid.org/secure/attachment/1020015/image-2026-08-06-17-41-28-760.png",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L717-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L816-L822",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1978-L1991"
+      ]
+    },
+    {
+      "ids": [
+        "CBRD-27194-A1020015-C003",
+        "CBRD-27194-A1020015-C004"
+      ],
+      "disposition": "corrected",
+      "reason": "Screenshot predicts garbage-pointer deletion on error before low-priority queue assignment and says only a second initialize call can expose it. Neither is demonstrated by the screenshot: it contains no runtime log; static zero initialization, finalizer NULL resets and conditional boot-manager reuse must be considered. Keep the lifetime investigation without asserting a reproduced or guaranteed reinitialization crash.",
+      "evidence": [
+        "http://jira.cubrid.org/secure/attachment/1020015/image-2026-08-06-17-41-28-760.png",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L816-L822",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1750-L1778",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1978-L1991",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L587-L594"
+      ]
+    },
+    {
+      "ids": [
+        "CBRD-27194-A1020015-C005"
+      ],
+      "disposition": "corrected",
+      "reason": "Screenshot SHOULD recommendation to use destination sizeof is historical proposed remediation. Report preserves the complete-initialization outcome and leaves implementation to ANALYSIS; remove unsupported guarantees that observable behavior cannot change and drop-in validation is unaffected.",
+      "evidence": [
+        "http://jira.cubrid.org/secure/attachment/1020015/image-2026-08-06-17-41-28-760.png",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1593-L1601",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1668-L1718",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L511"
+      ]
+    }
+  ]
+}

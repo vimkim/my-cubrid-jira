@@ -1,0 +1,242 @@
+[
+  {
+    "key": "CBRD-27193",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27193",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "7f27a70777b4da23c2cfdcd3a17e160998722f0b8cf3de69f31e2f03260eed23",
+    "converted_description_chars": 15358,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27194",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27194",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "14f9e96e2d9dffc0a7dbb072a7d830abb32c056a3a30e2baf0e71210bd7da175",
+    "converted_description_chars": 12929,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27196",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27196",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "9cb3202676554813ae618a92528f3be3d5ed98224424217dbec7b19391e25247",
+    "converted_description_chars": 12362,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27211",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27211",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "3525feb4e0a519f25497c1053568a2519a7ddd89ad77d368cffd9c6918a2b54b",
+    "converted_description_chars": 10290,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27252",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27252",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "2b040277ae3068d258bd92763914e1bfb87401eca8356f70ece8f3152ed40ef8",
+    "converted_description_chars": 9522,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27262",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27262",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "55b1c6240f6d19d31d5bb3df95ad9cd693c9f56470bfdb93bfec0b6d6bf01879",
+    "converted_description_chars": 11933,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27263",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27263",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "bbf387e637b5280af330bde2d44766cf986e2d914499b3e47ea1af66167d70b6",
+    "converted_description_chars": 16530,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27264",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27264",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "17bf45cc7b18b7a4393b31e0aa116b8d418c714a49bb8e4a1fcf18bbccd1caf2",
+    "converted_description_chars": 10543,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27265",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27265",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "2e1f92eddaa75b68d3ec85c11d8d549d80c47d3e0af1e5802066448c04e1a67b",
+    "converted_description_chars": 13516,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27266",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27266",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "67d8b82274f892cf272df249ddf94657097c9e0df4790a069685bdfbb945ee5d",
+    "converted_description_chars": 11771,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27267",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27267",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "8651aa8cf66109e21aa62e9ecb20cb167c93e5b866f8ff82972a7323c4b0bd2a",
+    "converted_description_chars": 12109,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27268",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27268",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "f2f83000e1f8c06f49b64602ca53495d7e7daa3591df34c4c9dece7e60ccc18f",
+    "converted_description_chars": 10491,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27269",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27269",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "5ad506b975f74db6eb1935e1500ea43f9a51fb4eaf18401bb24ec53792b0d4b8",
+    "converted_description_chars": 13168,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27270",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27270",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "24e4de998bb4310d3f5c95562620d518437b04bb35c93a59452d07f30d6486cf",
+    "converted_description_chars": 16482,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27316",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27316",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "f13959d1233161b04d5358f437fa8a81bd3edeb5d51132f5f1e97188234e5725",
+    "converted_description_chars": 10274,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27356",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27356",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "cb5833e27f82f5fb4e4076a217d989b508b1e937dbd0bb57683ae81cf560e5a1",
+    "converted_description_chars": 13769,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27370",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27370",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "66808ddf05da3fd81acbbb3192bfaaf378015c41940d9cb15e319cf503213e31",
+    "converted_description_chars": 14552,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27398",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27398",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "77e5bb66c09475e54b1dd16dc3dcf659cc18384a42804d0541a6f640de7eb84f",
+    "converted_description_chars": 13632,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27423",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27423",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "dc27428611e53cbf3d2577fe0b346c87a644baaf423c028b255364e9b05c84a9",
+    "converted_description_chars": 10147,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  },
+  {
+    "key": "CBRD-27630",
+    "target": "http://jira.cubrid.org/rest/api/2/issue/CBRD-27630",
+    "fields": [
+      "description"
+    ],
+    "source_sha256": "bcb4645cc5c6b97150927d1b770634564b18f4e73eeb896bafc94cae91217405",
+    "converted_description_chars": 13642,
+    "format": "JIRA wiki",
+    "dry_run": true,
+    "result": "passed"
+  }
+]

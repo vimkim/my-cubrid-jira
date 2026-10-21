@@ -1,0 +1,705 @@
+{
+  "issue": "CBRD-27264",
+  "reviewer": "/root",
+  "report_sha256": "17bf45cc7b18b7a4393b31e0aa116b8d418c714a49bb8e4a1fcf18bbccd1caf2",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27264-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: victim 공급이 끊긴 순간 대기 스레드를 구제하도록 설계된 direct victim 긴급 배정 경로 두 곳이 실제로 동작하게 하거나, 동작하지 않는 채로 남은 코드를 제거해 코드와 실제 동작을 일치시킨다.",
+      "sha256": "d6e8c5b7579cb25fd3fc20b8c2a642d39c9f26e2bb9890173c4852c61b7b0e01",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27264-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27264-C003",
+      "origin": "live-description",
+      "text": "-   **AS-IS (현재 동작 / 배경)**: 100ms 주기 `pgbuf-maintain` 데몬(`page_buffer.c:17113`)이 부르는 `pgbuf_direct_victims_maintenance` (`:9563`) 의 두 순회는 `index = prv_index` 로 시작한 뒤 조건에서 `index != prv_index` 를 요구해(`:9577`, `:9586`) 본문이 한 번도 실행되지 않고, 긴급 배정 함수의 나머지 호출부(`:9407`)는 리스트에서 이미 떼어낸 BCB 의 이웃 포인터를 넘겨 항상 NULL 로 진입한다. 그래서 긴급 배정 통계 `Num_victim_assign_direct_panic` 은 어떤 부하에서도 0 을 벗어날 수 없다.",
+      "sha256": "a0c35e742a57004c1f3fd2470b14da32c4601377431f0dfdffd951f8c6276a18",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27264-C004",
+      "origin": "live-description",
+      "text": "-   **TO-BE (목표 상태 / 기대 동작)**: 두 결말 중 하나로 정리한다 --- 순회를 의도대로 고쳐 저활동 구간에서도 주기적으로 direct victim 이 배정되게 하거나, 경로 자체를 제거해 \\\"백업 플랜이 있다\\\"는 코드상의 약속을 없앤다. 선택은 `TBD - 합의 미확인`.",
+      "sha256": "6ff91cda61f631bf4af1f5c3d28bf7fa01d5e97927973021acc506767a1135c3",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27264-C005",
+      "origin": "live-description",
+      "text": "-   **영향**: 설계 의도 훼손 --- `pgbuf_allocate_bcb` 의 `:8162-8166` TODO 주석이 우려한 \\\"아무도 대기 스레드에게 victim 을 공급하지 않는 경우\\\"에 대한 방어가 실질적으로 없다. 그 상황에 걸린 스레드는 `page_latch_timeout_in_msecs` (기본 300,000ms = 5분) 를 다 기다린 뒤 `ER_CSS_PTHREAD_COND_TIMEDOUT` 로 실패하며, debug 빌드는 그전에 `:8292` 의 `assert (r != ER_CSS_PTHREAD_COND_TIMEDOUT)` 로 서버가 중단된다.",
+      "sha256": "d16ebd1633911e09676bcc347a3e6406ec0ca2c873a788bab3c761f4fdeb37c0",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27264-C006",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: 목표 동작 선택은 미결이라 후보를 함께 올린다. 선택: `TBD - 합의 미확인`.",
+      "sha256": "35a99a883c0613939aec2ce2512ea13d95559aeb9d0325361e3d2118cf9dd0fa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27264-C007",
+      "origin": "live-description",
+      "text": "| 순위 | 후보                                                                                                                                                                                                                                                                                              | 고려사항                                                                                                                                                                    |\n|------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 1    | 순회 조건을 고쳐 백업 경로를 되살린다. 조건에서 `index != prv_index` 를 빼면 시작점부터 마지막 인덱스까지 훑고 다음 호출이 0 부터 이어받으며, `!(index == prv_index && restarted)` 로 바꾸면 호출마다 한 바퀴를 온전히 돈다. `:9407` 호출부는 리스트 이탈 전의 이웃 포인터를 넘기도록 함께 고친다 | 원래 의도한 안전망을 복원한다. 데몬이 실제로 일하게 되므로 100ms 마다 `lru_list->mutex` 를 잡는 구간(`:9614`)이 새로 생긴다 --- 저활동 구간 한정이지만 회귀 측정이 필요하다 |\n| 2    | 두 경로를 제거한다 (`pgbuf_direct_victims_maintenance`, `pgbuf_lfcq_assign_direct_victims`, `pgbuf_panic_assign_direct_victims_from_lru`, `:9402-9409` 의 hack 블록, `PSTAT_PB_VICTIM_ASSIGN_DIRECT_PANIC`)                                                                                       | 지금 동작과 코드가 일치하고 항상 0 인 통계 항목이 사라진다. `:8162-8166` TODO 가 지적한 취약점은 미해결로 남으므로 별도 대책이 필요하다                                     |",
+      "sha256": "a6f1c3695b5dae9c479d04fc418ed31bccdf9c59c55fe3a7995babcd9545ca69",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C008",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: 수정 대상은 `src/storage/page_buffer.c` 한 파일이고, 관련 코드는 전부 `#if defined (SERVER_MODE)` 구획(`:9486-9638`) 안에 있어 standalone (SA_MODE) 빌드와 클라이언트 라이브러리는 영향받지 않는다. 디스크 형식과 외부 interface 변경은 없다. 다만 `Num_victim_assign_direct_panic` (`src/base/perf_monitor.c:510`) 은 후보 1 에서는 0 이 아닌 값을 내기 시작하고 후보 2 에서는 항목 자체가 없어지므로, `cubrid statdump` 출력을 파싱하는 모니터링이 있으면 함께 확인해야 한다.",
+      "sha256": "1728384ab30ad744906e04327fc0592264ebce50fe1fa5db050c60fe918c5416",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27264-C009",
+      "origin": "live-description",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 D3 와 N3 이다.",
+      "sha256": "289141f3ecfd6f4932c31bb12d7be3bbc0f7e04bbfc6c155999349a2b5ff4aa2",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C010",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 는 새 page 를 올릴 자리가 필요할 때 victim (재사용할 수 있는 frame) 을 찾는다. 자리를 못 찾은 스레드는 대기 큐에 들어가고, 다른 주체가 BCB (Buffer Control Block --- frame 에 올라온 page 의 fix 수, latch, dirty 상태를 담은 제어 블록) 를 직접 넘겨주며 깨워준다. 이 방식이 direct victim 이고, 평상시 공급자는 flush 데몬이다 (`pgbuf_allocate_bcb` 가 대기 전에 `:8252` 에서 flush 데몬을 깨우고, flush 를 마친 page 는 `pgbuf_assign_flushed_pages` 가 대기 스레드에게 배정한다).",
+      "sha256": "b14835b2093214e82503e85a39aed862e4f31aa842ea2a6f02a7941bffc23ffe",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C011",
+      "origin": "live-description",
+      "text": "flush 데몬이 아무것도 내놓지 못하는 구간을 위한 두 번째 공급 경로가 `pgbuf_direct_victims_maintenance` 다. 함수 헤더 주석(`:9553-9561`)이 목적을 명시한다 --- \\\"the purpose of function is to make sure a victim is assigned even when system has low to no activity, which prevents bcb's from being assigned to a waiting thread. basically, this is the backup plan.\\\" 그 백업 플랜이 한 번도 실행되지 않는다.",
+      "sha256": "053030928344ac4b01527d80e3556858fd7bd17383892f8b26378bebec3bafbf",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C012",
+      "origin": "live-description",
+      "text": "[100ms 주기] pgbuf_page_maintenance_daemon_init (looper 100ms)   :17113\n      pgbuf_page_maintenance_execute                                 :16953\n        ├ pgbuf_adjust_quotas                                        (정상 동작)\n        └ pgbuf_direct_victims_maintenance                           :9563\n             ├ private 순회 index = prv_index / 조건 index != prv_index\n             │    ★ 첫 평가에서 거짓 -> 본문 0 회                     :9576-9581\n             └ shared  순회 index = shr_index / 조건 index != shr_index\n                  ★ 동일                                             :9585-9590\n             (본문) pgbuf_lfcq_assign_direct_victims                  :9580, :9589\n                      └ pgbuf_panic_assign_direct_victims_from_lru    :9616, :9631\n                           -> 호출 자체가 일어나지 않음",
+      "sha256": "289d80f1d5ca026b079eed3420cc40357c8e584a34185bd63d25962215526d94",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C013",
+      "origin": "live-description",
+      "text": "[victim 탐색 중] pgbuf_get_victim_from_lru_list\n      pgbuf_remove_from_lru_list (bufptr, lru_list)                  :9400\n        └ bufptr->prev_BCB = NULL                                   :10349\n      pgbuf_panic_assign_direct_victims_from_lru (.., bufptr->prev_BCB)\n        ★ bcb_start == NULL 이라 즉시 return 0                :9407 -> :9505",
+      "sha256": "6f30ef93c3eae4b1772f02e37234a7193e856516da709164b678c4cc5207f038",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C014",
+      "origin": "live-description",
+      "text": "순회 쪽은 초기화와 조건이 서로 모순이다. `index` 를 `prv_index` 로 초기화한 뒤 `index != prv_index` 를 요구하므로 첫 평가에서 끝난다. 종료 조건은 이미 `restarted` (마지막 인덱스에서 0 으로 되돌아갈 때 참이 되는 표시) 가 담당하고 있어서, 원래 의도는 \\\"재시작한 뒤에 시작점을 다시 만나면 멈춘다\\\" 였을 것이다. 즉 조건이 `index != prv_index` 가 아니라 `!(index == prv_index && restarted)` 여야 앞뒤가 맞는다.",
+      "sha256": "fb7af1e56eef0c2b3119d24e2e01246f5d049c6951efab847ff5b2de53b0df3d",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C015",
+      "origin": "live-description",
+      "text": "호출부 쪽은 인자 수명 문제다. `pgbuf_remove_from_lru_list` 는 BCB 를 LRU (Least Recently Used --- 최근 사용 시점을 기준으로 교체 대상을 고르는 목록) 에서 떼어내면서 `prev_BCB` 와 `next_BCB` 를 NULL 로 지운다(`:10349-10350`). 그 다음 줄의 hack 블록(`:9402-9409`)이 방금 지워진 `bufptr->prev_BCB` 를 긴급 배정 함수의 시작점으로 넘기니, 함수는 `bcb_start == NULL` 가드에서 바로 0 을 반환한다. 이웃 포인터를 쓰려면 리스트 이탈 전에 저장해야 하는데, 같은 함수가 `:9397` 에서 이미 `bufptr->prev_BCB` 로 victim hint 를 갱신하고 있어 저장 지점 자체는 어렵지 않다.",
+      "sha256": "0a7245199fad725fac4a0e42c2dcb5e29d3411febd80f8d4614f37e22f1d4b22",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C016",
+      "origin": "live-description",
+      "text": "두 결함이 겹치면서 `pgbuf_panic_assign_direct_victims_from_lru` 는 도달 가능한 모든 경로에서 0 을 반환하고, 그 안의 성능 통계 증가(`:9543`)도 실행되지 않는다. 함수에 붙은 `/* statistics shows not useful */` (`:9503`) 주석은 이런 상태에서 관측된 것이라 근거로 삼기 어렵다.",
+      "sha256": "73c4b5a2ea3f2dd49e2fea51948a2b4ebdafb98e2e77f619d4e0c88716ee2ecb",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27264-C017",
+      "origin": "live-description",
+      "text": "평상시에는 flush 데몬이 victim 을 계속 만들어내므로 백업 경로가 없어도 대기 스레드가 깨어난다. 백업 경로의 부재가 드러나는 조건은 flush 데몬이 내보낼 page 를 찾지 못하거나 깨어나지 못한 상태에서 victim 요구가 들어오는 경우로, 재현이 어렵고 발생해도 5분 timeout 뒤의 실패로만 관측된다. `:8162-8166` TODO 는 \\\"right now, after we added the victim rich hack, this may not happen\\\" 라고 적고 있지만, 그 hack 의 판정값인 `pgbuf_Pool.monitor.victim_rich` 는 `:14446` 에서 계산될 뿐 소비처가 없다 (EPIC 의 N9, 죽은 코드 정리 이슈 범위). 결과적으로 TODO 가 근거로 든 완화 장치도 실체가 없다.",
+      "sha256": "2834d8807237ebb745d7b335c9fb5f035d520eac7820896430b9c4b429566d4b",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27264-C018",
+      "origin": "live-description",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). 확인 환경은 Fedora 44 / GCC 16.1.1 이지만, 아래 확인 절차는 소스 정독과 별도 C 프로그램 실행이라 OS·컴파일러에 의존하지 않는다.",
+      "sha256": "1135c84d262beb2aa12238462dab72dbe615b18e605367b72cac98744b651654",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27264-C019",
+      "origin": "live-description",
+      "text": "1\\~3 단계는 소스만으로 확정되는 정적 확인, 4 단계는 순회 조건만 떼어낸 실행 확인, 5 단계는 운영 중 서버에서 보이는 증상이다. 1\\~4 단계 명령은 CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "817112acf600f957d99f35b1d8d8bc56e2cf4623cfe73fcd5cb1e7b332cd7ff6",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C020",
+      "origin": "live-description",
+      "text": "``` bash\n# 1) 순회 조건이 첫 평가에서 거짓임을 확인한다 (index 초기값 = prv_index)\nsed -n '9572,9591p' src/storage/page_buffer.c",
+      "sha256": "2ea1ecba7510411d314c581d9ba6022b434a60a5a2a4db093a31d41e36aa1335",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C021",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27264-C022",
+      "origin": "live-description",
+      "text": "``` bash\n# 4) 순회 형태만 떼어내 본문 실행 횟수를 센다 (DB 불필요)\ncat > /tmp/pgbuf_loop.c <<'EOF'\n#include <stdio.h>\n#define PGBUF_PRIVATE_LRU_COUNT 8   /* 임의의 양수 */\nint\nmain (void)\n{\n  int nassigns = 5, body_executed = 0, index, restarted;\n  static int prv_index = 0;",
+      "sha256": "bcae7c3050930f647915a7d80d9c9cd28cf9aa929b7ff640193c13b3a9abd358",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C023",
+      "origin": "live-description",
+      "text": "for (index = prv_index, restarted = 0;\n       nassigns > 0 && index != prv_index && !restarted;\n       (index == PGBUF_PRIVATE_LRU_COUNT - 1) ? index = 0, restarted = 1 : index++)\n    {\n      body_executed++;\n    }\n  printf (\"body executed %d times\\n\", body_executed);\n  return 0;\n}\nEOF\ngcc -Wall -o /tmp/pgbuf_loop /tmp/pgbuf_loop.c && /tmp/pgbuf_loop",
+      "sha256": "c44b59e0861315e946388c438b46c302493a263a279c6d2621d76ab7f0a7a73b",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C024",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27264-C025",
+      "origin": "live-description",
+      "text": "``` bash\n# 5) 실행 중 서버에서 긴급 배정 통계를 확인한다 (부하 종류와 시간에 무관하다)\ncubrid statdump -c -s victim_assign demodb",
+      "sha256": "39dcda2b01e726d398793539f691998f1f6c60d225a42b3135054a1adcac36a9",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27264-C026",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27264-C027",
+      "origin": "live-description",
+      "text": "-   4 단계: 순회는 시작점부터 한 바퀴를 돌아야 하므로 본문 실행 횟수가 1 이상이다.",
+      "sha256": "fdfd2e846a2df2340d96324ecaaa719520e274f53391115f8d2cec00cd5ba3ca",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27264-C028",
+      "origin": "live-description",
+      "text": "-   5 단계: victim 고갈 구간이 있었다면 `Num_victim_assign_direct_panic` 이 0 보다 크다.",
+      "sha256": "34ae007df3a4670d9ec740e467d63b2ba2c8c3b80bb999b98b02d9a62135e20b",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27264-C029",
+      "origin": "live-description",
+      "text": "-   victim 공급이 끊긴 구간에서도 100ms 안에 다음 유지보수 주기가 대기 스레드에게 BCB 를 배정하므로, `page_latch_timeout_in_msecs` 를 다 소진하는 대기가 생기지 않는다.",
+      "sha256": "761b193514ddee35e2ef302eb1744733a4e7d214f19049c6019c26cddfe66f38",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27264-C030",
+      "origin": "live-description",
+      "text": "-   4 단계 출력은 `body executed 0 times` 다. private/shared 순회 모두 같은 형태이므로 `pgbuf_direct_victims_maintenance` 는 100ms 마다 호출되면서도 아무 일도 하지 않는다.",
+      "sha256": "015e7efa1ebad896d2faf3a99093fbb14c07fb5763adebad5d7b1c28a71de008",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C031",
+      "origin": "live-description",
+      "text": "-   5 단계의 `Num_victim_assign_direct_panic` 은 항상 0 이다. 증가 지점(`:9543`)에 도달하는 경로가 없다.",
+      "sha256": "a0b8eaf0f193c184099dd00e86baa2bee5478ffeaa6cf1d09a44b5e8ea2460c2",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27264-C032",
+      "origin": "live-description",
+      "text": "-   victim 공급이 끊기면 대기 스레드는 `:8256` 의 timeout 대기를 그대로 소진한다. release 빌드는 `ER_CSS_PTHREAD_COND_TIMEDOUT`, debug 빌드는 `:8292` assert 실패로 끝난다.",
+      "sha256": "28e1ea9672e0ab3c7553e4ff50fc8cece6bd90aa8f62f52bf39f75f294234b7f",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27264-C033",
+      "origin": "live-description",
+      "text": "`PGBUF_PRIVATE_LRU_COUNT` 가 8, 시작점이 3 일 때 각 조건이 방문하는 인덱스와 다음 호출의 시작점이다 (위 4 단계 프로그램의 조건만 바꿔 확인).",
+      "sha256": "8f54846547e42a04d62e08567a6d10c4a99d3a7cb9015ecc27b5568e533eb081",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C034",
+      "origin": "live-description",
+      "text": "| 조건                                    | 방문 인덱스     | 다음 시작점 |\n|-----------------------------------------|-----------------|-------------|\n| 현행 `index != prv_index && !restarted` | 없음            | 3           |\n| `!restarted` (둘째 항 제거)             | 3 4 5 6 7       | 0           |\n| `!(index == prv_index && restarted)`    | 3 4 5 6 7 0 1 2 | 3           |",
+      "sha256": "1a92d1b4823edb26115332cfd6d78cd63710a39bafcd5b7bd901e160ea7b0181",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C035",
+      "origin": "live-description",
+      "text": "둘째 항만 제거하는 쪽은 호출당 부분 순회에 그치지만 라운드로빈 위치가 계속 전진하고, 셋째 안은 호출마다 한 바퀴를 돌되 `nassigns` 가 남아 있으면 시작점이 고정된다. 어느 의미를 택할지는 목표 동작 결정과 함께 정한다.",
+      "sha256": "cf0fde48bde08350162ccd0770d6ad9f37c7a79b491bd2864a0ed511b8506bb2",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C036",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A3 항목이다.",
+      "sha256": "736f48cac9f83fac5588a4905460d4097f9e73250095bca4279aa8c4ef4efa1c",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C037",
+      "origin": "live-description",
+      "text": "-   `monitor.victim_rich` 미소비와 `:9046-9053` 주석 불일치는 죽은 코드 정리 이슈(EPIC 의 B4)에서 다룬다. 여기서는 근거로만 인용한다.",
+      "sha256": "74c96532d44dee48fb2f513e07370d60e94d909df819b5e200da1a62e5d85c23",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C038",
+      "origin": "live-description",
+      "text": "-   direct victim 대기 큐 크기 상수 검증은 CBRD-27211 에서 별도로 진행한다.",
+      "sha256": "412819b560a7551bc32b53f27c53775015d80a8b5d7b5f5576fa0fa859bc3efb",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C039",
+      "origin": "live-description",
+      "text": "| 위치                        | 내용                                                              |\n|-----------------------------|-------------------------------------------------------------------|\n| `page_buffer.c:9563-9594`   | `pgbuf_direct_victims_maintenance` --- 두 순회                    |\n| `page_buffer.c:9605-9637`   | `pgbuf_lfcq_assign_direct_victims` --- hint 기반 정상 호출 경로   |\n| `page_buffer.c:9496-9551`   | `pgbuf_panic_assign_direct_victims_from_lru` --- NULL 가드와 통계 |\n| `page_buffer.c:9397-9409`   | victim 탐색 중의 hack 호출부                                      |\n| `page_buffer.c:10306-10358` | `pgbuf_remove_from_lru_list` --- 이웃 포인터 초기화               |\n| `page_buffer.c:8194-8302`   | 대기 스레드 등록과 timeout 처리                                   |\n| `page_buffer.c:17104-17117` | `pgbuf-maintain` 데몬 등록 (100ms)                                |",
+      "sha256": "4040f843798e04567723296c9bdc997cc477459dd0d6c77d60a912e9cc841d8a",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27264-C040",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: victim 공급이 끊긴 순간 대기 스레드를 구제하도록 설계된 direct victim 긴급 배정 경로 두 곳이 실제로 동작하게 하거나, 동작하지 않는 채로 남은 코드를 제거해 코드와 실제 동작을 일치시킨다.",
+      "sha256": "d6e8c5b7579cb25fd3fc20b8c2a642d39c9f26e2bb9890173c4852c61b7b0e01",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27264-C041",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27264-C042",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "- **AS-IS (현재 동작 / 배경)**: 100ms 주기 `pgbuf-maintain` 데몬(`page_buffer.c:17113`)이 부르는 `pgbuf_direct_victims_maintenance` (`:9563`) 의 두 순회는 `index = prv_index` 로 시작한 뒤 조건에서 `index != prv_index` 를 요구해(`:9577`, `:9586`) 본문이 한 번도 실행되지 않고, 긴급 배정 함수의 나머지 호출부(`:9407`)는 리스트에서 이미 떼어낸 BCB 의 이웃 포인터를 넘겨 항상 NULL 로 진입한다. 그래서 긴급 배정 통계 `Num_victim_assign_direct_panic` 은 어떤 부하에서도 0 을 벗어날 수 없다.\n- **TO-BE (목표 상태 / 기대 동작)**: 두 결말 중 하나로 정리한다 — 순회를 의도대로 고쳐 저활동 구간에서도 주기적으로 direct victim 이 배정되게 하거나, 경로 자체를 제거해 \"백업 플랜이 있다\"는 코드상의 약속을 없앤다. 선택은 `TBD - 합의 미확인`.\n- **영향**: 설계 의도 훼손 — `pgbuf_allocate_bcb` 의 `:8162-8166` TODO 주석이 우려한 \"아무도 대기 스레드에게 victim 을 공급하지 않는 경우\"에 대한 방어가 실질적으로 없다. 그 상황에 걸린 스레드는 `page_latch_timeout_in_msecs` (기본 300,000ms = 5분) 를 다 기다린 뒤 `ER_CSS_PTHREAD_COND_TIMEDOUT` 로 실패하며, debug 빌드는 그전에 `:8292` 의 `assert (r != ER_CSS_PTHREAD_COND_TIMEDOUT)` 로 서버가 중단된다.",
+      "sha256": "175b1eeb6a3f07166798cc3ad8d8c1e0c88ae9f97d848d3028657f0e6e973f42",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27264-C043",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**: 목표 동작 선택은 미결이라 후보를 함께 올린다. 선택: `TBD - 합의 미확인`.",
+      "sha256": "35a99a883c0613939aec2ce2512ea13d95559aeb9d0325361e3d2118cf9dd0fa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27264-C044",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "| 순위 | 후보 | 고려사항 |\n|---|---|---|\n| 1 | 순회 조건을 고쳐 백업 경로를 되살린다. 조건에서 `index != prv_index` 를 빼면 시작점부터 마지막 인덱스까지 훑고 다음 호출이 0 부터 이어받으며, `!(index == prv_index && restarted)` 로 바꾸면 호출마다 한 바퀴를 온전히 돈다. `:9407` 호출부는 리스트 이탈 전의 이웃 포인터를 넘기도록 함께 고친다 | 원래 의도한 안전망을 복원한다. 데몬이 실제로 일하게 되므로 100ms 마다 `lru_list->mutex` 를 잡는 구간(`:9614`)이 새로 생긴다 — 저활동 구간 한정이지만 회귀 측정이 필요하다 |\n| 2 | 두 경로를 제거한다 (`pgbuf_direct_victims_maintenance`, `pgbuf_lfcq_assign_direct_victims`, `pgbuf_panic_assign_direct_victims_from_lru`, `:9402-9409` 의 hack 블록, `PSTAT_PB_VICTIM_ASSIGN_DIRECT_PANIC`) | 지금 동작과 코드가 일치하고 항상 0 인 통계 항목이 사라진다. `:8162-8166` TODO 가 지적한 취약점은 미해결로 남으므로 별도 대책이 필요하다 |",
+      "sha256": "9bb83417956796e47e557ac984c971a39d12967fa409877d7a36ff5a57b543c1",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C045",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: 수정 대상은 `src/storage/page_buffer.c` 한 파일이고, 관련 코드는 전부 `#if defined (SERVER_MODE)` 구획(`:9486-9638`) 안에 있어 standalone (SA_MODE) 빌드와 클라이언트 라이브러리는 영향받지 않는다. 디스크 형식과 외부 interface 변경은 없다. 다만 `Num_victim_assign_direct_panic` (`src/base/perf_monitor.c:510`) 은 후보 1 에서는 0 이 아닌 값을 내기 시작하고 후보 2 에서는 항목 자체가 없어지므로, `cubrid statdump` 출력을 파싱하는 모니터링이 있으면 함께 확인해야 한다.",
+      "sha256": "94b623a8026fb0bdb560826314e87a2ad8a58cdd9f9e957302394a88016301ac",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27264-C046",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 D3 와 N3 이다.",
+      "sha256": "289141f3ecfd6f4932c31bb12d7be3bbc0f7e04bbfc6c155999349a2b5ff4aa2",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C047",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 는 새 page 를 올릴 자리가 필요할 때 victim (재사용할 수 있는 frame) 을 찾는다. 자리를 못 찾은 스레드는 대기 큐에 들어가고, 다른 주체가 BCB (Buffer Control Block — frame 에 올라온 page 의 fix 수, latch, dirty 상태를 담은 제어 블록) 를 직접 넘겨주며 깨워준다. 이 방식이 direct victim 이고, 평상시 공급자는 flush 데몬이다 (`pgbuf_allocate_bcb` 가 대기 전에 `:8252` 에서 flush 데몬을 깨우고, flush 를 마친 page 는 `pgbuf_assign_flushed_pages` 가 대기 스레드에게 배정한다).",
+      "sha256": "acd0502b1427e737f1e93c91ccc77734ef4874be93d40d83541edcbc88bb2831",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C048",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "flush 데몬이 아무것도 내놓지 못하는 구간을 위한 두 번째 공급 경로가 `pgbuf_direct_victims_maintenance` 다. 함수 헤더 주석(`:9553-9561`)이 목적을 명시한다 — \"the purpose of function is to make sure a victim is assigned even when system has low to no activity, which prevents bcb's from being assigned to a waiting thread. basically, this is the backup plan.\" 그 백업 플랜이 한 번도 실행되지 않는다.",
+      "sha256": "46ea67f9c3e3ccd5f1c57c485fa039973112e5e51c2d1a8079068514ce9ae9f7",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C049",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "```\n[100ms 주기] pgbuf_page_maintenance_daemon_init (looper 100ms)   :17113\n  pgbuf_page_maintenance_execute                                 :16953\n    ├ pgbuf_adjust_quotas                                        (정상 동작)\n    └ pgbuf_direct_victims_maintenance                           :9563\n         ├ private 순회 index = prv_index / 조건 index != prv_index\n         │    ★ 첫 평가에서 거짓 -> 본문 0 회                     :9576-9581\n         └ shared  순회 index = shr_index / 조건 index != shr_index\n              ★ 동일                                             :9585-9590\n         (본문) pgbuf_lfcq_assign_direct_victims                  :9580, :9589\n                  └ pgbuf_panic_assign_direct_victims_from_lru    :9616, :9631\n                       -> 호출 자체가 일어나지 않음",
+      "sha256": "593ff9ffd74b2eed895c8ce42778acd682f94098ae91ed24b30a3c6496d55002",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C050",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "[victim 탐색 중] pgbuf_get_victim_from_lru_list\n  pgbuf_remove_from_lru_list (bufptr, lru_list)                  :9400\n    └ bufptr->prev_BCB = NULL                                   :10349\n  pgbuf_panic_assign_direct_victims_from_lru (.., bufptr->prev_BCB)\n    ★ bcb_start == NULL 이라 즉시 return 0                :9407 -> :9505\n```",
+      "sha256": "555b607fc5469d68e9d9d896af6ef9e2f7b1351d617f1e374232a78bab79f67c",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27264-C051",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "순회 쪽은 초기화와 조건이 서로 모순이다. `index` 를 `prv_index` 로 초기화한 뒤 `index != prv_index` 를 요구하므로 첫 평가에서 끝난다. 종료 조건은 이미 `restarted` (마지막 인덱스에서 0 으로 되돌아갈 때 참이 되는 표시) 가 담당하고 있어서, 원래 의도는 \"재시작한 뒤에 시작점을 다시 만나면 멈춘다\" 였을 것이다. 즉 조건이 `index != prv_index` 가 아니라 `!(index == prv_index && restarted)` 여야 앞뒤가 맞는다.",
+      "sha256": "ceb666bada41dedf14b9c3032e9759f034ac3431866e7a6192afaa01542e36df",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "호출부 쪽은 인자 수명 문제다. `pgbuf_remove_from_lru_list` 는 BCB 를 LRU (Least Recently Used — 최근 사용 시점을 기준으로 교체 대상을 고르는 목록) 에서 떼어내면서 `prev_BCB` 와 `next_BCB` 를 NULL 로 지운다(`:10349-10350`). 그 다음 줄의 hack 블록(`:9402-9409`)이 방금 지워진 `bufptr->prev_BCB` 를 긴급 배정 함수의 시작점으로 넘기니, 함수는 `bcb_start == NULL` 가드에서 바로 0 을 반환한다. 이웃 포인터를 쓰려면 리스트 이탈 전에 저장해야 하는데, 같은 함수가 `:9397` 에서 이미 `bufptr->prev_BCB` 로 victim hint 를 갱신하고 있어 저장 지점 자체는 어렵지 않다.",
+      "sha256": "5eba75ba97f82ec5ebafacfbe1d0f1004ec836c85936f452afdc909afdf480b4",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "두 결함이 겹치면서 `pgbuf_panic_assign_direct_victims_from_lru` 는 도달 가능한 모든 경로에서 0 을 반환하고, 그 안의 성능 통계 증가(`:9543`)도 실행되지 않는다. 함수에 붙은 `/* statistics shows not useful */` (`:9503`) 주석은 이런 상태에서 관측된 것이라 근거로 삼기 어렵다.",
+      "sha256": "73c4b5a2ea3f2dd49e2fea51948a2b4ebdafb98e2e77f619d4e0c88716ee2ecb",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27264-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "평상시에는 flush 데몬이 victim 을 계속 만들어내므로 백업 경로가 없어도 대기 스레드가 깨어난다. 백업 경로의 부재가 드러나는 조건은 flush 데몬이 내보낼 page 를 찾지 못하거나 깨어나지 못한 상태에서 victim 요구가 들어오는 경우로, 재현이 어렵고 발생해도 5분 timeout 뒤의 실패로만 관측된다. `:8162-8166` TODO 는 \"right now, after we added the victim rich hack, this may not happen\" 라고 적고 있지만, 그 hack 의 판정값인 `pgbuf_Pool.monitor.victim_rich` 는 `:14446` 에서 계산될 뿐 소비처가 없다 (EPIC 의 N9, 죽은 코드 정리 이슈 범위). 결과적으로 TODO 가 근거로 든 완화 장치도 실체가 없다.",
+      "sha256": "5f1206adf8cecfe15f3faf4b871d9ec8b784d6115a38deaf29328fac8695e27a",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27264-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). 확인 환경은 Fedora 44 / GCC 16.1.1 이지만, 아래 확인 절차는 소스 정독과 별도 C 프로그램 실행이라 OS·컴파일러에 의존하지 않는다.",
+      "sha256": "1135c84d262beb2aa12238462dab72dbe615b18e605367b72cac98744b651654",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27264-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "1~3 단계는 소스만으로 확정되는 정적 확인, 4 단계는 순회 조건만 떼어낸 실행 확인, 5 단계는 운영 중 서버에서 보이는 증상이다. 1~4 단계 명령은 CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "7d5d5978b80e1c94ff5dff44e386fdac725769c53c33bc1fd08e5e6a62efc4e5",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "```bash\n# 1) 순회 조건이 첫 평가에서 거짓임을 확인한다 (index 초기값 = prv_index)\nsed -n '9572,9591p' src/storage/page_buffer.c",
+      "sha256": "460b60eb02cbfaccf1de9ee0c1b8192a61c9086e8c6820376e4c694955edbe0a",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "```bash\n# 4) 순회 형태만 떼어내 본문 실행 횟수를 센다 (DB 불필요)\ncat > /tmp/pgbuf_loop.c <<'EOF'\n#include <stdio.h>\n#define PGBUF_PRIVATE_LRU_COUNT 8\t/* 임의의 양수 */\nint\nmain (void)\n{\n  int nassigns = 5, body_executed = 0, index, restarted;\n  static int prv_index = 0;",
+      "sha256": "62b662a36c8f48c225291ea26b07e90d7668d472985b78fad61f1d464a52ba53",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "for (index = prv_index, restarted = 0;\n       nassigns > 0 && index != prv_index && !restarted;\n       (index == PGBUF_PRIVATE_LRU_COUNT - 1) ? index = 0, restarted = 1 : index++)\n    {\n      body_executed++;\n    }\n  printf (\"body executed %d times\\n\", body_executed);\n  return 0;\n}\nEOF\ngcc -Wall -o /tmp/pgbuf_loop /tmp/pgbuf_loop.c && /tmp/pgbuf_loop\n```",
+      "sha256": "a34acca59ca1b156d0c5e8156c248a0f92b289829ade89597ed78b8b01d4ae8c",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "```bash\n# 5) 실행 중 서버에서 긴급 배정 통계를 확인한다 (부하 종류와 시간에 무관하다)\ncubrid statdump -c -s victim_assign demodb\n```",
+      "sha256": "0871895065ba4c9e4b7b7647bae6ccac0ff254c727a96362e09b43a8cdd594df",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27264-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "- 4 단계: 순회는 시작점부터 한 바퀴를 돌아야 하므로 본문 실행 횟수가 1 이상이다.\n- 5 단계: victim 고갈 구간이 있었다면 `Num_victim_assign_direct_panic` 이 0 보다 크다.\n- victim 공급이 끊긴 구간에서도 100ms 안에 다음 유지보수 주기가 대기 스레드에게 BCB 를 배정하므로, `page_latch_timeout_in_msecs` 를 다 소진하는 대기가 생기지 않는다.",
+      "sha256": "55b4b5429a04253b84c54e9ede86547afe62b9cfe7b77ec21504477ad7fd419d",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27264-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "- 4 단계 출력은 `body executed 0 times` 다. private/shared 순회 모두 같은 형태이므로 `pgbuf_direct_victims_maintenance` 는 100ms 마다 호출되면서도 아무 일도 하지 않는다.\n- 5 단계의 `Num_victim_assign_direct_panic` 은 항상 0 이다. 증가 지점(`:9543`)에 도달하는 경로가 없다.\n- victim 공급이 끊기면 대기 스레드는 `:8256` 의 timeout 대기를 그대로 소진한다. release 빌드는 `ER_CSS_PTHREAD_COND_TIMEDOUT`, debug 빌드는 `:8292` assert 실패로 끝난다.",
+      "sha256": "ed6e3e43c565a2976a94fa57f165463f63bd1560e087538f689eb7231baa92dd",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27264-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "`PGBUF_PRIVATE_LRU_COUNT` 가 8, 시작점이 3 일 때 각 조건이 방문하는 인덱스와 다음 호출의 시작점이다 (위 4 단계 프로그램의 조건만 바꿔 확인).",
+      "sha256": "8f54846547e42a04d62e08567a6d10c4a99d3a7cb9015ecc27b5568e533eb081",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "| 조건 | 방문 인덱스 | 다음 시작점 |\n|---|---|---|\n| 현행 `index != prv_index && !restarted` | 없음 | 3 |\n| `!restarted` (둘째 항 제거) | 3 4 5 6 7 | 0 |\n| `!(index == prv_index && restarted)` | 3 4 5 6 7 0 1 2 | 3 |",
+      "sha256": "de681e2ccd41b82cc74efd34dde4d757bfc4dc00f66a5a4063d501225f3c687d",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "둘째 항만 제거하는 쪽은 호출당 부분 순회에 그치지만 라운드로빈 위치가 계속 전진하고, 셋째 안은 호출마다 한 바퀴를 돌되 `nassigns` 가 남아 있으면 시작점이 고정된다. 어느 의미를 택할지는 목표 동작 결정과 함께 정한다.",
+      "sha256": "cf0fde48bde08350162ccd0770d6ad9f37c7a79b491bd2864a0ed511b8506bb2",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27264-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "- 부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A3 항목이다.\n- `monitor.victim_rich` 미소비와 `:9046-9053` 주석 불일치는 죽은 코드 정리 이슈(EPIC 의 B4)에서 다룬다. 여기서는 근거로만 인용한다.\n- direct victim 대기 큐 크기 상수 검증은 CBRD-27211 에서 별도로 진행한다.",
+      "sha256": "fdbb4c0e3c40b7802e8d5a2f36097ec9dca1465d2ddb8f947fee9e942d8eaffd",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27264-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+      "text": "| 위치 | 내용 |\n|---|---|\n| `page_buffer.c:9563-9594` | `pgbuf_direct_victims_maintenance` — 두 순회 |\n| `page_buffer.c:9605-9637` | `pgbuf_lfcq_assign_direct_victims` — hint 기반 정상 호출 경로 |\n| `page_buffer.c:9496-9551` | `pgbuf_panic_assign_direct_victims_from_lru` — NULL 가드와 통계 |\n| `page_buffer.c:9397-9409` | victim 탐색 중의 hack 호출부 |\n| `page_buffer.c:10306-10358` | `pgbuf_remove_from_lru_list` — 이웃 포인터 초기화 |\n| `page_buffer.c:8194-8302` | 대기 스레드 등록과 timeout 처리 |\n| `page_buffer.c:17104-17117` | `pgbuf-maintain` 데몬 등록 (100ms) |",
+      "sha256": "0ef62247d5e750aceb6f703b1c176ae776451674d4171cd394552290348fe987",
+      "disposition_group": 14
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        4,
+        6,
+        40,
+        43
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve low/no activity backup progress outcome. Restore/remove remains unselected; deletion alone does not satisfy outcome, and needs supported alternative progress evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8173-L8187"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        21,
+        24,
+        26,
+        41
+      ],
+      "disposition": "non-substantive",
+      "reason": "Heading-only and code-fence fragments; rewritten under current four-field format.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        42
+      ],
+      "disposition": "corrected",
+      "reason": "Both source defects retained at pinned baseline, with exact private/shared identity and remaining NULL caller independently checked. Combined local paragraph also contains conditional runtime impact and unselected goal, both bounded in report. Counter inference scoped to source graph rather than runtime measurements.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9580-L9599",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9403-L9417",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10346-L10366",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9511-L9553"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        32
+      ],
+      "disposition": "corrected",
+      "reason": "300000ms default and conditional timeout/assert branches verified. No current starvation/hang, full wait or debug abort reproduced; assert is reached after timeout return, not an earlier deadline.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L5414-L5425",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8211-L8218",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8302-L8314"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        14,
+        15,
+        33,
+        34,
+        35,
+        44,
+        51,
+        52,
+        63,
+        64,
+        65
+      ],
+      "disposition": "corrected",
+      "reason": "Retain loop/NULL root facts and alternative traversal meanings as ANALYSIS questions. Remove ranking, claim of intended full round, easy saved-pointer fix, and low-activity-only lock impact. Reaching scan introduces work subject to candidate checks/locking/scan budget; remove path is conditional on alternative progress.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9403-L9417",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9521-L9556",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9578-L9645"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        45
+      ],
+      "disposition": "corrected",
+      "reason": "SERVER_MODE code boundary retained. One-file-only scope, guaranteed SA/client zero impact and no external-interface change cannot be promised before design, especially if common stat metadata is changed. Require scope/compatibility validation.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9494-L9646",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L518-L523"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        36,
+        37,
+        38,
+        46,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Parent relationship retained; volatile EPIC table labels removed. CBRD-27211 is waiter selector my_count%4, CBRD-27267 queue supply, CBRD-27269 behavior-preserving cleanup. Existing CBRD-24029 duplicate must coordinate one repair owner/result. No hard prerequisite inferred.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15509-L15539",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9613-L9645",
+        "https://jira.cubrid.org/browse/CBRD-24029",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        11,
+        12,
+        13,
+        47,
+        48,
+        49,
+        50
+      ],
+      "disposition": "retained",
+      "reason": "Retain page-buffer/BCB/direct-handoff background, backup purpose, both zero-body scans and cleared-pointer path. Refresh line references, avoid claim that quota adjustment is defect-free, and explain other live suppliers.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8168-L8271",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9403-L9417",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10346-L10366",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15446-L15506"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        31,
+        53
+      ],
+      "disposition": "corrected",
+      "reason": "Sole PANIC increment is unreachable through checked source graph. Tracking activation guard retained. Do not present unconditional runtime count measurement, infer incident frequency from zero, or assume historical useless-stat comment was based on this exact state.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9511-L9553",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L518-L523"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        54
+      ],
+      "disposition": "corrected",
+      "reason": "Other suppliers may mask missing backup, but permanence of flush supply, reproduction difficulty, exclusive 5-minute symptom, and absence of all defenses are not established. victim_rich cleanup is a separate issue, not proof of production failure.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6775-L6788",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10030-L10049",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8173-L8187",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15446-L15506"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        55
+      ],
+      "disposition": "corrected",
+      "reason": "Keep e6ed61e87/Fedora44/GCC16.1.1 only as attributed historical report, separate pinned f6cac312 source review and current condition model; no current engine test build claimed.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27264-pgbuf-direct-victim-dead-paths_e6ed61e_claude.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9578-L9599"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        20,
+        22,
+        23,
+        30,
+        56,
+        57,
+        58,
+        59,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "Replace stale line commands with pinned-source inspection. Run an independent in-memory first-condition model (private/shared start0/3: zero bodies, unchanged next start), limit it to control-flow evidence. Do not claim measured operational statdump/timeout result.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9578-L9599",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9403-L9417",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10346-L10366"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        60
+      ],
+      "disposition": "removed",
+      "reason": "Remove unconditional statdump command presented as measured symptom: no workload/tracking setup/current server run supplied. Report preserves sole increment proof and requires tracking activation for future measurements.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9547-L9553"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        28,
+        29,
+        61
+      ],
+      "disposition": "corrected",
+      "reason": "Expected outcome is progress when eligible candidates and waiters coexist, not a selected full-round algorithm, guaranteed nonzero stat under any shortage, or 100ms assignment bound. Scope candidate availability, tracking and actual scheduling.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9521-L9553",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9619-L9643",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17126-L17142"
+      ]
+    },
+    {
+      "ids": [
+        39,
+        67
+      ],
+      "disposition": "non-substantive",
+      "reason": "Reference-only source-location tables replaced by verified immutable source links at pinned baseline.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

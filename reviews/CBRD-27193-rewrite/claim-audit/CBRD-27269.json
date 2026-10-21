@@ -1,0 +1,1014 @@
+{
+  "issue": "CBRD-27269",
+  "reviewer": "/root",
+  "report_sha256": "5ad506b975f74db6eb1935e1500ea43f9a51fb4eaf18401bb24ec53792b0d4b8",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27269-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: `page_buffer.c` 와 `page_buffer.h` 에서 소비처가 없는 코드와 현재 구현과 어긋난 주석을 걷어내, 뒤따르는 page buffer 결함 수정과 재구현 논의가 틀린 설명을 근거로 삼지 않게 한다.",
+      "sha256": "8082371abfb361904d915f323b86ffdf8a561414f912b6837d9952266866707f",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27269-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27269-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |\n|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | 정리 대상 9건이 남아 있다. 계산만 되고 읽는 곳이 없는 `monitor.victim_rich`(`page_buffer.c:14446`), 호출부 없는 static 함수 `pgbuf_remove_private_from_aout_list`(`:10585`), 정의 자체가 없는 선언 `pgbuf_fix_without_validation_release`(`page_buffer.h:324`), 미사용 매크로 2개(`UINT16MAX` `:300`, `pgbuf_fix_without_validation` `page_buffer.h:320`), 제어 흐름에 영향을 주지 않는 `goto`(`:10772`), 그리고 현재 자료구조·동작과 어긋난 주석 3건과 헤더 인자명 1건이다. 빌드 옵션이 `-Wno-unused`(`CMakeLists.txt:613-617`)라 죽은 심볼은 경고로도 드러나지 않고, 주석과 인자명은 애초에 컴파일러가 검사하지 않는다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 실행 동작, 통계 값, 시스템 파라미터, 디스크 형식을 그대로 둔 채 9건을 삭제하거나 현행 코드에 맞게 고친다. 정리 후 남는 주석은 실제 자료구조(shared LRU + private LRU 2구획)와 실제 victim 탐색 흐름만 서술한다.                                                                                                                                                                                                                                                                                                                                                                                                           |\n| **영향**                          | 기술 부채 --- `pgbuf_get_victim` 주석(`:9048-9052`)은 코드에 존재하지 않는 victim 재시도 정책이 있다고 읽힌다. direct victim 긴급 배정 경로를 다루는 CBRD-27264 가 이 주석을 근거로 목표 동작을 잡으면 없는 정책을 전제로 판단하게 된다.                                                                                                                                                                                                                                                                                                                                                                                  |",
+      "sha256": "19bf80c96b96ddcbb623c167677c8d9811efd1d5b9859c1884358607cc24f2ee",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27269-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: 아래 Implementation 표의 9건만 손대고 실행 동작은 바꾸지 않는다. AOUT 강제 비활성 자체는 기존 CBRD-20741 소관이므로 주석 문구만 현행 상태에 맞추고 `prm_tune_parameters`(`system_parameter.c:10078`)는 건드리지 않는다.",
+      "sha256": "8f439ea28a05b14af6f4f59ae9f374d4695a0779158f127e21b5052e0e893191",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27269-C005",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c`, `src/storage/page_buffer.h` 두 파일. 삭제와 주석 교체가 대부분이고 함수 인자는 이름만 바뀌므로 외부 심볼, `SHOW PAGE BUFFER STATUS` 컬럼, perfmon 카운터, 시스템 파라미터, 디스크 형식은 전부 그대로다. `-Wno-unused` 상태라 컴파일 경고 출력도 달라지지 않는다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "c7a2befd0fd526bf6245caaeba3de85c929676c9ddf86e96a9ba79453e48738e",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27269-C006",
+      "origin": "live-description",
+      "text": "-   **부모 EPIC / 결함 ID**: CBRD-27193 의 자식 이슈이며 결함 N9(죽은 코드·낡은 주석)와 D8(`pgbuf_peek_stats` 헤더 인자명)을 소유한다.",
+      "sha256": "3acfff9d7c8f17f54a79af16055678aab73fbcde20666f4905648f72caff0dad",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27269-C007",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 오랜 기간 여러 차례 개편을 거쳤다. atomic latch 도입, private LRU 와 quota 도입, direct victim 도입이 그때마다 자료구조를 바꿨는데, 그 과정에서 쓰이지 않게 된 필드와 함수, 그리고 새 구조를 반영하지 못한 주석이 남았다. `LRU` (Least Recently Used --- 최근 사용 시점 기준 page 교체 목록), `victim` (교체 대상으로 뽑힌 BCB), `direct victim` (빈 frame 을 못 찾아 대기하는 스레드에게 재사용 가능한 BCB 를 직접 넘기는 방식), `BCB` (Buffer Control Block --- frame 에 올라온 page 의 fix 수와 latch, dirty 상태를 보관하는 제어 블록)가 이 정리에서 반복해 나오는 용어다.",
+      "sha256": "cbe0e89b25ebfff24dea68f5f8fdd0ec1567a4f89976d6ee3c09034f119931bc",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27269-C008",
+      "origin": "live-description",
+      "text": "남은 것 중 대부분은 무해하다. 쓰이지 않는 매크로, 호출부 없는 함수, 정의조차 없는 선언이 바이너리에 미치는 영향은 사실상 없다. 문제가 되는 쪽은 주석이다. 코드를 처음 읽는 사람은 주석을 규격으로 읽으므로, 실제 코드와 다른 주석은 없는 기능을 있다고 믿게 만든다.",
+      "sha256": "25d85dac0bbb174179f67636b8aad9a58dd9968794d7d3e3a04fbcbd65e0043a",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27269-C009",
+      "origin": "live-description",
+      "text": "첫째로 `victim_rich` 주석이다. `pgbuf_get_victim` 은 자기 private LRU, 다른 private LRU, shared LRU 를 차례로 뒤지는데, 주석은 \\\"세 탐색을 `victim_rich` 인 동안 반복한다\\\"고 적혀 있다. 실제 재시도 루프(`:9148-9164`)는 shared 단계만 반복하고 그 조건도 flush 데몬 유무와 큐 상태다. `victim_rich` 는 `pgbuf_adjust_quotas` 가 quota 조정마다 값을 채우지만 읽는 코드가 없으니, 이 주석은 코드 어디에도 대응하지 않는다.",
+      "sha256": "c6a3d7af3f1a162852246ad2101751826d2d108070aaf021308f367e73505b1a",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27269-C010",
+      "origin": "live-description",
+      "text": "둘째로 `buf_LRU_list` 주석의 \\\"garbage LRU\\\" 다. LRU 리스트 배열이 shared, garbage, private 세 구획으로 나뉜다고 설명하지만 garbage 구획은 지금 코드에 없다. `PGBUF_TOTAL_LRU_COUNT` 는 shared 와 private 의 합일 뿐이고, `num_garbage_LRU_list` 라는 이름은 소스 전체에서 이 주석 한 곳에만 등장한다. 같은 표현이 `avoid_shared_lru_idx` 주석(`:733`)에도 남아 있다.",
+      "sha256": "eb10137819014f13dfb42b9e29064f8c69893bdcb8f279c13847ef60a0ac70e4",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27269-C011",
+      "origin": "live-description",
+      "text": "셋째로 AOUT 주석이다. AOUT (2Q 교체 정책에서 main queue 에서 밀려난 page identifier 의 이력을 보관하는 queue)을 설명하는 `:637-641` 주석은 page 교체 알고리즘이 \\\"LRU + Aout of 2Q\\\" 라고 단정한다. 그런데 `data_aout_ratio` 기본값이 `0.0`(`system_parameter.c:3499`)이고, 그것과 무관하게 `prm_tune_parameters` 가 서버·SA 모드 기동 시 값을 `0` 으로 덮어쓴다(`system_parameter.c:10078`, 주석 \\\"disable AOUT list until we fix CBRD-20741\\\"). `pgbuf_initialize_aout_list` 는 ratio 가 0 이면 `max_count = 0` 으로 두고 즉시 반환하므로(`:5777-5782`), 현재 빌드에서 AOUT 은 항상 비어 있다. AOUT 을 되살리는 일은 CBRD-20741 의 몫이고, 이 이슈에서는 주석이 현재 상태를 오해하게 만들지 않도록만 손댄다.",
+      "sha256": "57811f31c49d63a59706019a29330d276033da4a2a99cb97b79d705560da6624",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27269-C012",
+      "origin": "live-description",
+      "text": "`pgbuf_peek_stats` 헤더 인자명(D8)도 같은 성질이다. 헤더 선언과 정의의 인자 이름이 어긋나 있어, 헤더만 보고 호출부를 작성하면 13번째 인자에 alloc 대기 스레드 수를 넣어야 한다고 오해한다. 실제로 그 자리에 들어가는 값은 direct victim 배정을 기다리는 flush 완료 BCB 수다. 타입이 모두 `UINT64 *` 라 컴파일러는 잡아주지 않는다.",
+      "sha256": "81833df858b8e716b6b32739806616f01025df7c60a028319b4e1043937c4a0a",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27269-C013",
+      "origin": "live-description",
+      "text": "없다(N/A). 사용자에게 노출되는 동작, 통계 컬럼, 파라미터, 매뉴얼 기재 사항 중 바뀌는 것이 없다.",
+      "sha256": "97c8dcbef3b1ed79776bd1f9d3c91ab7b0ee3442aa27521c3acee02f25df74a2",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27269-C014",
+      "origin": "live-description",
+      "text": "| \\#  | 위치                                                           | 현재 상태                                                                                                                                       | 조치                                                           |\n|-----|----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|\n| 1   | `page_buffer.c:713-714`, `:1638`, `:14007`, `:14052`, `:14446` | `monitor.victim_rich` 는 선언 1곳과 대입 4곳뿐이고 읽는 코드가 없다                                                                             | 필드와 초기화·계산 코드를 함께 삭제                            |\n| 2   | `:9048-9052`                                                   | 위 필드로 세 단계 탐색을 반복한다고 설명하는 주석                                                                                               | 실제 재시도 루프(`:9148-9164`)의 조건을 서술하도록 교체        |\n| 3   | `:1162`(선언), `:10578-10661`(주석과 정의)                     | `pgbuf_remove_private_from_aout_list` 는 호출부가 없다                                                                                          | 선언과 정의 삭제                                               |\n| 4   | `:300`                                                         | 매크로 `UINT16MAX` 는 소스 전체에서 이 정의 한 줄만 존재                                                                                        | 삭제                                                           |\n| 5   | `:771-774`, `:733`                                             | `buf_LRU_list` 주석의 garbage LRU 구획 설명과 `avoid_shared_lru_idx` 주석의 같은 표현                                                           | shared + private 2구획 기준으로 교체                           |\n| 6   | `:637-641`                                                     | \\\"LRU + Aout of 2Q\\\" 주석이 AOUT 을 상시 동작으로 서술                                                                                          | AOUT 이 현재 강제 비활성이라는 사실과 CBRD-20741 참조를 덧붙임 |\n| 7   | `:10772`                                                       | `goto copy_unflushed_lsa` 의 레이블이 감싼 블록 바로 뒤(`:10776`)라 제어 흐름이 같다                                                            | `goto` 삭제(직전 `iopage = NULL;` 은 유지)                     |\n| 8   | `page_buffer.h:449-454`                                        | `pgbuf_peek_stats` 선언 인자명이 정의(`page_buffer.c:14686-14691`)와 불일치                                                                     | 정의를 기준으로 통일하고, 12번 인자는 실제 값에 맞춰 이름 정정 |\n| 9   | `page_buffer.h:320-326`                                        | `pgbuf_fix_without_validation_release` 는 선언만 있고 정의가 소스 어디에도 없다. 감싸는 매크로 `pgbuf_fix_without_validation` 도 함께 죽어 있다 | 매크로와 선언 삭제                                             |",
+      "sha256": "ebd6f643b7d12f3f98a53191143fed68194898c5cfc6cee6ec62e2cc574a1eaf",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27269-C015",
+      "origin": "live-description",
+      "text": "pgbuf_get_victim ()                                              :9022\n      1. 자기 private LRU (quota 초과인 경우만)                       :9061\n      2. 다른 private LRU (LFCQ 에서 리스트 인덱스를 꺼내 탐색)        :9106\n      3. shared LRU                                                  :9150\n         └ do { 3단계만 재시도 }                                     :9148-9164\n              while (flush 데몬 없음\n                     && shared_lrus_with_victims 큐가 비지 않음\n                     && 소비 커서 진행량 <= num_LRU_list\n                     && ++nloops <= num_LRU_list)\n      4. 실패 시 자기 private LRU 재시도 (quota 미달이어도)            :9176\n    ★ 주석(:9052)은 \"victim_rich 인 동안 1~3 을 반복\" 이라고 설명 — 그런 루프는 없다",
+      "sha256": "9f5ff2ede987f0d944394e8498f22c1fa9b019d03aa401bfd2022fe1ee079f29",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27269-C016",
+      "origin": "live-description",
+      "text": "`LFCQ` 는 victim 이 있는 LRU 리스트 인덱스만 담는 lock-free circular queue 로, 리스트 선택을 O(1)로 만드는 장치다. 재시도 루프가 shared 단계에만 있는 이유는 그 주석(`:9132-9140`)에 따로 적혀 있으므로, 항목 2 는 `:9048-9052` 문단만 지우거나 실제 조건으로 다시 쓰면 된다.",
+      "sha256": "c62acaa80aeb3d5ae8ead15036093161e71ca968a2d35fec259847446817616e",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27269-C017",
+      "origin": "live-description",
+      "text": "호출부는 `perf_monitor.c:1976-1991` 한 곳이고, perfmon 카운터를 순서대로 넘긴다. 헤더와 정의, 실제 값이 어긋난 자리는 다음 세 개다.",
+      "sha256": "b95c3cc6d8e3beb13f9cdd9f36e6449b815cd04108c858c5c9e460e0717de354",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27269-C018",
+      "origin": "live-description",
+      "text": "| 인자 위치 | 헤더 선언 (`page_buffer.h:449-454`) | 정의 (`page_buffer.c:14686-14691`)   | 실제로 채우는 값                                                 | 대응 perfmon 카운터                     |\n|-----------|-------------------------------------|--------------------------------------|------------------------------------------------------------------|-----------------------------------------|\n| 6         | `vict_candidates`                   | `victim_candidates`                  | LRU 리스트별 `count_vict_cand` 합 (`:14754-14757`)               | `PSTAT_PB_VICT_CAND`                    |\n| 12        | `alloc_bcb_waiter_med`              | `alloc_bcb_waiter_med`               | `direct_victims.waiter_threads_low_priority->size ()` (`:14763`) | `PSTAT_PB_WAIT_THREADS_LOW_PRIO`        |\n| 13        | `alloc_bcb_waiter_low`              | `flushed_bcbs_waiting_direct_assign` | `flushed_bcbs->size ()` (`:14764`)                               | `PSTAT_PB_FLUSHED_BCBS_WAIT_FOR_ASSIGN` |",
+      "sha256": "463fead7a36cbb3499e55351f48487030ef2acf9d541131cc19418d7d830fa47",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27269-C019",
+      "origin": "live-description",
+      "text": "12번은 헤더와 정의가 일치하지만 둘 다 값과 맞지 않는다. 대기 우선순위는 high 와 low 두 단계뿐이고 11번이 `alloc_bcb_waiter_high` 이므로, 12번은 `alloc_bcb_waiter_low` 로 바꾸는 것이 실제 값과 카운터 이름 모두에 맞는다. 13번은 정의 쪽 이름이 옳으니 헤더를 정의에 맞춘다.",
+      "sha256": "759397c4c3eabad380fcffb2eee0668eda15a692093a23401c6c0983f2437834",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27269-C020",
+      "origin": "live-description",
+      "text": "`grep -rn 'fix_without_validation' src/` 는 헤더 세 줄만 반환한다. 매크로 정의(`page_buffer.h:320-323`)와 그 매크로가 가리키는 함수 선언(`:324-326`)뿐이고, 함수 본체는 어디에도 없다.",
+      "sha256": "22703caa1094403627c4559e21a8a334ee28ac2df7670233b4ea871ac4abf34a",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27269-C021",
+      "origin": "live-description",
+      "text": "두 줄 모두 `#else /* NDEBUG */` 안, 즉 release 빌드에서만 보이는 구획에 있다. debug 빌드에는 짝이 되는 `_debug` 선언조차 없어서, 만약 누군가 `pgbuf_fix_without_validation` 을 쓰면 debug 빌드는 컴파일 단계에서, release 빌드는 링크 단계에서 서로 다르게 깨진다. 아무도 부르지 않은 덕에 지금까지 드러나지 않았다.",
+      "sha256": "709972870573e3aad8098ff67bfc6ea6b41dbe383e191131aa8bfb28145a07d6",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27269-C022",
+      "origin": "live-description",
+      "text": "> **요지**: 9건 중 실제로 사람을 헷갈리게 하는 것은 주석 3건(항목 2, 5, 6)과 헤더 인자명 1건(항목 8)이다. 나머지 5건은 삭제로 끝난다.",
+      "sha256": "1a7b0741fd6a5da077dfd3141655352f0a1464aeb3981e6a322d6e09efd58122",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27269-C023",
+      "origin": "live-description",
+      "text": "정리 커밋에는 동작 변경을 섞지 않는다. 결함 수정 이슈가 나중에 문제를 일으켜 revert 될 때 이 정리까지 함께 되돌아가지 않게 하는 것이 분리 이유다.",
+      "sha256": "ddc06fdaff36fece07b205128d5793c80316d8acf87b59ec8d9b8e8cf9dd4130",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27269-C024",
+      "origin": "live-description",
+      "text": "항목 7 만 예외적으로 순서 제약이 있다. 삭제할 `goto` 가 `pgbuf_bcb_flush_with_wal` 안에 있고, 같은 함수의 TDE·DWB 조기 실패 경로(`:10755`, `:10767`)를 고치는 CBRD-27262 가 그 바로 위 줄들을 바꾼다. CBRD-27262 를 먼저 병합해야 충돌 없이 적용된다. `TDE` 는 data page 암호화, `DWB` 는 원래 위치에 쓰기 전 별도 파일에 사본을 기록하는 torn-write 보호 장치다.",
+      "sha256": "790a4e2587c3dd810b7cbdefb99202df3ea06c71d189fe8ca68f66343f2fedc9",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27269-C025",
+      "origin": "live-description",
+      "text": "-   [ ] 위 표 1\\~9 항목이 모두 반영된다. `page_buffer.c` 와 `page_buffer.h` 에서 `victim_rich`, `pgbuf_remove_private_from_aout_list`, `UINT16MAX`, `garbage` 검색 결과가 0건이고, `src/` 전체에서 `fix_without_validation` 검색 결과가 0건이다.",
+      "sha256": "9c525ab3ead5f3a0d583c1218a5af5f6f16f93b4ec00291bbb0f3ad04e7ad298",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27269-C026",
+      "origin": "live-description",
+      "text": "-   [ ] `pgbuf_peek_stats` 의 헤더 선언과 정의 인자명이 완전히 일치하고, 12번 인자 이름이 실제로 채우는 low priority 대기 스레드 수와 맞다.",
+      "sha256": "c4b82e3767fe49806805526fcd7d439665a72aed78971f95e29af9128f6bb7f7",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27269-C027",
+      "origin": "live-description",
+      "text": "-   [ ] 남은 주석이 현행 코드와 대조해 참이다 --- victim 탐색 주석은 `:9148-9164` 의 실제 조건을, `buf_LRU_list` 주석은 shared + private 2구획을, AOUT 주석은 현재 비활성 상태를 서술한다.",
+      "sha256": "cc2926224f7995d011a421cd0e8a64ed448a8112bc4f5c18a6d3c1e553bab34e",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27269-C028",
+      "origin": "live-description",
+      "text": "-   [ ] 동작 무변경을 확인한다: 같은 워크로드에서 `SHOW PAGE BUFFER STATUS` 19개 컬럼과 `PSTAT_PB_*` 카운터가 정리 전후로 동일한 의미를 유지하고, 시스템 파라미터 기본값과 디스크 형식이 그대로다.",
+      "sha256": "aebf00b50f6d7a42f62fab021db53a2e61369ccd03ec3820bc9223edb8c6f81d",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27269-C029",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria 충족",
+      "sha256": "0ea4a17918fef8cc37098a111487d52496e3d2ec6ab4b5cbe13fd0d6508e5d5d",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27269-C030",
+      "origin": "live-description",
+      "text": "-   [ ] release 와 debug 두 빌드가 통과하고, `-DCUBRID_DEBUG` 관련 코드 경로를 건드리지 않았음을 확인한다",
+      "sha256": "613116ac1a22428131fe08b107a6317aeb266fc5252bedaf9f582b5ce85dfed5",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27269-C031",
+      "origin": "live-description",
+      "text": "-   [ ] QA 통과 (SQL 회귀와 medium 스위트)",
+      "sha256": "d936433d8574a939a9f55ccb7219e9246f994b8c14dfe0dd6cdc1aec1f4795e1",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27269-C032",
+      "origin": "live-description",
+      "text": "-   [ ] CBRD-27262 가 먼저 병합된 뒤에 항목 7 을 적용한다",
+      "sha256": "942385da97f8311764dd773050762ee34d56628f318ab242da5c6409243faf27",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27269-C033",
+      "origin": "live-description",
+      "text": "-   [ ] 문서/매뉴얼 반영 대상 없음을 커밋 메시지에 남긴다",
+      "sha256": "10b7e00a0e9a59b3443665bd9ddeefcd5848f856a2cc436273ee68c906ab3a2e",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27269-C034",
+      "origin": "live-description",
+      "text": "이 이슈 범위에서 뺀 항목이 둘 있다.",
+      "sha256": "1d86a2b422932271e806ab736722e660f840c1d06ee9393c00984430fcf7f0d2",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27269-C035",
+      "origin": "live-description",
+      "text": "-   `pgbuf_peek_stats` 의 `lfcq_big_prv_num` / `lfcq_prv_num` 은 해당 LFCQ 포인터가 `NULL` 이면 대입되지 않고(`:14771-14779`), 진입부 초기화 목록(`:14697-14705`)에도 빠져 있다. 호출부가 미리 채워진 통계 배열의 슬롯을 넘기므로 스택 쓰레기가 출력되는 상황은 아니지만, 값을 채우는 수정은 동작 변경이라 big private victim queue 를 다루는 CBRD-27267 로 넘긴다. 두 값 모두 그 queue(`big_private_lrus_with_victims`, `private_lrus_with_victims`)의 크기라 소유 범위가 맞다.",
+      "sha256": "d990c2e0dd00f8fd678dbb01acc67d5fd0d7d2ad8735e9609be587807bf103a4",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27269-C036",
+      "origin": "live-description",
+      "text": "-   소스에 남은 기존 TODO(`:599-601` victim hint 논리 의심, `:3368`, `:7050`, `:8692`, `:12107`)는 각각 판단이 필요한 항목이라 이 정리 대상이 아니다.",
+      "sha256": "4751fb1712ac3201e65b1eb6a5cc4be267cfeaebb0ae20f732387ecb65fe5b45",
+      "disposition_group": 35
+    },
+    {
+      "id": "CBRD-27269-C037",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c`, `src/storage/page_buffer.h` --- 정리 대상",
+      "sha256": "86710f9bb65299b484e664107ce6991c50d961504f55def7c4b29f613f19f4f9",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27269-C038",
+      "origin": "live-description",
+      "text": "-   `src/base/perf_monitor.c:1976-1991` --- `pgbuf_peek_stats` 유일한 호출부",
+      "sha256": "50638a66e2fd485ed397e1e3e213ffe87338640f642abf376c70935b4a07edc8",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27269-C039",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:3494-3505`, `:10078` --- `data_aout_ratio` 정의와 강제 비활성",
+      "sha256": "e672a96ee1ef3782122a7d4a3d21b5ed79b0f437e044edaacba1afcd9d5c0218",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27269-C040",
+      "origin": "live-description",
+      "text": "-   `CMakeLists.txt:613-617` --- `-Wno-unused` 로 미사용 심볼 경고가 나오지 않는 이유",
+      "sha256": "36666369ec78b885824911b7df72ddf09ad1b7eb4b38b0d7b164423809fd29d0",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27269-C041",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: `page_buffer.c` 와 `page_buffer.h` 에서 소비처가 없는 코드와 현재 구현과 어긋난 주석을 걷어내, 뒤따르는 page buffer 결함 수정과 재구현 논의가 틀린 설명을 근거로 삼지 않게 한다.",
+      "sha256": "8082371abfb361904d915f323b86ffdf8a561414f912b6837d9952266866707f",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27269-C042",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27269-C043",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | 정리 대상 9건이 남아 있다. 계산만 되고 읽는 곳이 없는 `monitor.victim_rich`(`page_buffer.c:14446`), 호출부 없는 static 함수 `pgbuf_remove_private_from_aout_list`(`:10585`), 정의 자체가 없는 선언 `pgbuf_fix_without_validation_release`(`page_buffer.h:324`), 미사용 매크로 2개(`UINT16MAX` `:300`, `pgbuf_fix_without_validation` `page_buffer.h:320`), 제어 흐름에 영향을 주지 않는 `goto`(`:10772`), 그리고 현재 자료구조·동작과 어긋난 주석 3건과 헤더 인자명 1건이다. 빌드 옵션이 `-Wno-unused`(`CMakeLists.txt:613-617`)라 죽은 심볼은 경고로도 드러나지 않고, 주석과 인자명은 애초에 컴파일러가 검사하지 않는다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 실행 동작, 통계 값, 시스템 파라미터, 디스크 형식을 그대로 둔 채 9건을 삭제하거나 현행 코드에 맞게 고친다. 정리 후 남는 주석은 실제 자료구조(shared LRU + private LRU 2구획)와 실제 victim 탐색 흐름만 서술한다. |\n| **영향** | 기술 부채 — `pgbuf_get_victim` 주석(`:9048-9052`)은 코드에 존재하지 않는 victim 재시도 정책이 있다고 읽힌다. direct victim 긴급 배정 경로를 다루는 CBRD-27264 가 이 주석을 근거로 목표 동작을 잡으면 없는 정책을 전제로 판단하게 된다. |",
+      "sha256": "85b4ecfd5d5c66a48d16440afbafc3dcf22918f83f37bcea564d128f4d545307",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27269-C044",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**: 아래 Implementation 표의 9건만 손대고 실행 동작은 바꾸지 않는다. AOUT 강제 비활성 자체는 기존 CBRD-20741 소관이므로 주석 문구만 현행 상태에 맞추고 `prm_tune_parameters`(`system_parameter.c:10078`)는 건드리지 않는다.",
+      "sha256": "8f439ea28a05b14af6f4f59ae9f374d4695a0779158f127e21b5052e0e893191",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27269-C045",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c`, `src/storage/page_buffer.h` 두 파일. 삭제와 주석 교체가 대부분이고 함수 인자는 이름만 바뀌므로 외부 심볼, `SHOW PAGE BUFFER STATUS` 컬럼, perfmon 카운터, 시스템 파라미터, 디스크 형식은 전부 그대로다. `-Wno-unused` 상태라 컴파일 경고 출력도 달라지지 않는다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.\n- **부모 EPIC / 결함 ID**: CBRD-27193 의 자식 이슈이며 결함 N9(죽은 코드·낡은 주석)와 D8(`pgbuf_peek_stats` 헤더 인자명)을 소유한다.",
+      "sha256": "49b2a84438d6db90c67621534a145e1fa4452cf0ee48785fe43611460b9d1cd0",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27269-C046",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 오랜 기간 여러 차례 개편을 거쳤다. atomic latch 도입, private LRU 와 quota 도입, direct victim 도입이 그때마다 자료구조를 바꿨는데, 그 과정에서 쓰이지 않게 된 필드와 함수, 그리고 새 구조를 반영하지 못한 주석이 남았다. `LRU` (Least Recently Used — 최근 사용 시점 기준 page 교체 목록), `victim` (교체 대상으로 뽑힌 BCB), `direct victim` (빈 frame 을 못 찾아 대기하는 스레드에게 재사용 가능한 BCB 를 직접 넘기는 방식), `BCB` (Buffer Control Block — frame 에 올라온 page 의 fix 수와 latch, dirty 상태를 보관하는 제어 블록)가 이 정리에서 반복해 나오는 용어다.",
+      "sha256": "4e787401e693fdb331f60328b6059f37fa45be39c8ef81d5dabcb96265ccc959",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27269-C047",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "남은 것 중 대부분은 무해하다. 쓰이지 않는 매크로, 호출부 없는 함수, 정의조차 없는 선언이 바이너리에 미치는 영향은 사실상 없다. 문제가 되는 쪽은 주석이다. 코드를 처음 읽는 사람은 주석을 규격으로 읽으므로, 실제 코드와 다른 주석은 없는 기능을 있다고 믿게 만든다.",
+      "sha256": "25d85dac0bbb174179f67636b8aad9a58dd9968794d7d3e3a04fbcbd65e0043a",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27269-C048",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "첫째로 `victim_rich` 주석이다. `pgbuf_get_victim` 은 자기 private LRU, 다른 private LRU, shared LRU 를 차례로 뒤지는데, 주석은 \"세 탐색을 `victim_rich` 인 동안 반복한다\"고 적혀 있다. 실제 재시도 루프(`:9148-9164`)는 shared 단계만 반복하고 그 조건도 flush 데몬 유무와 큐 상태다. `victim_rich` 는 `pgbuf_adjust_quotas` 가 quota 조정마다 값을 채우지만 읽는 코드가 없으니, 이 주석은 코드 어디에도 대응하지 않는다.",
+      "sha256": "09887d5831c93990bb568d07899db0d2fb19dd6b540b84e156fe2f72b3202ba4",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27269-C049",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "둘째로 `buf_LRU_list` 주석의 \"garbage LRU\" 다. LRU 리스트 배열이 shared, garbage, private 세 구획으로 나뉜다고 설명하지만 garbage 구획은 지금 코드에 없다. `PGBUF_TOTAL_LRU_COUNT` 는 shared 와 private 의 합일 뿐이고, `num_garbage_LRU_list` 라는 이름은 소스 전체에서 이 주석 한 곳에만 등장한다. 같은 표현이 `avoid_shared_lru_idx` 주석(`:733`)에도 남아 있다.",
+      "sha256": "9a588a91f12feb3141cc99d8feaf4d9f8ce3e3380b249102a15d1ccbb93a7781",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27269-C050",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "셋째로 AOUT 주석이다. AOUT (2Q 교체 정책에서 main queue 에서 밀려난 page identifier 의 이력을 보관하는 queue)을 설명하는 `:637-641` 주석은 page 교체 알고리즘이 \"LRU + Aout of 2Q\" 라고 단정한다. 그런데 `data_aout_ratio` 기본값이 `0.0`(`system_parameter.c:3499`)이고, 그것과 무관하게 `prm_tune_parameters` 가 서버·SA 모드 기동 시 값을 `0` 으로 덮어쓴다(`system_parameter.c:10078`, 주석 \"disable AOUT list until we fix CBRD-20741\"). `pgbuf_initialize_aout_list` 는 ratio 가 0 이면 `max_count = 0` 으로 두고 즉시 반환하므로(`:5777-5782`), 현재 빌드에서 AOUT 은 항상 비어 있다. AOUT 을 되살리는 일은 CBRD-20741 의 몫이고, 이 이슈에서는 주석이 현재 상태를 오해하게 만들지 않도록만 손댄다.",
+      "sha256": "8c53fb65740db95eb5c896619148e953226ccf5bd8c951d77c0a5eea533fe21a",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27269-C051",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "`pgbuf_peek_stats` 헤더 인자명(D8)도 같은 성질이다. 헤더 선언과 정의의 인자 이름이 어긋나 있어, 헤더만 보고 호출부를 작성하면 13번째 인자에 alloc 대기 스레드 수를 넣어야 한다고 오해한다. 실제로 그 자리에 들어가는 값은 direct victim 배정을 기다리는 flush 완료 BCB 수다. 타입이 모두 `UINT64 *` 라 컴파일러는 잡아주지 않는다.",
+      "sha256": "81833df858b8e716b6b32739806616f01025df7c60a028319b4e1043937c4a0a",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27269-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "없다(N/A). 사용자에게 노출되는 동작, 통계 컬럼, 파라미터, 매뉴얼 기재 사항 중 바뀌는 것이 없다.",
+      "sha256": "97c8dcbef3b1ed79776bd1f9d3c91ab7b0ee3442aa27521c3acee02f25df74a2",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27269-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "| # | 위치 | 현재 상태 | 조치 |\n|---|---|---|---|\n| 1 | `page_buffer.c:713-714`, `:1638`, `:14007`, `:14052`, `:14446` | `monitor.victim_rich` 는 선언 1곳과 대입 4곳뿐이고 읽는 코드가 없다 | 필드와 초기화·계산 코드를 함께 삭제 |\n| 2 | `:9048-9052` | 위 필드로 세 단계 탐색을 반복한다고 설명하는 주석 | 실제 재시도 루프(`:9148-9164`)의 조건을 서술하도록 교체 |\n| 3 | `:1162`(선언), `:10578-10661`(주석과 정의) | `pgbuf_remove_private_from_aout_list` 는 호출부가 없다 | 선언과 정의 삭제 |\n| 4 | `:300` | 매크로 `UINT16MAX` 는 소스 전체에서 이 정의 한 줄만 존재 | 삭제 |\n| 5 | `:771-774`, `:733` | `buf_LRU_list` 주석의 garbage LRU 구획 설명과 `avoid_shared_lru_idx` 주석의 같은 표현 | shared + private 2구획 기준으로 교체 |\n| 6 | `:637-641` | \"LRU + Aout of 2Q\" 주석이 AOUT 을 상시 동작으로 서술 | AOUT 이 현재 강제 비활성이라는 사실과 CBRD-20741 참조를 덧붙임 |\n| 7 | `:10772` | `goto copy_unflushed_lsa` 의 레이블이 감싼 블록 바로 뒤(`:10776`)라 제어 흐름이 같다 | `goto` 삭제(직전 `iopage = NULL;` 은 유지) |\n| 8 | `page_buffer.h:449-454` | `pgbuf_peek_stats` 선언 인자명이 정의(`page_buffer.c:14686-14691`)와 불일치 | 정의를 기준으로 통일하고, 12번 인자는 실제 값에 맞춰 이름 정정 |\n| 9 | `page_buffer.h:320-326` | `pgbuf_fix_without_validation_release` 는 선언만 있고 정의가 소스 어디에도 없다. 감싸는 매크로 `pgbuf_fix_without_validation` 도 함께 죽어 있다 | 매크로와 선언 삭제 |",
+      "sha256": "8ca2725277720b78b16cddf91d61206513f679517448dec9b96d825f5d5fd9ad",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27269-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "pgbuf_get_victim ()                                              :9022\n      1. 자기 private LRU (quota 초과인 경우만)                       :9061\n      2. 다른 private LRU (LFCQ 에서 리스트 인덱스를 꺼내 탐색)        :9106\n      3. shared LRU                                                  :9150\n         └ do { 3단계만 재시도 }                                     :9148-9164\n              while (flush 데몬 없음\n                     && shared_lrus_with_victims 큐가 비지 않음\n                     && 소비 커서 진행량 <= num_LRU_list\n                     && ++nloops <= num_LRU_list)\n      4. 실패 시 자기 private LRU 재시도 (quota 미달이어도)            :9176\n    ★ 주석(:9052)은 \"victim_rich 인 동안 1~3 을 반복\" 이라고 설명 — 그런 루프는 없다",
+      "sha256": "9f5ff2ede987f0d944394e8498f22c1fa9b019d03aa401bfd2022fe1ee079f29",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27269-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "`LFCQ` 는 victim 이 있는 LRU 리스트 인덱스만 담는 lock-free circular queue 로, 리스트 선택을 O(1)로 만드는 장치다. 재시도 루프가 shared 단계에만 있는 이유는 그 주석(`:9132-9140`)에 따로 적혀 있으므로, 항목 2 는 `:9048-9052` 문단만 지우거나 실제 조건으로 다시 쓰면 된다.",
+      "sha256": "c62acaa80aeb3d5ae8ead15036093161e71ca968a2d35fec259847446817616e",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27269-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "호출부는 `perf_monitor.c:1976-1991` 한 곳이고, perfmon 카운터를 순서대로 넘긴다. 헤더와 정의, 실제 값이 어긋난 자리는 다음 세 개다.",
+      "sha256": "b95c3cc6d8e3beb13f9cdd9f36e6449b815cd04108c858c5c9e460e0717de354",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27269-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "| 인자 위치 | 헤더 선언 (`page_buffer.h:449-454`) | 정의 (`page_buffer.c:14686-14691`) | 실제로 채우는 값 | 대응 perfmon 카운터 |\n|---|---|---|---|---|\n| 6 | `vict_candidates` | `victim_candidates` | LRU 리스트별 `count_vict_cand` 합 (`:14754-14757`) | `PSTAT_PB_VICT_CAND` |\n| 12 | `alloc_bcb_waiter_med` | `alloc_bcb_waiter_med` | `direct_victims.waiter_threads_low_priority->size ()` (`:14763`) | `PSTAT_PB_WAIT_THREADS_LOW_PRIO` |\n| 13 | `alloc_bcb_waiter_low` | `flushed_bcbs_waiting_direct_assign` | `flushed_bcbs->size ()` (`:14764`) | `PSTAT_PB_FLUSHED_BCBS_WAIT_FOR_ASSIGN` |",
+      "sha256": "3377cba3877e22ebcae4fbe49c1a4d562252f45de995275334cf357da9b881f1",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27269-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "12번은 헤더와 정의가 일치하지만 둘 다 값과 맞지 않는다. 대기 우선순위는 high 와 low 두 단계뿐이고 11번이 `alloc_bcb_waiter_high` 이므로, 12번은 `alloc_bcb_waiter_low` 로 바꾸는 것이 실제 값과 카운터 이름 모두에 맞는다. 13번은 정의 쪽 이름이 옳으니 헤더를 정의에 맞춘다.",
+      "sha256": "759397c4c3eabad380fcffb2eee0668eda15a692093a23401c6c0983f2437834",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27269-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "`grep -rn 'fix_without_validation' src/` 는 헤더 세 줄만 반환한다. 매크로 정의(`page_buffer.h:320-323`)와 그 매크로가 가리키는 함수 선언(`:324-326`)뿐이고, 함수 본체는 어디에도 없다.",
+      "sha256": "22703caa1094403627c4559e21a8a334ee28ac2df7670233b4ea871ac4abf34a",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27269-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "두 줄 모두 `#else /* NDEBUG */` 안, 즉 release 빌드에서만 보이는 구획에 있다. debug 빌드에는 짝이 되는 `_debug` 선언조차 없어서, 만약 누군가 `pgbuf_fix_without_validation` 을 쓰면 debug 빌드는 컴파일 단계에서, release 빌드는 링크 단계에서 서로 다르게 깨진다. 아무도 부르지 않은 덕에 지금까지 드러나지 않았다.",
+      "sha256": "709972870573e3aad8098ff67bfc6ea6b41dbe383e191131aa8bfb28145a07d6",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27269-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "> **요지**: 9건 중 실제로 사람을 헷갈리게 하는 것은 주석 3건(항목 2, 5, 6)과 헤더 인자명 1건(항목 8)이다. 나머지 5건은 삭제로 끝난다.",
+      "sha256": "1a7b0741fd6a5da077dfd3141655352f0a1464aeb3981e6a322d6e09efd58122",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27269-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "정리 커밋에는 동작 변경을 섞지 않는다. 결함 수정 이슈가 나중에 문제를 일으켜 revert 될 때 이 정리까지 함께 되돌아가지 않게 하는 것이 분리 이유다.",
+      "sha256": "ddc06fdaff36fece07b205128d5793c80316d8acf87b59ec8d9b8e8cf9dd4130",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27269-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "항목 7 만 예외적으로 순서 제약이 있다. 삭제할 `goto` 가 `pgbuf_bcb_flush_with_wal` 안에 있고, 같은 함수의 TDE·DWB 조기 실패 경로(`:10755`, `:10767`)를 고치는 CBRD-27262 가 그 바로 위 줄들을 바꾼다. CBRD-27262 를 먼저 병합해야 충돌 없이 적용된다. `TDE` 는 data page 암호화, `DWB` 는 원래 위치에 쓰기 전 별도 파일에 사본을 기록하는 torn-write 보호 장치다.",
+      "sha256": "790a4e2587c3dd810b7cbdefb99202df3ea06c71d189fe8ca68f66343f2fedc9",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27269-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] 위 표 1~9 항목이 모두 반영된다. `page_buffer.c` 와 `page_buffer.h` 에서 `victim_rich`, `pgbuf_remove_private_from_aout_list`, `UINT16MAX`, `garbage` 검색 결과가 0건이고, `src/` 전체에서 `fix_without_validation` 검색 결과가 0건이다.",
+      "sha256": "ca6cdb4362eb041d9e80ec16dce3fdca57ce73e208ce6b9c4be6cea436965a81",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27269-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] `pgbuf_peek_stats` 의 헤더 선언과 정의 인자명이 완전히 일치하고, 12번 인자 이름이 실제로 채우는 low priority 대기 스레드 수와 맞다.",
+      "sha256": "a5f92d39773683c31fee5c24ce83c96caa6eb2bd36b512de90c3f70ad948fb6d",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27269-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] 남은 주석이 현행 코드와 대조해 참이다 — victim 탐색 주석은 `:9148-9164` 의 실제 조건을, `buf_LRU_list` 주석은 shared + private 2구획을, AOUT 주석은 현재 비활성 상태를 서술한다.",
+      "sha256": "df38c5d74c02e391d1113e235e8b40cc2f2338bec6f232b2151b9a205b744784",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27269-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] 동작 무변경을 확인한다: 같은 워크로드에서 `SHOW PAGE BUFFER STATUS` 19개 컬럼과 `PSTAT_PB_*` 카운터가 정리 전후로 동일한 의미를 유지하고, 시스템 파라미터 기본값과 디스크 형식이 그대로다.",
+      "sha256": "bb9cf5e70ff84066e96090d7788229ed6db79ac9e28cd3b2d8db5a8829e93f6e",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27269-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria 충족",
+      "sha256": "2a8eff1f148627fb5762c305e645d09b1089f7f902472864f724713cac135d2e",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27269-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] release 와 debug 두 빌드가 통과하고, `-DCUBRID_DEBUG` 관련 코드 경로를 건드리지 않았음을 확인한다",
+      "sha256": "da13f14b1b1072d644442bf935a6ff016421795c5dc12fed9e8f821b97f4077e",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27269-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] QA 통과 (SQL 회귀와 medium 스위트)",
+      "sha256": "8ad57329c43479b00b2e3d28ab878c814a8c1591242e3fdc798a972c3ba710c3",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27269-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] CBRD-27262 가 먼저 병합된 뒤에 항목 7 을 적용한다",
+      "sha256": "bb893f4999cbd4f75b30f0d9a17f7c0b8e78d6e81c4e722a2ab0871147c2be96",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27269-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- [ ] 문서/매뉴얼 반영 대상 없음을 커밋 메시지에 남긴다",
+      "sha256": "9df55984c6b09924d262322229443e522c509209a14a6fe628db4090a31d1d67",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27269-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "이 이슈 범위에서 뺀 항목이 둘 있다.",
+      "sha256": "1d86a2b422932271e806ab736722e660f840c1d06ee9393c00984430fcf7f0d2",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27269-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- `pgbuf_peek_stats` 의 `lfcq_big_prv_num` / `lfcq_prv_num` 은 해당 LFCQ 포인터가 `NULL` 이면 대입되지 않고(`:14771-14779`), 진입부 초기화 목록(`:14697-14705`)에도 빠져 있다. 호출부가 미리 채워진 통계 배열의 슬롯을 넘기므로 스택 쓰레기가 출력되는 상황은 아니지만, 값을 채우는 수정은 동작 변경이라 big private victim queue 를 다루는 CBRD-27267 로 넘긴다. 두 값 모두 그 queue(`big_private_lrus_with_victims`, `private_lrus_with_victims`)의 크기라 소유 범위가 맞다.\n- 소스에 남은 기존 TODO(`:599-601` victim hint 논리 의심, `:3368`, `:7050`, `:8692`, `:12107`)는 각각 판단이 필요한 항목이라 이 정리 대상이 아니다.",
+      "sha256": "7ad632e7402e411d5190fd5ae8c664d7ea815043ae7921df996bf28d9d050876",
+      "disposition_group": 37
+    },
+    {
+      "id": "CBRD-27269-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27269-pgbuf-dead-code-cleanup_e6ed61e_claude.md",
+      "text": "- `src/storage/page_buffer.c`, `src/storage/page_buffer.h` — 정리 대상\n- `src/base/perf_monitor.c:1976-1991` — `pgbuf_peek_stats` 유일한 호출부\n- `src/base/system_parameter.c:3494-3505`, `:10078` — `data_aout_ratio` 정의와 강제 비활성\n- `CMakeLists.txt:613-617` — `-Wno-unused` 로 미사용 심볼 경고가 나오지 않는 이유",
+      "sha256": "60eb1279fc3f8cdcc53d8273a099d5a9b86b873c55e2ad7b62cebc3819f202fc",
+      "disposition_group": 36
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        41
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate live/local purpose retained: remove misleading explanation and unsupported interface impressions so follow-up work uses current behavior. The rewrite grounds the maintenance cost in the retry policy, LRU boundary, and thread-versus-BCB outputs.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9047-L9067",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9155-L9190",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        42
+      ],
+      "disposition": "non-substantive",
+      "reason": "Duplicate opening-field label only; replaced by the current four-field structure.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        43
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate old triage tables: all nine candidate groups were reverified, but fixed deletion instructions are no prior decision. Behavior preservation is a scope constraint, Linux warning flags are scoped, and the new text distinguishes source findings from unmeasured runtime impact.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L690-L692",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10586-L10669",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L605-L618"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        44
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate prescribed implementation replaced with ANALYSIS. Retained AOUT policy exclusion with the source comment referencing CBRD-20741; no AOUT activation or removal is selected.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10200-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5774-L5788"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        45
+      ],
+      "disposition": "corrected",
+      "reason": "Old baseline and zero-impact/warning guarantees corrected to pinned f6cac312 and requested behavior preservation. SHOW layout remains 19 columns with nine deprecated NULL columns. Historical N9/D8 inventory tags are omitted as current requirements; parent relationship is retained.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L605-L618",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        6
+      ],
+      "disposition": "corrected",
+      "reason": "Live parent relationship retained. N9/D8 are historical analysis labels, not independently verified accepted ownership decisions, and are omitted from the rewritten report.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        46
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate background keeps page buffer, BCB, victim, direct victim and LRU concepts. Unsupported causal history about successive redesigns is omitted; BCB is defined as slot control information and private LRU is not treated as proof that only one transaction currently fixes a page.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L671-L729",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1025-L1033"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        47
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate harmless/binary-negligible assertion is unsupported and removed. Concrete maintenance misunderstandings are explained; no runtime or binary equivalence is claimed before implementation verification.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9047-L9067",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        48
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate stale retry explanation is verified and retained, with exact shared-loop conditions and the guarded final own-private attempt. The old broad own/other/shared narrative is not an unconditional runtime sequence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9138",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9155-L9204",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14456-L14460"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        49
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate garbage-LRU inconsistency is verified. The only num_garbage_LRU_list occurrence is the comment; actual total and private offsets use shared plus private counts.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L705-L751",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1025-L1033",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5723-L5735"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        50
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate AOUT finding narrowed from always empty in current builds to default/tuning/initialization behavior on the supported SERVER/SA startup path. CBRD-20741 is a code-comment reference, not a verified current ownership or policy decision.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10200-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L3506-L3517",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5774-L5788"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        51
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate header-versus-definition output mismatch retained. The rewrite explicitly notes the actual caller uses the correct existing perfmon slots and does not claim already swapped values.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14698-L14702",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14773-L14781",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        52
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate N/A/no changes assertion replaced with the desired compatibility boundary and pending ANALYSIS of the actual diff and documentation impact. No implementation has been validated.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        53
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate nine-row deletion recipe replaced with a nine-row current-evidence inventory. All candidates survive at f6cac312; declarations, definition/call searches, write-only field and its total_victims input, stale comments, fall-through goto and output naming were checked. Deletion and replacement choices remain ANALYSIS.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L690-L692",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1134-L1137",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10586-L10669",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10768-L10785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14456-L14460",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        54
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate pseudo-flow corrected: other-private search requires quota plus flush-thread availability; final own-private attempt requires !searched_own. Current shared retry conditions retained; historical line numbers replaced.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9138",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9155-L9204"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        55
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate queue/O(1) explanation not needed for the cleanup case and omitted. Retained the demonstrated shared-only loop distinction without turning a suggested comment edit into an agreed choice.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9140-L9173"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        56
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate sole caller claim verified across the repository; scoped to its SERVER_MODE guard and the current argument order.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        57
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate argument-comparison table facts retained at the current baseline: positions 6, 12 and 13 names, actual outputs and perfmon destinations verified.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14698-L14702",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14766-L14781",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        58
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate low-priority/BCB meaning retained; exact replacement names are not an already selected implementation. Acceptance asks matching names and correct units without prescribing a rename recipe.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L724-L727",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14773-L14781",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        59
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate absence of implementation/callers verified across the complete source archive. Brittle claim of exactly three header lines removed; current macro/declaration spans multiple physical lines.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        60
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate NDEBUG branch facts retained. Compile/link failure if a new caller is added is a source inference, not a build that was run, so the rewrite does not claim observed build failures or infer why it remained undetected historically.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L281-L287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        61
+      ],
+      "disposition": "removed",
+      "reason": "Duplicate assertion that only comments/names mislead and the other five items are simply deletable is too strong. Definition-free API also misleads readers, deletion still requires scope/compatibility review, and no implementation decision source exists.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        23,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate separation from functional fixes retained as desired cleanup scope; exact commit split is left to ANALYSIS instead of asserting a preselected implementation/revert strategy.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10785",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        63
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate hard dependency removed. The goto is adjacent to TDE/DWB errors in the same function, which justifies coordination with CBRD-27262 but does not prove merge-first is necessary or conflict-free. Ancillary TDE/DWB glossary omitted as unnecessary.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10785",
+        "https://jira.cubrid.org/browse/CBRD-27262"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate forced deletion and zero-search acceptance replaced by explicit disposition for every candidate plus substantiated handling. A broad zero-match for garbage would not prove correctness and can erase legitimate unrelated text.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L705-L751",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10586-L10669",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336"
+      ]
+    },
+    {
+      "ids": [
+        26,
+        65
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate desired interface naming consistency and low-priority meaning retained as an observable outcome; the actual caller order/meaning must remain preserved.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L456-L461",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14773-L14781",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        66
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate requirement for comments to match real control flow, LRU partition and current AOUT policy retained with current evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9155-L9190",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1025-L1033",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10200-L10246"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate same-workload counter equality and all-19-as-numeric premise corrected. Nine SHOW columns are deprecated NULL; verification should preserve meanings, activation and NULL contracts, not require equal dynamic snapshots.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        68
+      ],
+      "disposition": "non-substantive",
+      "reason": "Duplicate generic Acceptance Criteria satisfied checkbox adds no independent fact; retained completion structure has specific evidence requirements.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        30,
+        69
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate blanket debug/release check revised to relevant server/SA debug/release build/link checks once the diff exists. No unsupported claim that CUBRID_DEBUG code must remain untouched substitutes for checking NDEBUG branches.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L281-L287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L325-L336",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/cubrid/CMakeLists.txt#L539-L544",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/sa/CMakeLists.txt#L541-L546"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        70
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate unconditional SQL/medium QA obligation replaced with verification proportionate to the final diff and a final regression scope selected in ANALYSIS. No existing decision source establishes those blanket suites for every cleanup.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        32,
+        71
+      ],
+      "disposition": "removed",
+      "reason": "Duplicate CBRD-27262 merge-first gate has no demonstrated hard dependency. Related-issue coordination remains, with no required predecessor.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10785",
+        "https://jira.cubrid.org/browse/CBRD-27262"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate no-docs conclusion replaced by checking and recording comment/developer/user-document impact after scope is decided. The absence of user-visible changes is a desired constraint rather than completed verification.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        73
+      ],
+      "disposition": "non-substantive",
+      "reason": "Duplicate remarks lead-in contains no independent technical assertion; boundaries are integrated into Related Issues.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        35
+      ],
+      "disposition": "corrected",
+      "reason": "NULL private-queue pointers leave corresponding outputs unwritten and excluded initialization is verified. No independent runtime claim about prefilled slots or stack garbage is made. Output contract work is coordinated with statistics/queue issues rather than assigned exclusively to CBRD-27267 by this draft.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14709-L14717",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967",
+        "https://jira.cubrid.org/browse/CBRD-27266",
+        "https://jira.cubrid.org/browse/CBRD-27267"
+      ]
+    },
+    {
+      "ids": [
+        36
+      ],
+      "disposition": "corrected",
+      "reason": "Retained the boundary that unresolved TODO/algorithm/error-policy questions must not be deleted automatically. Historical TODO line numbers are omitted because they moved and were not selected cleanup candidates.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9140-L9173",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        37,
+        38,
+        39,
+        40,
+        75
+      ],
+      "disposition": "non-substantive",
+      "reason": "Reference-only live/local units are replaced by verified immutable links at f6cac312. Their underlying caller, AOUT and Linux-warning claims are substantively handled above.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1967",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10200-L10246",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L605-L618"
+      ]
+    },
+    {
+      "ids": [
+        74
+      ],
+      "disposition": "corrected",
+      "reason": "Local combined remarks duplicate claims 35 and 36. Conditional output gaps are verified; no stack-garbage guarantee or exclusive 27267 ownership is repeated, and unresolved TODO policies stay outside cleanup.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14709-L14717",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://jira.cubrid.org/browse/CBRD-27266",
+        "https://jira.cubrid.org/browse/CBRD-27267"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

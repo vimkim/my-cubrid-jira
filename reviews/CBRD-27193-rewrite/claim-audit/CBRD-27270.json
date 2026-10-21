@@ -1,0 +1,1175 @@
+{
+  "issue": "CBRD-27270",
+  "reviewer": "/root",
+  "report_sha256": "24e4de998bb4310d3f5c95562620d518437b04bb35c93a59452d07f30d6486cf",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27270-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 복구 구간에서 `pgbuf_is_temporary_volume` 이 항상 false 를 반환하는 현재 동작이 안전한지 판정하고, 안전하다면 그 판단 근거를 코드에 남긴다. 위험이 확인되면 별도 수정 이슈로 넘긴다.",
+      "sha256": "e1a84ec26456d4c2c358455164b620d4bd27070330f6682b66fdde350b1c0af3",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                  |\n|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | `pgbuf_is_temporary_volume`(`page_buffer.c:5493-5503`)은 `LOG_ISRESTARTED ()` 가 거짓인 동안 볼륨 목적을 조회하지 않고 무조건 false 를 반환한다(`:5498-5501`). 그 구간에서는 temp 볼륨의 page 가 일반 page 와 구별되지 않아 temp 전용 처리 경로를 하나도 타지 않는다. 함수에 달린 주석은 \\\"I don't know why page buffer should care about temporary files ... it is really annoying\\\" 이라, 이 동작이 의도인지 회피인지 판단할 근거가 남아 있지 않다. |\n| **TO-BE (목표 상태 / 기대 동작)** | `TBD - 조사 결과에 따름`. 구간 안에서 temp 볼륨 page 접근이 없다고 확인되면 현재 동작을 그대로 두고, 왜 안전한지를 함수 주석으로 대체하는 것이 목표 상태다. 접근이 존재하고 non-temp 취급이 위험 측이면 판정 로직 수정을 후속 이슈로 분리한다.                                                                                                                                                                                                        |\n| **영향**                          | 설계 의도 훼손 가능성 --- temp page 처리는 \\\"복구 대상이 아니므로 로깅도 이중 쓰기도 필요 없다\\\"는 전제로 만들어졌는데, 이 구간에서는 그 전제가 통째로 빠진다. 특히 TDE 를 켠 데이터베이스는 `is_temp` 가 데이터 키 선택을 바꾸므로(`tde.c:927-939`, `:979-988`), 같은 page 를 쓸 때와 읽을 때 판정이 갈리면 복호화가 어긋난다.                                                                                                                       |",
+      "sha256": "686c2a6f0c52dca30e43ac5c10c4dffe8da4da71c288a63756b093797af97a0c",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27270-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: 코드 수정 없이 조사부터 한다. 아래 Implementation 의 세 질문에 결론을 내고, 수정 여부와 범위는 그 결론으로 정한다. 결론이 \\\"문제 없음\\\" 으로 끝날 수 있는 조사이며, 그 경우에도 판정 근거를 코드 주석으로 남기는 것까지가 이 이슈의 완료 조건이다. 판정 함수를 손대는 수정은 이 이슈에서 하지 않고 별도 이슈로 등록한다.",
+      "sha256": "cff7454902c1a8bb3d5367c7fe91469131261900c4f8d38c561017c3f22abaa7",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C005",
+      "origin": "live-description",
+      "text": "-   **조사 범위**: `src/storage/page_buffer.c`(판정 함수와 11개 호출 지점), `src/transaction/log_manager.c`(`rcv_phase` 전이와 로깅 생략 판정), `src/transaction/boot_sr.c`(temp 볼륨 제거 시점), `src/storage/disk_manager.c`(`xdisk_get_purpose` 초기화 전 동작), `src/storage/tde.c`(키 선택), `src/storage/double_write_buffer.cpp`(복구 시 미마운트 볼륨 처리). 조사 산출물은 결론 문서와 코드 주석이며, 예상되는 코드 변경은 최소 주석 한 문단에서 최대 판정 함수 수정까지다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "371e9e49ef582508b60c09e081ea4c9d90f99055549e150774b4f8b2050795ac",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C006",
+      "origin": "live-description",
+      "text": "-   **부모 EPIC / 결함 ID**: CBRD-27193 의 자식 이슈이며 결함 N7(복구 중 temp 볼륨 판정)을 소유한다.",
+      "sha256": "dd1197b868efe67643b7dfbdb6d257d4ec123dd9e76d5e6d4361a4874d717be9",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27270-C007",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 temp page 를 특별하게 다룬다. temp page 는 재기동 후 살아남을 필요가 없으므로 `WAL` (Write-Ahead Logging --- data page 보다 log 를 먼저 기록하는 규칙)을 적용하지 않고, `DWB` (Double Write Buffer --- 원래 위치에 쓰기 전 별도 파일에 사본을 기록하는 torn-write 보호 장치)도 거치지 않으며, `LRU` (Least Recently Used --- 최근 사용 시점 기준 page 교체 목록) 승격 대상에서도 빠진다.",
+      "sha256": "daead7e3a92a97818b4bb6a16e46a8dc7466de1f451375e625cbb3fa72aceeba",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27270-C008",
+      "origin": "live-description",
+      "text": "문제는 \\\"이 page 가 temp 인가\\\" 를 판정하는 두 축 중 하나가 특정 구간에서 무력화된다는 점이다.",
+      "sha256": "a5aad7ad86375ab93f36ea98fb5b91439e266f151cf6f8190e27fd7d79c3e640",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27270-C009",
+      "origin": "live-description",
+      "text": "| 축            | 판정 함수                           | 근거                                                                           | 위치           |\n|---------------|-------------------------------------|--------------------------------------------------------------------------------|----------------|\n| 볼륨 목적     | `pgbuf_is_temporary_volume (volid)` | `xdisk_get_purpose` 결과가 `DB_TEMPORARY_DATA_PURPOSE` 인가                    | `:5493-5503`   |\n| page LSA 마커 | `pgbuf_is_temp_lsa (lsa)`           | page 의 `prv.lsa` 가 `PGBUF_TEMP_LSA` 인가 (`page_buffer.h:260` 의 `{-2, -2}`) | `:17260-17264` |",
+      "sha256": "4a65c594876a5b6f8b8e7550b709731d3bb7478d69edb50e4be38eae12e58c8a",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27270-C010",
+      "origin": "live-description",
+      "text": "`pgbuf_is_lsa_temporary`(`:5470-5484`)는 두 축의 OR 이므로, 볼륨 축이 죽어도 마커 축이 남아 있으면 판정은 살아 있다. 반대로 볼륨 축만 보는 지점은 구간 안에서 판정이 완전히 뒤집힌다.",
+      "sha256": "a6ad9af76b9eb0d6994d8dc55e601f85b5125b6e8653891555907ff3766b4fa6",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27270-C011",
+      "origin": "live-description",
+      "text": "볼륨의 종류(voltype)와 용도(purpose)는 별개 축이다(`dbtype_def.h:198-209`). `pgbuf_is_temporary_volume` 은 용도만 보므로 아래 둘을 구별하지 않는다.",
+      "sha256": "0cd458bb300764f77e72c25375310dec987e043ea924c15af543c60687833afa",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27270-C012",
+      "origin": "live-description",
+      "text": "| 종류                     | 만드는 방법                                                                 | 재기동 시                                                                                                      | 예시                         |\n|--------------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|------------------------------|\n| 임시 voltype + temp 용도 | 정렬·질의 임시 공간이 부족할 때 서버가 자동 생성                            | `boot_remove_all_temp_volumes` 가 삭제 (`boot_sr.c:904-924`, `boot_Db_parm->temp_last_volid` 이상 범위만 대상) | `<db>_t32766`                |\n| 영구 voltype + temp 용도 | `cubrid addvoldb -p temp <db>` (`util_cs.c:463-465`, voltype 기본값이 perm) | 삭제되지 않고 그대로 남는다                                                                                    | `<db>_x001` 형태의 확장 볼륨 |",
+      "sha256": "dcb1c3e5ce4b8257bda7868a3ea5eb8327dc5e3e712a811ff34ee72b412309f0",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27270-C013",
+      "origin": "live-description",
+      "text": "\\\"temp 볼륨은 재기동 때 재생성되므로 복구가 건드릴 일이 없다\\\" 는 전제는 첫째 종류에만 성립한다. 둘째 종류는 재기동 후에도 계속 존재하고, 복구 구간에도 마운트된 상태다.",
+      "sha256": "ba9b38d35abf5e12e04abc651681845a3e696064fec14fed2991378232e06d41",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C014",
+      "origin": "live-description",
+      "text": "`LOG_ISRESTARTED ()` 는 `log_Gl.rcv_phase == LOG_RESTARTED` 다(`log_impl.h:193`). `LOG_RESTARTED` 는 enum 의 첫 값(0)이라 전역 변수 `log_Gl` 이 0 으로 초기화된 상태에서는 참이고, 로그 매니저가 복구를 시작하면서 거짓으로 바뀐다.",
+      "sha256": "17a487a31d4b92801b6c838345d5afbdf87bdbd8b55d8b3c6242448987af4a95",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27270-C015",
+      "origin": "live-description",
+      "text": "부팅\n      log_initialize_internal ()                              log_manager.c:1102\n        rcv_phase = LOG_RECOVERY_ANALYSIS_PHASE               log_manager.c:1145\n        └ logtb_define_trantable_log_latch ()\n             └ pgbuf_initialize ()                            log_tran_table.c:494\n        analysis -> redo -> undo -> finish 2PC                log_recovery.c:835-920\n        rcv_phase = LOG_RESTARTED                             log_manager.c:1443\n    ★ 여기까지가 판정 false 구간 — page buffer 의 첫 수명 전체가 이 안에 든다\n      정상 운영 (볼륨 목적 조회가 실제로 동작)\n    종료\n      log_final ()                                            log_manager.c:1743\n        rcv_phase = LOG_RECOVERY_ANALYSIS_PHASE               log_manager.c:1761\n    ★ 여기서 판정 false 구간이 다시 열린다\n        pgbuf_flush_all (NULL_VOLID)  <- 모든 dirty page flush log_manager.c:1835\n        logtb_undefine_trantable () -> pgbuf_finalize ()       log_tran_table.c:591",
+      "sha256": "d73ca0994d3179fd96a4fc4aa0503732584b44a90ea0be30d229d99f5608c311",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C016",
+      "origin": "live-description",
+      "text": "즉 이 구간은 \\\"crash recovery 중\\\" 만이 아니다. page buffer 가 만들어진 직후부터 복구가 끝날 때까지, 그리고 종료 절차가 시작된 뒤 마지막 flush 까지가 모두 포함된다.",
+      "sha256": "e400a67b07a379b3c047cd409b81743851fa4d08b99c0154994cea59ee69485e",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C017",
+      "origin": "live-description",
+      "text": "`xdisk_get_purpose`(`disk_manager.c:5616`)는 disk 매니저가 초기화되기 전(`disk_Cache == NULL`)이면 `assert (volid == LOG_DBFIRST_VOLID)` 를 걸고 `DB_PERMANENT_DATA_PURPOSE` 를 반환한다(`:5618-5623`). 가드가 없으면 볼륨 정보가 아직 없는 시점의 page fix 가 debug 빌드에서 이 assert 를 때린다. 주석의 \\\"annoying\\\" 은 이 상황을 가리키는 것으로 보인다.",
+      "sha256": "ab9c94c5c983d2abd8a92a874bd7b9eb22ad4a9a4e1242b1925649bd5c576a4a",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C018",
+      "origin": "live-description",
+      "text": "다만 정상 재기동 경로에서는 `disk_manager_init (thread_p, true)` 가 `log_initialize` 보다 먼저 실행되므로(`boot_sr.c:2372` 대 `:2428`), 복구 구간에는 disk 캐시가 이미 채워져 있다. 가드가 필요한 창보다 넓게 잡혀 있을 가능성이 있고, 이것도 조사 항목이다.",
+      "sha256": "9c724f6685a4aa6bc8f88bc99ba4496931eef9a2a9e590f4fd5815c48813a730",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C019",
+      "origin": "live-description",
+      "text": "-   로깅 생략 판정(`log_can_skip_undo_logging` `log_manager.c:4356`, `log_can_skip_redo_logging` `:4400`)은 `pgbuf_is_lsa_temporary` 를 쓰므로 마커 축으로도 성립한다. 디스크에서 읽어 온 temp page 는 이미 마커를 갖고 있어 이 경로는 구간 안에서도 보호된다.",
+      "sha256": "f72b7aa28aaa8e555897e36c924d94c697e1571468eed868d3ad91b0f71c213e",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C020",
+      "origin": "live-description",
+      "text": "-   DWB 복구는 마운트되지 않은 볼륨의 slot 을 건너뛴다(`double_write_buffer.cpp:3123-3127`). 임시 voltype 볼륨의 page 가 DWB 에 들어간 뒤 그 볼륨이 삭제됐더라도 재기동 자체를 깨뜨리지는 않는다.",
+      "sha256": "357355797eab08bc2eaddf6315bdc0993eb962d9034dac3f8cfcd8ee277bf984",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27270-C021",
+      "origin": "live-description",
+      "text": "-   정상 종료 경로는 임시 voltype 볼륨을 `boot_remove_all_temp_volumes`(`boot_sr.c:3081`)로 먼저 제거한 뒤 `log_final`(`:3110`)을 호출한다. 그 종류에 한해서는 종료 구간이 다시 열릴 때 대상 볼륨이 이미 없다.",
+      "sha256": "20e15249ac3f7820732d003f1ff905987326b0b67dfcbe83410c6f136d5ba829",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27270-C022",
+      "origin": "live-description",
+      "text": "반대로 위험 쪽으로 기우는 사실도 있다. 재기동 경로의 임시 voltype 볼륨 제거(`boot_sr.c:2568`)는 복구가 끝난 뒤라, 복구 중에는 이전 실행의 볼륨이 아직 마운트되어 있다. 영구 voltype + temp 용도 볼륨은 애초에 삭제 대상이 아니어서 복구와 종료 구간 모두에서 계속 존재한다.",
+      "sha256": "d6ba7403fc7ea9849437ccbf8c7911593e5af27002038bb46e5a17c078897f7d",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C023",
+      "origin": "live-description",
+      "text": "> **요지**: 마커 축이 살아 있어 로깅 계열은 대체로 보호된다. 남는 위험은 구간 안에서 처음 만들어져 마커를 못 받은 page, 볼륨 축만 보는 지점들, 그리고 재기동 후에도 삭제되지 않는 영구 voltype + temp 용도 볼륨이다.",
+      "sha256": "b0c628b74282e6c1135932f3f10823d964eb69439cfc869bc1e4d6eb0c174d7e",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C024",
+      "origin": "live-description",
+      "text": "없다(N/A). 조사 이슈이므로 사용자 노출 스펙 변경은 없다. 조사 결과 판정 로직을 바꾸기로 결정되면 그 이슈에서 스펙 변경을 다룬다.",
+      "sha256": "4493c795f27b95b6567d4b802d8c87027b0c2ac6e50d54e475f47d99ac973403",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C025",
+      "origin": "live-description",
+      "text": "조사 계획을 세 질문으로 나눈다.",
+      "sha256": "01b74d917551a620b09e373b73f1ec8fdd1364d140cd144f4a68f70d56354d49",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C026",
+      "origin": "live-description",
+      "text": "임시 voltype 볼륨은 재기동 시 삭제되므로 복구가 그 page 를 건드릴 이유가 없어 보인다. 영구 voltype + temp 용도 볼륨은 그 논리가 통하지 않으니 두 종류를 나눠 확인한다.",
+      "sha256": "d1f2d3d565c395e9b3ec9a894e91c96303f26d4a0ea9fc1f9743726c5f08049f",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C027",
+      "origin": "live-description",
+      "text": "-   temp page 는 로깅되지 않으므로 redo/undo 대상이 될 수 없다는 점을 `log_can_skip_undo_logging` / `log_can_skip_redo_logging` 의 조건으로 확인한다. 특히 마커 없이 만들어진 temp 볼륨 page 가 로깅 대상이 될 수 있는지를 본다.",
+      "sha256": "43aa61c636fec63ed8d4f252e17eb93a672a73f94d53a92e80f5be5199ef4150",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C028",
+      "origin": "live-description",
+      "text": "-   복구 중 호출되는 `pgbuf_flush_all (NULL_VOLID)`(`log_recovery.c:943`, `:4079`, `:5139`)이 temp 볼륨 BCB 를 만날 수 있는지 확인한다. `BCB` 는 frame 에 올라온 page 의 fix 수와 latch, dirty 상태를 보관하는 제어 블록이다.",
+      "sha256": "4cdcb87de4e4eca2b50c723a74b6d8421443e7343312617574879355f013e248",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27270-C029",
+      "origin": "live-description",
+      "text": "-   종료 경로의 `pgbuf_flush_all`(`log_manager.c:1835`)과, temp 볼륨 제거를 거치지 않고 `log_final` 에 도달하는 오류 경로를 확인한다. 재기동 실패 정리 경로(`boot_restart_server`, `boot_sr.c:2783`)와 DB 생성 실패 정리 경로(`xboot_initialize_server`, `boot_sr.c:1922`)가 그 후보다.",
+      "sha256": "5eed7ea2109ff659418ce0503f56df8e42adfaa59af8d109fa1f7c9b9c9d9ced",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27270-C030",
+      "origin": "live-description",
+      "text": "-   재기동 중 temp 볼륨 page 를 fix 하는 호출자가 있는지 확인한다. temp 전용 latchless API `pgbuf_simple_fix` 는 진입부에 `assert (pgbuf_is_temporary_volume (vpid->volid))`(`:2659`)가 있어 구간 안에서 호출되면 debug 빌드가 즉시 멈춘다. 지금까지 확인된 호출부는 temp 파일 파괴(`file_manager.c:4101`, `:4309`)와 질의 결과 리스트 파일(`query_manager.c:2733`)이며, 둘 다 복구 구간 밖으로 보이지만 확정이 필요하다.",
+      "sha256": "09ad269c47313bbbb71ee3d41729ecefe188608b3c0a2760a3f611bc1246f837",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27270-C031",
+      "origin": "live-description",
+      "text": "-   확인 방법: 판정 함수 `:5498-5501` 의 조기 반환 앞에 임시 계측을 넣는다. `!LOG_ISRESTARTED ()` 이면서 `xdisk_get_purpose (NULL, volid) == DB_TEMPORARY_DATA_PURPOSE` 인 경우에 volid 와 호출 스택을 `er_log_debug` 로 남기고, 아래 시나리오를 돌린다. 조기 반환 앞에서 조회하므로 계측 자체는 판정 결과를 바꾸지 않는다.",
+      "sha256": "c65f8db009e19b730c8c860587aa4266346d3f2d16a2f0b21a45439dd7ef92ef",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27270-C032",
+      "origin": "live-description",
+      "text": "``` bash\n# 영구 voltype + temp 용도 볼륨이 있는 데이터베이스를 만든다\ncubrid createdb --db-volume-size=100M --log-volume-size=100M tempchk en_US\ncubrid server start tempchk\ncubrid addvoldb -p temp --db-volume-size=100M tempchk\ncubrid spacedb -p tempchk        # 볼륨 용도가 TEMPORARY 로 잡혔는지 확인",
+      "sha256": "c6414d72649686d56c3da162260fdcde34ac2023d9a06b80bcbb35f8d653c927",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27270-C033",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C034",
+      "origin": "live-description",
+      "text": "임시 계측은 조사용이며 커밋 대상이 아니다.",
+      "sha256": "c55dfe5f7b567232091256f215b82e931ec8dafa7969cd3335ea08b0c241642c",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27270-C035",
+      "origin": "live-description",
+      "text": "볼륨 축만 보는 지점을 전부 열거하고 각각의 위험 방향을 채운다. 아래 표의 마지막 칸이 조사 산출물이다.",
+      "sha256": "a66fc212061583828367a0e520dda6ec2bc1c1741d2cb16d4ef827ede4b46f78",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C036",
+      "origin": "live-description",
+      "text": "| \\#  | 지점                                                    | 위치                                         | temp 로 판정될 때의 동작                              | 구간 안에서의 실제 동작                            | 위험 방향                                   |\n|-----|---------------------------------------------------------|----------------------------------------------|-------------------------------------------------------|----------------------------------------------------|---------------------------------------------|\n| 1   | 최초 read 후 temp LSA 스탬프                            | `:8515-8521`                                 | 마커가 없으면 `pgbuf_init_temp_page_lsa` + dirty 설정 | 스탬프하지 않음                                    | 조사 필요                                   |\n| 2   | NEW_PAGE 초기화                                         | `:8554-8562`                                 | temp 마커로 초기화                                    | `fileio_init_lsa_of_page` 로 일반 page 처럼 초기화 | 조사 필요 (마커 자체가 안 붙는 유일한 경로) |\n| 3   | `pgbuf_set_lsa` 강제 복원                               | `:4981-4988`                                 | LSA 를 temp 마커로 되돌림                             | 실제 LSA 를 그대로 기록                            | 조사 필요                                   |\n| 4   | LRU 승격 억제 (`PGBUF_SHOULD_IGNORE_UNFIX`, `:288-295`) | `:6705`, `:6734`, `:6769`                    | zone 1/2/3 에서 boost 와 private→shared 이동 생략     | 일반 page 와 동일하게 승격                         | 성능만 (안전 측)                            |\n| 5   | DWB 우회                                                | `:10688`, `:10743`                           | `uses_dwb = false`                                    | DWB 경유 기록                                      | 쓰기 증폭 (안전 측으로 보임, 확인 필요)     |\n| 6   | WAL 미로깅 경고 억제                                    | `:10793`                                     | 경고 침묵                                             | `er_log_debug` 경고 출력                           | 로그 소음                                   |\n| 7   | 체크포인트 flush 제외                                   | `pgbuf_flush_checkpoint` `:4204`             | 후보에서 `continue`                                   | 체크포인트 대상에 포함                             | 조사 필요                                   |\n| 8   | TDE 키 선택                                             | `:8498`(복호화), `:10688`\\\\+`:10751`(암호화) | `temp_key` + 카운터 nonce                             | `perm_key` + LSA nonce                             | 조사 필요 (아래 별항)                       |\n| 9   | temp 전용 API assert                                    | `:2659`                                      | assert 통과                                           | debug 빌드에서 assert 실패                         | 조사 필요                                   |\n| 10  | snapshot 통계 분류                                      | `:17318`                                     | `num_temp_pages` 로만 집계                            | data/index/system 으로 분류                        | 통계 표시만                                 |\n| 11  | `pgbuf_is_lsa_temporary` 의 볼륨 축                     | `:5477-5478`                                 | 마커가 없어도 temp 로 판정                            | 마커 축만 남음                                     | 마커 있는 page 는 보호됨                    |",
+      "sha256": "ee0e35b1519230887f57ac8b72ac2c1116cb1929010a13c2941820c8d8d9f4e2",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C037",
+      "origin": "live-description",
+      "text": "8번은 별도로 다룬다. `tde_encrypt_data_page`(`tde.c:913`)는 `is_temp` 로 데이터 키를 고르고(`:927-939`, temp 는 `temp_key` 와 원자적 카운터 nonce, perm 은 `perm_key` 와 page LSA nonce), `tde_decrypt_data_page`(`:966`)도 같은 인자로 키를 고른다(`:979-988`). nonce 는 page 헤더에 저장돼 되읽히지만 키는 매번 `is_temp` 로 다시 고르므로, 쓸 때와 읽을 때 판정이 다르면 복호화 결과가 깨진다. temp 파일도 TDE 대상이 될 수 있다는 점은 `file_manager.c:5533` 의 `pgbuf_set_tde_algorithm (..., FILE_IS_TEMPORARY (fhead))` 로 확인된다. 따라서 \\\"구간 안에서 temp 볼륨 + TDE page 가 flush 되거나 read 되는 경우가 있는가\\\" 가 이 조사에서 가장 먼저 답해야 할 질문이다.",
+      "sha256": "ae6d4ad30d58019c464b9d4a942a959f249c6569dc8a765db0ee8888df2012f1",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27270-C038",
+      "origin": "live-description",
+      "text": "1번과 2번의 결론이 \\\"구간 안에 temp 볼륨 page 접근이 없다\\\" 로 모이면, 지금의 `TODO` 주석을 다음 내용으로 교체한다.",
+      "sha256": "eac659bec45b1568d2927dc5706b601b8351f6e18edf7e65f8e00e2342f3d692",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C039",
+      "origin": "live-description",
+      "text": "-   판정이 false 로 고정되는 구간의 정확한 경계(`log_manager.c:1145` \\~ `:1443`, 그리고 `:1761` 이후)",
+      "sha256": "5aa9af22ef1f2173c5e2135508d2f175d1237c9565aa592f1d35c7f4b9a7294a",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C040",
+      "origin": "live-description",
+      "text": "-   그 구간에 temp 볼륨 page 가 존재할 수 없는 이유와 근거 코드 위치",
+      "sha256": "bfb27131ec29320e18f85693e14f69231f0634fc1c0090955631fb574123f04a",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C041",
+      "origin": "live-description",
+      "text": "-   가드가 필요한 근본 이유(`xdisk_get_purpose` 의 disk 캐시 미초기화 분기)",
+      "sha256": "4ae87157924c1772397460f613399e23e27e1848367874522b4a44812972d1bd",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C042",
+      "origin": "live-description",
+      "text": "-   이 전제가 깨지면 무엇이 먼저 문제가 되는지(TDE 키 선택과 NEW_PAGE 마커 누락)",
+      "sha256": "706d2c710b9ec9dd075d217d70204116cc1debc3733f8cfdc79cf861f79e4795",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C043",
+      "origin": "live-description",
+      "text": "전제가 깨지는 것을 코드로 잡을 수 있으면 주석 대신 `assert` 를 넣는 쪽이 낫다. 어느 쪽을 택할지는 조사 결론과 함께 결정한다.",
+      "sha256": "e8bdaa66fdc17cd708ad18169256cc35b468c4fbe92733b7ee5f25358259da52",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C044",
+      "origin": "live-description",
+      "text": "-   [ ] 판정이 false 로 고정되는 구간의 경계가 `rcv_phase` 전이 근거와 함께 정리되고, 복구 구간만이 아니라 종료 구간도 포함된다는 점이 명시된다.",
+      "sha256": "5aa0c9ad44c868f5d056142de8a6aa4731dd2e79c80faa4e78260a14b41d2679",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C045",
+      "origin": "live-description",
+      "text": "-   [ ] 구간 안에서 temp 용도 볼륨 page 접근이 발생하는지에 대해 \\\"발생함\\\" 또는 \\\"발생하지 않음\\\" 중 하나로 결론이 나고, 계측 또는 코드 경로 추적 근거가 붙는다. 임시 voltype 볼륨과 영구 voltype + temp 용도 볼륨을 각각 판정한다.",
+      "sha256": "dd9a6aac49a75a513d000a4d9de429ee5d1605a22e0772c38d5d0c6dba8e4325",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27270-C046",
+      "origin": "live-description",
+      "text": "-   [ ] 위 11개 지점 표의 위험 방향 칸이 전부 채워지고, 각 항목이 안전 측(성능·로그 소음만) 또는 위험 측(정합성)으로 분류된다.",
+      "sha256": "35d0bcc6eac0b0bd7c35c4c8e938f3b2aa99d794c218396b034ea56566da183e",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C047",
+      "origin": "live-description",
+      "text": "-   [ ] TDE 조합 판정이 결론에 포함된다 --- temp 볼륨 page 가 구간 안에서 암호화되어 기록되거나 복호화될 수 있는지, 가능하다면 키 불일치가 실제로 성립하는지.",
+      "sha256": "67067e0da7341b42044d038af7a117a22f04c4e7be897da392125d3b2b105c73",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27270-C048",
+      "origin": "live-description",
+      "text": "-   [ ] 결론이 \\\"문제 없음\\\" 이면 판정 근거가 `pgbuf_is_temporary_volume` 주석으로 남고 기존 `TODO` 주석이 대체된다. 코드로 전제를 검사할 수 있으면 `assert` 추가 여부까지 판단한다.",
+      "sha256": "09698c0d19616ce0bc64ad77c032bdc5fcf2bc388d5662b38940c3bbf6f1add4",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C049",
+      "origin": "live-description",
+      "text": "-   [ ] 위험이 확인되면 수정 범위와 방향을 정리해 별도 이슈로 등록하고 이 이슈에 링크한다.",
+      "sha256": "564ec9707c0f4356cb9b33332cbd0dc3ccef067e40777539cf8913451bc60641",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C050",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria 충족",
+      "sha256": "0ea4a17918fef8cc37098a111487d52496e3d2ec6ab4b5cbe13fd0d6508e5d5d",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C051",
+      "origin": "live-description",
+      "text": "-   [ ] 조사에 쓴 임시 계측 코드가 커밋에 남지 않는다",
+      "sha256": "2247e504f7546366bed1c0111c34a86924151d88e5b6b448067d8cf832c692d6",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27270-C052",
+      "origin": "live-description",
+      "text": "-   [ ] 주석 또는 `assert` 를 추가한 경우 release 와 debug 빌드가 통과하고 QA 회귀에 영향이 없음을 확인한다",
+      "sha256": "99273ae5515309cb0b9674ca115b467be7659b7fed79b91385b1cad420efb94b",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27270-C053",
+      "origin": "live-description",
+      "text": "-   [ ] 결론과 후속 처리(현행 유지 또는 수정 이슈 번호)가 부모 EPIC 에 반영된다",
+      "sha256": "0d936d93c3175b64b09f1f2f44b275f3b67c85b698b5eee6d9f431ffb66d94c0",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27270-C054",
+      "origin": "live-description",
+      "text": "가드 조건을 `LOG_ISRESTARTED ()` 대신 disk 매니저 초기화 여부로 바꾸면, 복구 구간에서도 볼륨 목적을 정상 조회할 수 있다. `disk_manager_init` 이 `log_initialize` 앞에 있으므로(`boot_sr.c:2372` 대 `:2428`) 정상 재기동 경로에서는 성립하지만, SA 모드와 emergency 재기동, `log_recreate` 같은 다른 진입 경로에서 순서가 같은지 확인해야 한다. 이 방향을 택할지는 `TBD - 합의 미확인` 이며 조사 결론을 본 뒤 결정한다.",
+      "sha256": "285dc9dfe1b312ac61e46051db499f03fcb6ba56ae5dd00da3f50fac290de87d",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C055",
+      "origin": "live-description",
+      "text": "`pgbuf_is_temporary_volume` 은 `PGBUF_SHOULD_IGNORE_UNFIX`(`:291-292`)를 통해 모든 unfix 경로에서 호출되는데, 결과를 캐시하지 않고 매번 `xdisk_get_purpose` 를 부른다. 이것은 정합성이 아니라 성능 축의 별개 문제이므로 이 이슈에서는 다루지 않는 것을 제안한다. 판정 로직을 바꾸기로 하면 두 사안이 같은 함수에서 만나므로 그때 함께 볼 수 있다.",
+      "sha256": "67a550143c5084035756470e27e6f98850b061f6089ef225efc4768d1d56b1b1",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27270-C056",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:5493-5503` --- 판정 함수 본체",
+      "sha256": "26fb848911e5115f182a8fad017fefbf30a27a008fa795ce629dc3bb9b199bd0",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C057",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c` 의 볼륨 축 호출 지점: `:288-295`, `:2659`, `:4204`, `:4981`, `:5477-5478`, `:8498`, `:8515`, `:8554`, `:10688`, `:10793`, `:17318`",
+      "sha256": "c3bf692c8c54fabd0b67256a3ce7e09e6f8c54266c5ae71e74bf00bf0af152c4",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C058",
+      "origin": "live-description",
+      "text": "-   `src/transaction/log_manager.c:1145`, `:1443`, `:1761` --- `rcv_phase` 전이",
+      "sha256": "b0a9efd6da6223930f91c91dade6b535db99b87187fe38f941bbfdffa550439d",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C059",
+      "origin": "live-description",
+      "text": "-   `src/transaction/log_manager.c:4333-4360`, `:4385-4404` --- 로깅 생략 판정",
+      "sha256": "6d7e4af3ebaa410bccecee5134aa36b235da0b9dc1f35df3f3fe8bc5e8d05941",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C060",
+      "origin": "live-description",
+      "text": "-   `src/transaction/boot_sr.c:2372`, `:2428`, `:2568`, `:3081`, `:3110` --- 부팅·종료 순서",
+      "sha256": "47a6d1b1f163b65d0c22260140708316977f084e2f51f5ada3169f8419f43ced",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C061",
+      "origin": "live-description",
+      "text": "-   `src/storage/disk_manager.c:5616-5623` --- disk 캐시 미초기화 시 동작",
+      "sha256": "4b1e8f38d20c676890a4021eefe533030ff6f5691ed4c10d048bbd18d3cecc3f",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C062",
+      "origin": "live-description",
+      "text": "-   `src/storage/tde.c:913-954`, `:966-1003` --- `is_temp` 에 따른 키와 nonce 선택",
+      "sha256": "0681129657375305ee6d2d45511e144bba7f55eb3acfce398282c6c3f3d4d21e",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C063",
+      "origin": "live-description",
+      "text": "-   `src/storage/double_write_buffer.cpp:3123-3127` --- 복구 시 미마운트 볼륨 slot 건너뛰기",
+      "sha256": "8834d3542c7bc6c663f048f2f8bc37a6184dfcb702a858a192ae51e80fc9918f",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C064",
+      "origin": "live-description",
+      "text": "-   `src/compat/dbtype_def.h:198-209` --- 볼륨 용도와 볼륨 종류 열거값",
+      "sha256": "35b39cade209fd6ed95e91a5cb169bf6d305a7730f5d54c1c162942478c3840d",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C065",
+      "origin": "live-description",
+      "text": "-   `src/executables/util_cs.c:463-465`, `:488-520` --- `addvoldb` 의 purpose 와 voltype 조합 처리",
+      "sha256": "923ba1761705c9668ce52aaf628f78d08d208b69a25668f37b95665fdfb127d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C066",
+      "origin": "live-description",
+      "text": "-   `src/transaction/boot_sr.c:904-924`, `:1149-1187` --- 임시 voltype 볼륨만 제거하는 범위",
+      "sha256": "05a50e0f58efc1615896ae814105e57d61558488f41c61a3569111ac65beb17e",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27270-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: 복구 구간에서 `pgbuf_is_temporary_volume` 이 항상 false 를 반환하는 현재 동작이 안전한지 판정하고, 안전하다면 그 판단 근거를 코드에 남긴다. 위험이 확인되면 별도 수정 이슈로 넘긴다.",
+      "sha256": "e1a84ec26456d4c2c358455164b620d4bd27070330f6682b66fdde350b1c0af3",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | `pgbuf_is_temporary_volume`(`page_buffer.c:5493-5503`)은 `LOG_ISRESTARTED ()` 가 거짓인 동안 볼륨 목적을 조회하지 않고 무조건 false 를 반환한다(`:5498-5501`). 그 구간에서는 temp 볼륨의 page 가 일반 page 와 구별되지 않아 temp 전용 처리 경로를 하나도 타지 않는다. 함수에 달린 주석은 \"I don't know why page buffer should care about temporary files ... it is really annoying\" 이라, 이 동작이 의도인지 회피인지 판단할 근거가 남아 있지 않다. |\n| **TO-BE (목표 상태 / 기대 동작)** | `TBD - 조사 결과에 따름`. 구간 안에서 temp 볼륨 page 접근이 없다고 확인되면 현재 동작을 그대로 두고, 왜 안전한지를 함수 주석으로 대체하는 것이 목표 상태다. 접근이 존재하고 non-temp 취급이 위험 측이면 판정 로직 수정을 후속 이슈로 분리한다. |\n| **영향** | 설계 의도 훼손 가능성 — temp page 처리는 \"복구 대상이 아니므로 로깅도 이중 쓰기도 필요 없다\"는 전제로 만들어졌는데, 이 구간에서는 그 전제가 통째로 빠진다. 특히 TDE 를 켠 데이터베이스는 `is_temp` 가 데이터 키 선택을 바꾸므로(`tde.c:927-939`, `:979-988`), 같은 page 를 쓸 때와 읽을 때 판정이 갈리면 복호화가 어긋난다. |",
+      "sha256": "70b0976571636a131b4f8f3357324482b22ab756bb73589c79b43e25cace8a3f",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27270-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**: 코드 수정 없이 조사부터 한다. 아래 Implementation 의 세 질문에 결론을 내고, 수정 여부와 범위는 그 결론으로 정한다. 결론이 \"문제 없음\" 으로 끝날 수 있는 조사이며, 그 경우에도 판정 근거를 코드 주석으로 남기는 것까지가 이 이슈의 완료 조건이다. 판정 함수를 손대는 수정은 이 이슈에서 하지 않고 별도 이슈로 등록한다.",
+      "sha256": "573712d666c3879a054ef59e25908d6fc502051fc29dd99b3f4472ba1a59c738",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- **조사 범위**: `src/storage/page_buffer.c`(판정 함수와 11개 호출 지점), `src/transaction/log_manager.c`(`rcv_phase` 전이와 로깅 생략 판정), `src/transaction/boot_sr.c`(temp 볼륨 제거 시점), `src/storage/disk_manager.c`(`xdisk_get_purpose` 초기화 전 동작), `src/storage/tde.c`(키 선택), `src/storage/double_write_buffer.cpp`(복구 시 미마운트 볼륨 처리). 조사 산출물은 결론 문서와 코드 주석이며, 예상되는 코드 변경은 최소 주석 한 문단에서 최대 판정 함수 수정까지다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.\n- **부모 EPIC / 결함 ID**: CBRD-27193 의 자식 이슈이며 결함 N7(복구 중 temp 볼륨 판정)을 소유한다.",
+      "sha256": "54146ae1c1e0a0fc5fd7b1e19fdc09fb6bab1d55811fce37f98b62c58711d6bc",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 temp page 를 특별하게 다룬다. temp page 는 재기동 후 살아남을 필요가 없으므로 `WAL` (Write-Ahead Logging — data page 보다 log 를 먼저 기록하는 규칙)을 적용하지 않고, `DWB` (Double Write Buffer — 원래 위치에 쓰기 전 별도 파일에 사본을 기록하는 torn-write 보호 장치)도 거치지 않으며, `LRU` (Least Recently Used — 최근 사용 시점 기준 page 교체 목록) 승격 대상에서도 빠진다.",
+      "sha256": "bae9cfb8ea2f0d163fa908444a512493110d9860dd9cb0b94709668b779c6a8a",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27270-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "문제는 \"이 page 가 temp 인가\" 를 판정하는 두 축 중 하나가 특정 구간에서 무력화된다는 점이다.",
+      "sha256": "bfe06d4d93eaf284ce4f95c02b0b6011d88483d6d683107a106bcaac2e278a73",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27270-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "| 축 | 판정 함수 | 근거 | 위치 |\n|---|---|---|---|\n| 볼륨 목적 | `pgbuf_is_temporary_volume (volid)` | `xdisk_get_purpose` 결과가 `DB_TEMPORARY_DATA_PURPOSE` 인가 | `:5493-5503` |\n| page LSA 마커 | `pgbuf_is_temp_lsa (lsa)` | page 의 `prv.lsa` 가 `PGBUF_TEMP_LSA` 인가 (`page_buffer.h:260` 의 `{-2, -2}`) | `:17260-17264` |",
+      "sha256": "989a22a49f1cbab640d2759e78781731a0f153276ef711860192a0ad3d6a5091",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27270-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "`pgbuf_is_lsa_temporary`(`:5470-5484`)는 두 축의 OR 이므로, 볼륨 축이 죽어도 마커 축이 남아 있으면 판정은 살아 있다. 반대로 볼륨 축만 보는 지점은 구간 안에서 판정이 완전히 뒤집힌다.",
+      "sha256": "a6ad9af76b9eb0d6994d8dc55e601f85b5125b6e8653891555907ff3766b4fa6",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27270-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "볼륨의 종류(voltype)와 용도(purpose)는 별개 축이다(`dbtype_def.h:198-209`). `pgbuf_is_temporary_volume` 은 용도만 보므로 아래 둘을 구별하지 않는다.",
+      "sha256": "0cd458bb300764f77e72c25375310dec987e043ea924c15af543c60687833afa",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27270-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "| 종류 | 만드는 방법 | 재기동 시 | 예시 |\n|---|---|---|---|\n| 임시 voltype + temp 용도 | 정렬·질의 임시 공간이 부족할 때 서버가 자동 생성 | `boot_remove_all_temp_volumes` 가 삭제 (`boot_sr.c:904-924`, `boot_Db_parm->temp_last_volid` 이상 범위만 대상) | `<db>_t32766` |\n| 영구 voltype + temp 용도 | `cubrid addvoldb -p temp <db>` (`util_cs.c:463-465`, voltype 기본값이 perm) | 삭제되지 않고 그대로 남는다 | `<db>_x001` 형태의 확장 볼륨 |",
+      "sha256": "a0c0519a7a1ae4e638dea4a20419aee30367fd63daa7454ab46bff87520638ef",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27270-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "\"temp 볼륨은 재기동 때 재생성되므로 복구가 건드릴 일이 없다\" 는 전제는 첫째 종류에만 성립한다. 둘째 종류는 재기동 후에도 계속 존재하고, 복구 구간에도 마운트된 상태다.",
+      "sha256": "cde54f3f1b800ad21423315a16e9641b4cbe4c0d3633b415b93fa6b83858a414",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "`LOG_ISRESTARTED ()` 는 `log_Gl.rcv_phase == LOG_RESTARTED` 다(`log_impl.h:193`). `LOG_RESTARTED` 는 enum 의 첫 값(0)이라 전역 변수 `log_Gl` 이 0 으로 초기화된 상태에서는 참이고, 로그 매니저가 복구를 시작하면서 거짓으로 바뀐다.",
+      "sha256": "17a487a31d4b92801b6c838345d5afbdf87bdbd8b55d8b3c6242448987af4a95",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27270-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "부팅\n      log_initialize_internal ()                              log_manager.c:1102\n        rcv_phase = LOG_RECOVERY_ANALYSIS_PHASE               log_manager.c:1145\n        └ logtb_define_trantable_log_latch ()\n             └ pgbuf_initialize ()                            log_tran_table.c:494\n        analysis -> redo -> undo -> finish 2PC                log_recovery.c:835-920\n        rcv_phase = LOG_RESTARTED                             log_manager.c:1443\n    ★ 여기까지가 판정 false 구간 — page buffer 의 첫 수명 전체가 이 안에 든다\n      정상 운영 (볼륨 목적 조회가 실제로 동작)\n    종료\n      log_final ()                                            log_manager.c:1743\n        rcv_phase = LOG_RECOVERY_ANALYSIS_PHASE               log_manager.c:1761\n    ★ 여기서 판정 false 구간이 다시 열린다\n        pgbuf_flush_all (NULL_VOLID)  <- 모든 dirty page flush log_manager.c:1835\n        logtb_undefine_trantable () -> pgbuf_finalize ()       log_tran_table.c:591",
+      "sha256": "d73ca0994d3179fd96a4fc4aa0503732584b44a90ea0be30d229d99f5608c311",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "즉 이 구간은 \"crash recovery 중\" 만이 아니다. page buffer 가 만들어진 직후부터 복구가 끝날 때까지, 그리고 종료 절차가 시작된 뒤 마지막 flush 까지가 모두 포함된다.",
+      "sha256": "b1ee26c4ce991159ba884e6b84cd3f807b26c882acc6fcfa6d59383484a47ce9",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "`xdisk_get_purpose`(`disk_manager.c:5616`)는 disk 매니저가 초기화되기 전(`disk_Cache == NULL`)이면 `assert (volid == LOG_DBFIRST_VOLID)` 를 걸고 `DB_PERMANENT_DATA_PURPOSE` 를 반환한다(`:5618-5623`). 가드가 없으면 볼륨 정보가 아직 없는 시점의 page fix 가 debug 빌드에서 이 assert 를 때린다. 주석의 \"annoying\" 은 이 상황을 가리키는 것으로 보인다.",
+      "sha256": "1ee9a2f812916187cc6b4cd215c11a7db4720769e11923d1957aab37f1c54fb4",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "다만 정상 재기동 경로에서는 `disk_manager_init (thread_p, true)` 가 `log_initialize` 보다 먼저 실행되므로(`boot_sr.c:2372` 대 `:2428`), 복구 구간에는 disk 캐시가 이미 채워져 있다. 가드가 필요한 창보다 넓게 잡혀 있을 가능성이 있고, 이것도 조사 항목이다.",
+      "sha256": "9c724f6685a4aa6bc8f88bc99ba4496931eef9a2a9e590f4fd5815c48813a730",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- 로깅 생략 판정(`log_can_skip_undo_logging` `log_manager.c:4356`, `log_can_skip_redo_logging` `:4400`)은 `pgbuf_is_lsa_temporary` 를 쓰므로 마커 축으로도 성립한다. 디스크에서 읽어 온 temp page 는 이미 마커를 갖고 있어 이 경로는 구간 안에서도 보호된다.\n- DWB 복구는 마운트되지 않은 볼륨의 slot 을 건너뛴다(`double_write_buffer.cpp:3123-3127`). 임시 voltype 볼륨의 page 가 DWB 에 들어간 뒤 그 볼륨이 삭제됐더라도 재기동 자체를 깨뜨리지는 않는다.\n- 정상 종료 경로는 임시 voltype 볼륨을 `boot_remove_all_temp_volumes`(`boot_sr.c:3081`)로 먼저 제거한 뒤 `log_final`(`:3110`)을 호출한다. 그 종류에 한해서는 종료 구간이 다시 열릴 때 대상 볼륨이 이미 없다.",
+      "sha256": "dec260c355b6da6b587108ccb1b6d2c913be7a7d48f886fbb395b88b62ff8c6f",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "반대로 위험 쪽으로 기우는 사실도 있다. 재기동 경로의 임시 voltype 볼륨 제거(`boot_sr.c:2568`)는 복구가 끝난 뒤라, 복구 중에는 이전 실행의 볼륨이 아직 마운트되어 있다. 영구 voltype + temp 용도 볼륨은 애초에 삭제 대상이 아니어서 복구와 종료 구간 모두에서 계속 존재한다.",
+      "sha256": "d6ba7403fc7ea9849437ccbf8c7911593e5af27002038bb46e5a17c078897f7d",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "> **요지**: 마커 축이 살아 있어 로깅 계열은 대체로 보호된다. 남는 위험은 구간 안에서 처음 만들어져 마커를 못 받은 page, 볼륨 축만 보는 지점들, 그리고 재기동 후에도 삭제되지 않는 영구 voltype + temp 용도 볼륨이다.",
+      "sha256": "b0c628b74282e6c1135932f3f10823d964eb69439cfc869bc1e4d6eb0c174d7e",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "없다(N/A). 조사 이슈이므로 사용자 노출 스펙 변경은 없다. 조사 결과 판정 로직을 바꾸기로 결정되면 그 이슈에서 스펙 변경을 다룬다.",
+      "sha256": "4493c795f27b95b6567d4b802d8c87027b0c2ac6e50d54e475f47d99ac973403",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "조사 계획을 세 질문으로 나눈다.",
+      "sha256": "01b74d917551a620b09e373b73f1ec8fdd1364d140cd144f4a68f70d56354d49",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "임시 voltype 볼륨은 재기동 시 삭제되므로 복구가 그 page 를 건드릴 이유가 없어 보인다. 영구 voltype + temp 용도 볼륨은 그 논리가 통하지 않으니 두 종류를 나눠 확인한다.",
+      "sha256": "d1f2d3d565c395e9b3ec9a894e91c96303f26d4a0ea9fc1f9743726c5f08049f",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27270-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- temp page 는 로깅되지 않으므로 redo/undo 대상이 될 수 없다는 점을 `log_can_skip_undo_logging` / `log_can_skip_redo_logging` 의 조건으로 확인한다. 특히 마커 없이 만들어진 temp 볼륨 page 가 로깅 대상이 될 수 있는지를 본다.\n- 복구 중 호출되는 `pgbuf_flush_all (NULL_VOLID)`(`log_recovery.c:943`, `:4079`, `:5139`)이 temp 볼륨 BCB 를 만날 수 있는지 확인한다. `BCB` 는 frame 에 올라온 page 의 fix 수와 latch, dirty 상태를 보관하는 제어 블록이다.\n- 종료 경로의 `pgbuf_flush_all`(`log_manager.c:1835`)과, temp 볼륨 제거를 거치지 않고 `log_final` 에 도달하는 오류 경로를 확인한다. 재기동 실패 정리 경로(`boot_restart_server`, `boot_sr.c:2783`)와 DB 생성 실패 정리 경로(`xboot_initialize_server`, `boot_sr.c:1922`)가 그 후보다.\n- 재기동 중 temp 볼륨 page 를 fix 하는 호출자가 있는지 확인한다. temp 전용 latchless API `pgbuf_simple_fix` 는 진입부에 `assert (pgbuf_is_temporary_volume (vpid->volid))`(`:2659`)가 있어 구간 안에서 호출되면 debug 빌드가 즉시 멈춘다. 지금까지 확인된 호출부는 temp 파일 파괴(`file_manager.c:4101`, `:4309`)와 질의 결과 리스트 파일(`query_manager.c:2733`)이며, 둘 다 복구 구간 밖으로 보이지만 확정이 필요하다.\n- 확인 방법: 판정 함수 `:5498-5501` 의 조기 반환 앞에 임시 계측을 넣는다. `!LOG_ISRESTARTED ()` 이면서 `xdisk_get_purpose (NULL, volid) == DB_TEMPORARY_DATA_PURPOSE` 인 경우에 volid 와 호출 스택을 `er_log_debug` 로 남기고, 아래 시나리오를 돌린다. 조기 반환 앞에서 조회하므로 계측 자체는 판정 결과를 바꾸지 않는다.",
+      "sha256": "ef7ecaf434646a4ddb8ae64c235606b32e023e06db99bb36ec4ff4aaebeb8c59",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27270-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "```bash\n# 영구 voltype + temp 용도 볼륨이 있는 데이터베이스를 만든다\ncubrid createdb --db-volume-size=100M --log-volume-size=100M tempchk en_US\ncubrid server start tempchk\ncubrid addvoldb -p temp --db-volume-size=100M tempchk\ncubrid spacedb -p tempchk        # 볼륨 용도가 TEMPORARY 로 잡혔는지 확인",
+      "sha256": "fd2841c0aff2d59c6f296f9244f90caa264d80f4251da19e9c2ac2927e98ccc9",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27270-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "임시 계측은 조사용이며 커밋 대상이 아니다.",
+      "sha256": "c55dfe5f7b567232091256f215b82e931ec8dafa7969cd3335ea08b0c241642c",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27270-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "볼륨 축만 보는 지점을 전부 열거하고 각각의 위험 방향을 채운다. 아래 표의 마지막 칸이 조사 산출물이다.",
+      "sha256": "a66fc212061583828367a0e520dda6ec2bc1c1741d2cb16d4ef827ede4b46f78",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C094",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "| # | 지점 | 위치 | temp 로 판정될 때의 동작 | 구간 안에서의 실제 동작 | 위험 방향 |\n|---|---|---|---|---|---|\n| 1 | 최초 read 후 temp LSA 스탬프 | `:8515-8521` | 마커가 없으면 `pgbuf_init_temp_page_lsa` + dirty 설정 | 스탬프하지 않음 | 조사 필요 |\n| 2 | NEW_PAGE 초기화 | `:8554-8562` | temp 마커로 초기화 | `fileio_init_lsa_of_page` 로 일반 page 처럼 초기화 | 조사 필요 (마커 자체가 안 붙는 유일한 경로) |\n| 3 | `pgbuf_set_lsa` 강제 복원 | `:4981-4988` | LSA 를 temp 마커로 되돌림 | 실제 LSA 를 그대로 기록 | 조사 필요 |\n| 4 | LRU 승격 억제 (`PGBUF_SHOULD_IGNORE_UNFIX`, `:288-295`) | `:6705`, `:6734`, `:6769` | zone 1/2/3 에서 boost 와 private→shared 이동 생략 | 일반 page 와 동일하게 승격 | 성능만 (안전 측) |\n| 5 | DWB 우회 | `:10688`, `:10743` | `uses_dwb = false` | DWB 경유 기록 | 쓰기 증폭 (안전 측으로 보임, 확인 필요) |\n| 6 | WAL 미로깅 경고 억제 | `:10793` | 경고 침묵 | `er_log_debug` 경고 출력 | 로그 소음 |\n| 7 | 체크포인트 flush 제외 | `pgbuf_flush_checkpoint` `:4204` | 후보에서 `continue` | 체크포인트 대상에 포함 | 조사 필요 |\n| 8 | TDE 키 선택 | `:8498`(복호화), `:10688`+`:10751`(암호화) | `temp_key` + 카운터 nonce | `perm_key` + LSA nonce | 조사 필요 (아래 별항) |\n| 9 | temp 전용 API assert | `:2659` | assert 통과 | debug 빌드에서 assert 실패 | 조사 필요 |\n| 10 | snapshot 통계 분류 | `:17318` | `num_temp_pages` 로만 집계 | data/index/system 으로 분류 | 통계 표시만 |\n| 11 | `pgbuf_is_lsa_temporary` 의 볼륨 축 | `:5477-5478` | 마커가 없어도 temp 로 판정 | 마커 축만 남음 | 마커 있는 page 는 보호됨 |",
+      "sha256": "f088b5aef3204c3a00498c5d41286eacd12f63c8631dac707e75075f03424dac",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C095",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "8번은 별도로 다룬다. `tde_encrypt_data_page`(`tde.c:913`)는 `is_temp` 로 데이터 키를 고르고(`:927-939`, temp 는 `temp_key` 와 원자적 카운터 nonce, perm 은 `perm_key` 와 page LSA nonce), `tde_decrypt_data_page`(`:966`)도 같은 인자로 키를 고른다(`:979-988`). nonce 는 page 헤더에 저장돼 되읽히지만 키는 매번 `is_temp` 로 다시 고르므로, 쓸 때와 읽을 때 판정이 다르면 복호화 결과가 깨진다. temp 파일도 TDE 대상이 될 수 있다는 점은 `file_manager.c:5533` 의 `pgbuf_set_tde_algorithm (..., FILE_IS_TEMPORARY (fhead))` 로 확인된다. 따라서 \"구간 안에서 temp 볼륨 + TDE page 가 flush 되거나 read 되는 경우가 있는가\" 가 이 조사에서 가장 먼저 답해야 할 질문이다.",
+      "sha256": "86e14d6f6b2cc698d7ca60733a06633f14ba731d2bc14fb762445f7e520b9e21",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27270-C096",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "1번과 2번의 결론이 \"구간 안에 temp 볼륨 page 접근이 없다\" 로 모이면, 지금의 `TODO` 주석을 다음 내용으로 교체한다.",
+      "sha256": "3d7b98fd74c99006084e60dc3287daf950312b44b929b8324c2324592c403948",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C097",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- 판정이 false 로 고정되는 구간의 정확한 경계(`log_manager.c:1145` ~ `:1443`, 그리고 `:1761` 이후)\n- 그 구간에 temp 볼륨 page 가 존재할 수 없는 이유와 근거 코드 위치\n- 가드가 필요한 근본 이유(`xdisk_get_purpose` 의 disk 캐시 미초기화 분기)\n- 이 전제가 깨지면 무엇이 먼저 문제가 되는지(TDE 키 선택과 NEW_PAGE 마커 누락)",
+      "sha256": "689249736039e9c387f11cb017982f9a345095cdcb4005f84f027866e6d77f14",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C098",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "전제가 깨지는 것을 코드로 잡을 수 있으면 주석 대신 `assert` 를 넣는 쪽이 낫다. 어느 쪽을 택할지는 조사 결론과 함께 결정한다.",
+      "sha256": "e8bdaa66fdc17cd708ad18169256cc35b468c4fbe92733b7ee5f25358259da52",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C099",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 판정이 false 로 고정되는 구간의 경계가 `rcv_phase` 전이 근거와 함께 정리되고, 복구 구간만이 아니라 종료 구간도 포함된다는 점이 명시된다.",
+      "sha256": "4b2bed16fb82825f197b9a004f56f0bcc9b7bb614d2d60322d26202deba8e7f2",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27270-C100",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 구간 안에서 temp 용도 볼륨 page 접근이 발생하는지에 대해 \"발생함\" 또는 \"발생하지 않음\" 중 하나로 결론이 나고, 계측 또는 코드 경로 추적 근거가 붙는다. 임시 voltype 볼륨과 영구 voltype + temp 용도 볼륨을 각각 판정한다.",
+      "sha256": "9b6f961c235301d64653b018ae60c4b8f2ca7ed5c9e5ea38d4b154b054e8bcff",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27270-C101",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 위 11개 지점 표의 위험 방향 칸이 전부 채워지고, 각 항목이 안전 측(성능·로그 소음만) 또는 위험 측(정합성)으로 분류된다.",
+      "sha256": "212959547587c2dc1412254574efc51db979ab409d81be7cab00a0d66313871f",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27270-C102",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] TDE 조합 판정이 결론에 포함된다 — temp 볼륨 page 가 구간 안에서 암호화되어 기록되거나 복호화될 수 있는지, 가능하다면 키 불일치가 실제로 성립하는지.",
+      "sha256": "d6d05131641af0093e35c02911d6ab8490d3914724b9224f0caf4526d04d1b11",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27270-C103",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 결론이 \"문제 없음\" 이면 판정 근거가 `pgbuf_is_temporary_volume` 주석으로 남고 기존 `TODO` 주석이 대체된다. 코드로 전제를 검사할 수 있으면 `assert` 추가 여부까지 판단한다.",
+      "sha256": "5f826eb330f89791fad4571a26a06744a5bdeafabdcaf4d3eec4caf380ff0157",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C104",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 위험이 확인되면 수정 범위와 방향을 정리해 별도 이슈로 등록하고 이 이슈에 링크한다.",
+      "sha256": "456cc8a765f48017ba0db1a5c5ff3731b6940fde46ec6bff82afc8fcfa2bc92f",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27270-C105",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria 충족",
+      "sha256": "2a8eff1f148627fb5762c305e645d09b1089f7f902472864f724713cac135d2e",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27270-C106",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 조사에 쓴 임시 계측 코드가 커밋에 남지 않는다",
+      "sha256": "900abfcbad97cbc6b17b9a3dbc5424f895f5f74643038a6d43befae5362710d3",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27270-C107",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 주석 또는 `assert` 를 추가한 경우 release 와 debug 빌드가 통과하고 QA 회귀에 영향이 없음을 확인한다",
+      "sha256": "c366dc48c0173fdf0c16dcb205a86a907a796934c0f2c53fed1be82488e4a418",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27270-C108",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- [ ] 결론과 후속 처리(현행 유지 또는 수정 이슈 번호)가 부모 EPIC 에 반영된다",
+      "sha256": "97f3036f8084cc349ee8fb3882c5513a8ce5125177fb4ed7518b1dbe94bfc4f3",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27270-C109",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "가드 조건을 `LOG_ISRESTARTED ()` 대신 disk 매니저 초기화 여부로 바꾸면, 복구 구간에서도 볼륨 목적을 정상 조회할 수 있다. `disk_manager_init` 이 `log_initialize` 앞에 있으므로(`boot_sr.c:2372` 대 `:2428`) 정상 재기동 경로에서는 성립하지만, SA 모드와 emergency 재기동, `log_recreate` 같은 다른 진입 경로에서 순서가 같은지 확인해야 한다. 이 방향을 택할지는 `TBD - 합의 미확인` 이며 조사 결론을 본 뒤 결정한다.",
+      "sha256": "285dc9dfe1b312ac61e46051db499f03fcb6ba56ae5dd00da3f50fac290de87d",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27270-C110",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "`pgbuf_is_temporary_volume` 은 `PGBUF_SHOULD_IGNORE_UNFIX`(`:291-292`)를 통해 모든 unfix 경로에서 호출되는데, 결과를 캐시하지 않고 매번 `xdisk_get_purpose` 를 부른다. 이것은 정합성이 아니라 성능 축의 별개 문제이므로 이 이슈에서는 다루지 않는 것을 제안한다. 판정 로직을 바꾸기로 하면 두 사안이 같은 함수에서 만나므로 그때 함께 볼 수 있다.",
+      "sha256": "67a550143c5084035756470e27e6f98850b061f6089ef225efc4768d1d56b1b1",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27270-C111",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27270-pgbuf-temp-volume-during-recovery_e6ed61e_claude.md",
+      "text": "- `src/storage/page_buffer.c:5493-5503` — 판정 함수 본체\n- `src/storage/page_buffer.c` 의 볼륨 축 호출 지점: `:288-295`, `:2659`, `:4204`, `:4981`, `:5477-5478`, `:8498`, `:8515`, `:8554`, `:10688`, `:10793`, `:17318`\n- `src/transaction/log_manager.c:1145`, `:1443`, `:1761` — `rcv_phase` 전이\n- `src/transaction/log_manager.c:4333-4360`, `:4385-4404` — 로깅 생략 판정\n- `src/transaction/boot_sr.c:2372`, `:2428`, `:2568`, `:3081`, `:3110` — 부팅·종료 순서\n- `src/storage/disk_manager.c:5616-5623` — disk 캐시 미초기화 시 동작\n- `src/storage/tde.c:913-954`, `:966-1003` — `is_temp` 에 따른 키와 nonce 선택\n- `src/storage/double_write_buffer.cpp:3123-3127` — 복구 시 미마운트 볼륨 slot 건너뛰기\n- `src/compat/dbtype_def.h:198-209` — 볼륨 용도와 볼륨 종류 열거값\n- `src/executables/util_cs.c:463-465`, `:488-520` — `addvoldb` 의 purpose 와 voltype 조합 처리\n- `src/transaction/boot_sr.c:904-924`, `:1149-1187` — 임시 voltype 볼륨만 제거하는 범위",
+      "sha256": "d383b30da065d4032c4342022a292c4747ca17829a3fdd82620b592e3960f052",
+      "disposition_group": 1
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        2,
+        25,
+        33,
+        50,
+        68,
+        88,
+        105
+      ],
+      "disposition": "non-substantive",
+      "reason": "Empty reason labels, transition sentence, isolated fence, and acceptance-summary boilerplate; live/local duplicates normalized to current structure.",
+      "evidence": [
+        "inventory:CBRD-27270-original-claims.json"
+      ]
+    },
+    {
+      "ids": [
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        111
+      ],
+      "disposition": "non-substantive",
+      "reason": "Bare source-location/reference lists are replaced by verified immutable links at the new baseline; substantive claims are accounted for in their own groups.",
+      "evidence": [
+        "report:Evidence"
+      ]
+    },
+    {
+      "ids": [
+        1,
+        4,
+        5,
+        24,
+        38,
+        40,
+        43,
+        48,
+        49,
+        67,
+        70,
+        71,
+        87,
+        96,
+        97,
+        98,
+        103,
+        104
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate live/local scope promises conflict between no code changes, mandatory comment/assert, and guard modification. Survey may conclude no functional defect, evidence/comment improvement, or a scoped followup. No behavior fix or mandatory code modification is preselected; bounded evidence rather than universal page absence is required.",
+      "evidence": [
+        "report:Issue Triage",
+        "report:Specification Changes",
+        "report:Implementation",
+        "report:Acceptance Criteria"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        7,
+        69,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "Blanket loss of all temporary handling/WAL protection is false. Marker-based predicates and explicit callers survive the gate; practical TDE/DWB consequences require actual page/settings reachability. Reframed as investigation rather than confirmed corruption.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5472-L5510",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L4366-L4442",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4942-L5006"
+      ]
+    },
+    {
+      "ids": [
+        6
+      ],
+      "disposition": "corrected",
+      "reason": "Retain parent-child scope while removing the inherited N7 defect label as evidence of an already confirmed functional defect.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27270",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        10,
+        73,
+        75
+      ],
+      "disposition": "retained",
+      "reason": "Two independent temporary-classification axes and their OR are directly verified; affected volume-only branches are evaluated conditionally. Duplicate local/live wording combined.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5472-L5510"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        74
+      ],
+      "disposition": "retained",
+      "reason": "Temporary LSA marker and purpose predicates retained with current definitions and correct source locations, including header/watermark update.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L264-L267",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17284-L17297"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        76
+      ],
+      "disposition": "retained",
+      "reason": "Volume type and purpose are distinct enums; restarted page-buffer classification checks purpose.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/compat/dbtype_def.h#L197-L209",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5501-L5510"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        77
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the two combinations and addvoldb default permanent type; replace deletion-only lifecycle account with explicit mount boundary and verified metadata reachability. Filename examples are unnecessary and omitted.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_cs.c#L463-L521",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L1039-L1049",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L2452-L2484"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        22,
+        26,
+        78,
+        85,
+        89
+      ],
+      "disposition": "corrected",
+      "reason": "Deletion after recovery does not imply temporary-voltype volumes are mounted during recovery: bootstrap explicitly does not mount them. Permanent-type/temp-purpose metadata access is verified; payload and other entry paths remain open.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L1039-L1049",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L1270-L1285",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L2452-L2484"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        79
+      ],
+      "disposition": "corrected",
+      "reason": "LOG_RESTARTED is enum zero, but log_global constructor explicitly initializes recovery-analysis phase; zero-initialization argument is invalid.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_global.c#L49-L64",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_impl.h#L190-L194"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        16,
+        39,
+        44,
+        80,
+        81,
+        99
+      ],
+      "disposition": "corrected",
+      "reason": "Gate covers early initialization as well as recovery and log_final cleanup. Current boot prepares pool early and log_initialize reuses managers; describe actual state boundaries and early returns, rather than an obsolete first-lifetime sequence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2263-L2275",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1130-L1151",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1411-L1473",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1792-L1810",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_tran_table.c#L483-L504"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        18,
+        41,
+        54,
+        82,
+        83,
+        109
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve cache-not-ready assertion and disk-init-before-log-init order, but historical TODO author intent is not proved. Cache existence alone is insufficient: valid/populated volid information and all entry paths matter. A changed guard remains an unselected analysis question.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L5631-L5658",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2362-L2376",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2423-L2427"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        23,
+        27,
+        84,
+        86,
+        90
+      ],
+      "disposition": "corrected",
+      "reason": "Keep marker protection and investigation of recovery/cleanup/simple-fix callers, but not universal marker presence or impossibility of temp logging/recovery. Log-index exceptions, undo assert, and explicit metadata marker/flush are verified. Compound local duplicate includes DWB/shutdown facts with their respective limits.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L4366-L4442",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4942-L5006",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4036-L4078",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4272-L4293",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/query_manager.c#L2806-L2821"
+      ]
+    },
+    {
+      "ids": [
+        20
+      ],
+      "disposition": "corrected",
+      "reason": "DWB recovery skips unmounted-volume slots. This local condition does not establish safe restart in all cases.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L3111-L3130"
+      ]
+    },
+    {
+      "ids": [
+        21
+      ],
+      "disposition": "retained",
+      "reason": "Normal shutdown calls temporary-volume removal before log_final; report states order rather than an unconditional success guarantee.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L3084-L3099",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L3135-L3141"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        29,
+        30
+      ],
+      "disposition": "retained",
+      "reason": "Preserve focused questions about recovery-wide flush, initialization-error cleanup, and simple-fix callers/assert. Mark tracing/runtime coverage as unfinished, not observed production failure. Source lines updated.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_recovery.c#L932-L946",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1792-L1810",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_manager.c#L1864-L1899",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2603-L2629",
+        "report:Investigation Scope"
+      ]
+    },
+    {
+      "ids": [
+        31
+      ],
+      "disposition": "removed",
+      "reason": "Do not instrument by calling xdisk_get_purpose before its existing guard. It can assert before the cache is ready or when the volid is invalid. Replaced with lifecycle-safe/header-based observation and explicit unknown values.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L5631-L5658",
+        "report:제안하는 한정 검증"
+      ]
+    },
+    {
+      "ids": [
+        32,
+        91
+      ],
+      "disposition": "removed",
+      "reason": "Unexecuted old recipe is not a validated reproducer; the full original block uses global server-name pkill and does not establish temp-disk workload reachability. Replace with proposed isolated per-DB/PID test design and recorded prerequisites; run nothing.",
+      "evidence": [
+        "inventory:live-description and original local report code block",
+        "report:제안하는 한정 검증"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        51,
+        92,
+        106
+      ],
+      "disposition": "corrected",
+      "reason": "Separate disposable instrumentation from any deliberately adopted reproducible verification assets. Handling must be recorded; do not preclude a justified retained test merely by requiring all investigation code to disappear.",
+      "evidence": [
+        "report:Definition of done"
+      ]
+    },
+    {
+      "ids": [
+        35,
+        36,
+        42,
+        46,
+        93,
+        94,
+        101
+      ],
+      "disposition": "corrected",
+      "reason": "Retain all 11 impact topics, but correct unconditional claims: existing marker independently blocks set_lsa; inactive true branch can continue setting LSA; DWB needs creation; NEW_PAGE can be explicitly restamped by caller; LRU/stat/checkpoint effects need reachability. Do not force every unknown into safe/performance-only versus corruption categories.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L4937-L4960",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8564-L8572",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10692-L10757",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4942-L5006",
+        "report:영향 후보와 보호 조건"
+      ]
+    },
+    {
+      "ids": [
+        37,
+        47,
+        95,
+        102
+      ],
+      "disposition": "retained",
+      "reason": "TDE is_temp key and nonce selection, stored nonce, and temporary-file algorithm assignment directly verified. Potential key mismatch is retained as a conditional mechanism, with actual encrypted payload reachability explicitly unknown.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.c#L973-L1003",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.c#L1025-L1052",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L5472-L5506"
+      ]
+    },
+    {
+      "ids": [
+        45,
+        100
+      ],
+      "disposition": "corrected",
+      "reason": "Require conclusions scoped to examined entry paths/settings, with unresolved cases documented; finite tracing cannot prove unconditional absence and metadata access is already present.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L2452-L2484",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4942-L5006",
+        "report:Acceptance Criteria"
+      ]
+    },
+    {
+      "ids": [
+        52,
+        107
+      ],
+      "disposition": "corrected",
+      "reason": "If changes are adopted, require proportionate debug/release checks and evidence/limits; remove unsupported requirement to prove no QA regression across an unspecified corpus. Document-only completion remains possible.",
+      "evidence": [
+        "report:Definition of done"
+      ]
+    },
+    {
+      "ids": [
+        53,
+        108
+      ],
+      "disposition": "retained",
+      "reason": "Parent receives evidence-backed conclusion and explicit followup disposition.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "report:Definition of done"
+      ]
+    },
+    {
+      "ids": [
+        55,
+        110
+      ],
+      "disposition": "corrected",
+      "reason": "Every-unfix/no-cache cost claim overstates actual SERVER_MODE, vacuum short-circuit, and zone conditions; xdisk uses cached purpose after readiness. Performance measurement stays separate from this safety survey.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L281-L295",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6710-L6791",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L5631-L5658",
+        "report:Triage Request"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

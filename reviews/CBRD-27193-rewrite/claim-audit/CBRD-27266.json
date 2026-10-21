@@ -1,0 +1,1049 @@
+{
+  "issue": "CBRD-27266",
+  "reviewer": "/root",
+  "report_sha256": "67d8b82274f892cf272df249ddf94657097c9e0df4790a069685bdfbb945ee5d",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27266-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: DWB 가 켜진 기본 설정에서도 page buffer 의 쓰기·읽기·victim 지표가 실제 동작을 반영하도록, 논리 page flush 와 물리 write 를 분리한 통계 계약을 확정하고 미집계 지점을 채운다.",
+      "sha256": "065425413be74567b061ed62236c992baf1c7c34210c16fdd7d16daef3b5a6aa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27266-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |\n|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | DWB(Double Write Buffer --- 원래 위치에 쓰기 전 별도 파일에 page 사본을 먼저 기록하는 torn-write 보호 장치)는 `double_write_buffer_size` 기본값이 2 MiB 라 기본 활성인데(`system_parameter.c:4345`), page buffer 의 쓰기 관련 카운터가 DWB 도입 전의 \\\"page 1장 flush = 볼륨 write 1회\\\" 전제로 배치되어 있다. 그 결과 기본 설정에서 \\\"page buffer 가 page 를 몇 장 내보냈는가\\\" 를 맞게 답하는 지표가 하나도 없다. 읽기 카운터, `Victim_candidate_pages`, `Num_data_page_flushed`, NEW_PAGE 의 hit 집계도 이름과 실제 집계 조건이 어긋나 있다. 지표별 집계 지점과 실측 근거는 아래 Description 의 불일치 목록에 정리했다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 지표를 논리 축(pgbuf 가 flush 한 page 수)과 물리 축(볼륨에 실제 발생한 write 수)으로 나누어 정의하고, 이름·도움말·집계 지점을 그 정의에 맞춘다. DWB on/off 가 값의 의미를 바꾸지 않는다. 이름과 집계 조건이 어긋난 나머지 항목도 같은 기준으로 정리한다.                                                                                                                                                                                                                                                                                                                                                                   |\n| **영향**                          | 설계 의도 훼손 --- flush 부하 조사에 쓸 지표가 없다. DBA 가 `SHOW PAGE BUFFER STATUS` 를 보면 write 가 0 이고, `cubrid statdump` 의 `Num_data_page_iowrites` 를 보면 실제 flush 량의 약 2배라, 두 지표 중 어느 쪽도 그대로 읽으면 틀린 결론에 도달한다.                                                                                                                                                                                                                                                                                                                                                                    |",
+      "sha256": "c9a4debb6602bc477ab65651af956e331590edbe2f956bcba7c2a05d76bde5da",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27266-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C005",
+      "origin": "live-description",
+      "text": "-   `num_pages_written` 미집계(N8)는 집계 지점을 DWB/non-DWB 공통 성공 처리부로 옮겨 수정한다.",
+      "sha256": "c3ebbd0da1c140fe89b87eb840e47f3a71a6c827b6b557d52e69463f88717120",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27266-C006",
+      "origin": "live-description",
+      "text": "-   나머지 정의 불일치는 지표별 계약을 확정한 뒤 이름·도움말·집계 조건을 맞춘다. 아래 Implementation 의 계약 표가 후보안이다.",
+      "sha256": "0456a2e7eec0877421dccad6bb8d2cbe67865270b09d1c7c38fe7e5dec3c1d2f",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C007",
+      "origin": "live-description",
+      "text": "-   기존 `SHOW PAGE BUFFER STATUS` 컬럼을 재정의할지, 새 컬럼을 추가하고 기존 컬럼을 단계적으로 폐기할지는 `TBD - 합의 미확인`.",
+      "sha256": "c6cc8a0b855a149636290dc6e053d005941e1670c8ab7e4165b7dcf2143ec11b",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C008",
+      "origin": "live-description",
+      "text": "-   SHOW 델타 컬럼의 파괴적 읽기는 이번 범위에서 동작을 바꾸지 않고 매뉴얼에 제약으로 명시하는 것까지만 한다.",
+      "sha256": "ddb1fcb7c6471b192554eb61a4cf07d2e1f52e43c07cfc3bb2473fa701ceb6ad",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27266-C009",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c`(집계 지점, `pgbuf_scan_bcb_table`, `pgbuf_start_scan`), `src/storage/double_write_buffer.cpp`(물리 write 집계), `src/base/perf_monitor.c`(지표 이름), `src/parser/show_meta.c`(SHOW 컬럼 정의), CUBRID 매뉴얼의 `SHOW PAGE BUFFER STATUS` 와 statdump 항목 설명. 디스크 형식과 클라이언트 API 는 바뀌지 않는다. 다만 컬럼 이름·의미를 바꾸면 이 컬럼을 파싱하는 외부 모니터링 스크립트와 QA 기대값이 깨지므로, 호환성 결정이 구현 범위를 좌우한다.",
+      "sha256": "0df0e5b48c0e24c4c53aea3b1cadd81c1125761f73fd7f672305068eb493d0bc",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27266-C010",
+      "origin": "live-description",
+      "text": "-   부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D6(통계 의미 불일치 4건)과 N8(DWB 경유 write 미집계)이다.",
+      "sha256": "a0c020c0d3a405248d598d7a989725954b016ce35d686e2c9443945237a732ca",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27266-C011",
+      "origin": "live-description",
+      "text": "pgbuf(page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)의 통계는 서로 독립한 세 계층에 산다.",
+      "sha256": "5c89bfc614a85e6e4ac4fc8277666e855a7483245ecb464fe2751a167fe17c22",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C012",
+      "origin": "live-description",
+      "text": "| 계층                                | 저장소                                               | 노출 경로                                 |\n|-------------------------------------|------------------------------------------------------|-------------------------------------------|\n| `PGBUF_STATUS` (thread 별 샤드)     | `pgbuf_Pool.show_status[]` (`page_buffer.c:395-404`) | `SHOW PAGE BUFFER STATUS` 의 델타 컬럼    |\n| `PGBUF_STATUS_SNAPSHOT` (전수 스캔) | `pgbuf_Pool.show_status_snapshot` (`:406-416`)       | `SHOW PAGE BUFFER STATUS` 의 현재값 컬럼  |\n| perfmon `PSTAT_PB_*`                | perf_monitor 모듈                                    | `SHOW EXEC STATISTICS`, `cubrid statdump` |",
+      "sha256": "8df3e67df56de02c96f8ef691aafdf9cfeddab5811f4705fdc6adc16565ddb76",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C013",
+      "origin": "live-description",
+      "text": "세 계층이 각자 자기 지점에서 카운터를 올리는데, 같은 사건을 세는 카운터들이 서로 다른 분기에 놓여 있어서 이름이 시사하는 의미와 실제 집계 조건이 어긋났다. 특히 DWB 도입 이후 \\\"page 1장 flush\\\" 와 \\\"볼륨 write 1회\\\" 가 더 이상 1:1 이 아니게 되었는데, 카운터는 그 구분을 반영하지 않았다.",
+      "sha256": "92fd3e6456ecfd69a6eb5cded0c488fa966c3a1041887afe8d37d9ac637c8276",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C014",
+      "origin": "live-description",
+      "text": "pgbuf_bcb_flush_with_wal()                                   page_buffer.c:10673\n      uses_dwb = dwb_is_created () && !is_temp                              :10743\n      ├ TDE 암호화 또는 memcpy 로 iopage 사본 생성                          :10749-10761\n      ├ uses_dwb 면 dwb_set_data_on_next_slot 으로 DWB 슬롯에 복사           :10762-10774\n      ├ BCB unlock → logpb_flush_log_for_wal (WAL 규칙 강제)                :10781-10789\n      ├ if (uses_dwb) → dwb_add_page ()                                     :10811-10825\n      │    ★ show_status->num_pages_written 증가 없음\n      │    ★ PSTAT_PB_NUM_IOWRITES 증가 없음 (실제 write 는 DWB 가 별도 집계)\n      └ else                                                                :10826-10839\n           show_status->num_pages_written++                                 :10828\n           perfmon_inc_stat (PSTAT_PB_NUM_IOWRITES)                         :10833  (write 시도 전)\n           fileio_write ()                                                  :10834\n      ...\n      └ 성공 처리부\n        if (perfmon_is_perf_tracking_and_active (PB_VICTIMIZATION))         :10894\n          perfmon_inc_stat (PSTAT_PB_FLUSH_PAGE_FLUSHED)                    :10896\n          ★ 이 게이트가 기본 off 라 논리 flush 카운터도 기본 0",
+      "sha256": "9f65951c0ce187ed1d2c7397619cdeef5e520e7ae10bc7d0388204aa81f36f13",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C015",
+      "origin": "live-description",
+      "text": "DWB 측 집계는 `double_write_buffer.cpp` 안에 따로 있다. `dwb_flush_block` 이 DWB 파일에 블록을 쓴 뒤 `PSTAT_PB_NUM_IOWRITES` 를 `block->count_wb_pages` 만큼 더하고(`:2339`), 이어서 원위치 볼륨으로 옮겨 쓰는 `dwb_write_block` 이 다시 `count_writes` 만큼 더한다(`:2115`, `:2150`). page 1장이 DWB 를 거치면 물리 write 는 실제로 2회이므로 이 집계 자체는 물리 관점에서 맞다. 문제는 같은 카운터가 DWB off 에서는 page 당 1 이 되어 DWB 설정에 따라 배율이 달라지는 것, 그리고 이 카운터를 논리 flush 량으로 읽는 관행이다.",
+      "sha256": "62fb5f4e53da677b85a4f84f98d441919e42e536c485e9bffbb4c1b01afcdb95",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27266-C016",
+      "origin": "live-description",
+      "text": "> **요지**: DWB 를 켜면 물리 write 카운터만 남고 논리 flush 카운터는 두 경로(SHOW 컬럼, perfmon 게이트)에서 동시에 0 이 된다. 지표 하나를 고치는 문제가 아니라 논리/물리 축을 나누는 계약 문제다.",
+      "sha256": "7d19fc38435efb6af8194919343d77f23d3b5917d66bc713fc6a0eb1cc5620b1",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C017",
+      "origin": "live-description",
+      "text": "부모 EPIC 의 N8 서술은 `PSTAT_PB_NUM_IOWRITES` 도 DWB 경유 쓰기를 집계하지 않는다고 적었으나, `e6ed61e87` 소스 재확인 결과 이 부분은 사실이 아니다. DWB 가 `double_write_buffer.cpp:2115`, `:2150`, `:2339` 에서 자체적으로 더하고 있으며, 오히려 page 당 2회로 과다 집계된다. 미집계가 확인된 것은 `show_status->num_pages_written` 뿐이다. 구 분석 보고서(commit `5cd4f860e`)의 D6(a) 항목은 이 이중 집계를 이미 지적하고 있었으므로, EPIC 요약 단계에서 두 사실이 섞인 것으로 보인다.",
+      "sha256": "cf8a556d156122b5c6c53115a7ef7ecfcdb72fb4c619bb59fd08804ea5a5a056",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C018",
+      "origin": "live-description",
+      "text": "아래는 `e6ed61e87` 소스에서 직접 대조한 결과다. 라인은 `page_buffer.c` 기준이며 다른 파일은 별도 표기했다.",
+      "sha256": "dbf029fa223862c91133fb36a4b1e25d04512314f2b78bb52a83441667061161",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C019",
+      "origin": "live-description",
+      "text": "| \\#  | 지표                                                           | 집계 지점                                                 | 실제 의미                                                                                                      | 이름·도움말과의 간극                                                                                                                                                                                                                                                     |\n|-----|----------------------------------------------------------------|-----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 1   | SHOW `Num_pages_written`, `Pages_written_rate`                 | :10828 (non-DWB 분기 전용)                                | DWB 를 거치지 않은 write 만. temp 볼륨 page 와 DWB 비활성 구간만 남는다                                        | DWB 기본 활성이므로 값이 사실상 0. 이름은 전체 write 를 시사                                                                                                                                                                                                             |\n| 2   | perfmon `Num_data_page_iowrites`                               | :10833 + `double_write_buffer.cpp:2115`, `:2150`, `:2339` | 물리 write 횟수. DWB on 이면 page 당 2회                                                                       | 물리 카운터로는 맞지만 DWB 설정에 따라 논리 page 수 대비 배율이 달라진다. `:10833` 은 `fileio_write` 실패 시에도 이미 증가한 상태                                                                                                                                        |\n| 3   | perfmon `Num_data_page_writes` (`PSTAT_PB_FLUSH_PAGE_FLUSHED`) | :10896, 게이트 :10894                                     | pgbuf 가 성공적으로 flush 한 논리 page 수 --- 사실상 유일한 논리 지표                                          | `extended_statistics_activation` 기본값에 `PB_VICTIMIZATION`(0x10)이 없어 기본 0. 이름도 \\\"writes\\\" 라 물리 지표처럼 읽힌다                                                                                                                                              |\n| 4   | perfmon `Num_data_page_flushed` (`PSTAT_PB_NUM_FLUSHED`)       | :4118 (`pgbuf_flush_victim_candidates` 종료 시 1회)       | victim flush 데몬이 flush 한 page 수만                                                                         | checkpoint flush 와 개별 동기 flush 는 빠진다. 이름은 전체 flush 량을 시사                                                                                                                                                                                               |\n| 5   | SHOW `Victim_candidate_pages`                                  | :17312-17315, 컬럼 값 :17451                              | LRU zone 3 이면서 **dirty** 인 BCB 수                                                                          | dirty BCB 는 victim 이 될 수 없다(`PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK`, :258-262, 주석 :254). 실제 후보 수는 각 LRU 리스트의 `count_vict_cand` 합계이고 perfmon `Num_data_page_victim_candidate` 로 별도 노출된다(:14756). 같은 이름의 두 지표가 정반대 집합을 센다 |\n| 6   | SHOW `Hit_rate`, `Num_hit`                                     | :2327, :2348, :8577                                       | :8577 은 NEW_PAGE 생성 경로 --- 디스크 read 가 없었던 신규 page 를 hit 으로 계산                               | insert 중심 부하에서 hit rate 가 과대. `num_pages_created` 도 같은 지점(:8576)에서 오르므로 중복 계산 관계가 드러나지 않는다                                                                                                                                             |\n| 7   | SHOW `Num_pages_read`, perfmon `Num_data_page_ioreads`         | :8444-8445                                                | `dwb_read_page`(:8456)와 `fileio_read`(:8466) **이전** 에 증가. DWB 버퍼에서 복사해 온 경우와 read 실패도 포함 | 물리 read 수가 아니라 read 시도 수                                                                                                                                                                                                                                       |\n| 8   | SHOW `Clean_pages`, `Dirty_pages`                              | :17297-17310                                              | invalid zone BCB 까지 포함해 합이 항상 `Pool_size`                                                             | `Free_pages`(:17308)와 중복 계산된다. `Clean_pages` 를 \\\"재사용 가능한 깨끗한 page\\\" 로 읽으면 틀린다                                                                                                                                                                    |\n| 9   | SHOW `Page_size`                                               | :17445                                                    | `PGBUF_IOPAGE_BUFFER_SIZE` --- BCB 의 iopage 슬롯 크기(헤더와 `CUBRID_DEBUG` 가드 포함)                        | `IO_PAGESIZE` 로 오독된다                                                                                                                                                                                                                                                |\n| 10  | SHOW 델타 컬럼 8개                                             | :17508-17513                                              | SHOW 실행이 `status_old` 를 갱신하는 파괴적 읽기                                                               | 두 세션이 동시에 모니터링하면 서로의 구간 값을 갉아먹는다. `show_status_mutex`(:17386, :17518)는 이 갱신을 직렬화할 뿐 간섭 자체를 막지 못한다                                                                                                                           |",
+      "sha256": "6ef8b137a3431ef57305402fd3dd595ff7ab4a6a8f3bc20aae28d9387c0444a1",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27266-C020",
+      "origin": "live-description",
+      "text": "기존 상세 분석서(`pgbuf_docs/06-misc-observability.md` §6.4)는 SHOW 컬럼 값 생성 라인을 17425-17501 로, 파괴적 읽기를 17506-17511 로 적었다. `e6ed61e87` 실측은 각각 17421-17502, 17508-17513 이다. 컬럼 순서와 대응 관계는 동일하고 라인만 3 정도 밀려 있다. 이 이슈 본문의 라인은 실측값을 따랐다.",
+      "sha256": "0eed7d6a1345ae024c58078332cd73ce860d3bdd5d0304a922b18dcf292b38bc",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C021",
+      "origin": "live-description",
+      "text": "지표 계약을 아래와 같이 확정하는 것을 전제로 한다. 컬럼 이름 확정과 기존 컬럼 처리 방식은 Open Questions 를 해소한 뒤 정한다.",
+      "sha256": "3d205886ce03fb87d57cfcf4f333ad5dcf1f9b703f964cf66110ae9857e09b0c",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C022",
+      "origin": "live-description",
+      "text": "| 축           | 정의                                         | 세는 사건                                                                  | DWB on 에서의 기대                              |\n|--------------|----------------------------------------------|----------------------------------------------------------------------------|-------------------------------------------------|\n| 논리 flush   | pgbuf 가 page 를 buffer 밖으로 내보낸 횟수   | `pgbuf_bcb_flush_with_wal` 성공 1회 = 1                                    | DWB off 와 같은 값                              |\n| 물리 write   | 볼륨 파일에 발생한 write 횟수                | `fileio_write` 계열 호출 1회 = 1                                           | 논리 flush 의 약 2배 (DWB 파일 + 원위치)        |\n| victim 후보  | 지금 victim 으로 뽑을 수 있는 BCB 수         | zone 3 이면서 `PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK` 에 걸리지 않는 BCB | flush 대기 중인 dirty 는 제외                   |\n| flush 필요량 | victim 이 되려면 flush 가 먼저 필요한 BCB 수 | zone 3 이면서 dirty                                                        | 현행 `Victim_candidate_pages` 가 실제로 세던 값 |",
+      "sha256": "f8be4d7ab15ea91db7dcb85a426611a2f067cb3872abde6aecc1068ba0723df1",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27266-C023",
+      "origin": "live-description",
+      "text": "문서 갱신 대상:",
+      "sha256": "ab68e2182b60a71de02aa8b05613c07e96f1df3bcfd86e412f4451be13737a34",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C024",
+      "origin": "live-description",
+      "text": "-   `SHOW PAGE BUFFER STATUS` 의 델타 컬럼 8개가 \\\"마지막 SHOW 이후\\\" 를 의미하며 SHOW 자체가 카운터를 리셋한다는 제약을 매뉴얼에 명시한다. 동시 모니터링 시 값이 서로 간섭한다는 경고를 포함한다.",
+      "sha256": "437fee225acf054b4c6da81787fec09368d082b6945e2fb0fba648ed05e7381c",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27266-C025",
+      "origin": "live-description",
+      "text": "-   `Clean_pages` + `Dirty_pages` = `Pool_size` 이고 `Free_pages` 와 중복된다는 점, `Page_size` 가 `IO_PAGESIZE` 가 아니라는 점을 컬럼 설명에 반영한다.",
+      "sha256": "beec4148870a602051af59a1b914f36d5b25707318e35c6bbbbea6b64c4d08df",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27266-C026",
+      "origin": "live-description",
+      "text": "-   statdump 항목 설명에 논리/물리 축 구분을 넣고, DWB 활성 시 `Num_data_page_iowrites` 가 page 당 2회임을 명시한다.",
+      "sha256": "b541ccf0324742f738aebd7f976f2af63739bf7019a85e2199c622cb89740b12",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27266-C027",
+      "origin": "live-description",
+      "text": "`show_status->num_pages_written` 증가를 `if (uses_dwb)` / `else` 양쪽이 아니라 flush 성공이 확정되는 공통 지점으로 옮긴다. 후보 위치는 `:10848` 의 오류 검사 직후이며, 이 지점은 DWB 경로와 non-DWB 경로가 합류한 뒤이고 실패 경로가 이미 걸러진 곳이다. 같은 지점에 이미 `PSTAT_PB_FLUSH_PAGE_FLUSHED` 가 있으므로(`:10894-10897`) 두 카운터의 의미가 자연스럽게 맞는다.",
+      "sha256": "7dd63652afa1828fb063810b612f0d144e3ec64e5e3909e3fd2887c569c9d752",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27266-C028",
+      "origin": "live-description",
+      "text": "`PSTAT_PB_NUM_IOWRITES` 는 물리 카운터로 두고 `:10833` 위치를 유지한다. 단 `fileio_write` 실패 시에도 증가하는 문제는 write 성공 확인 이후로 옮겨 해소한다.",
+      "sha256": "e99d299f10f112b36f9b784f12f6442cbb35936bbaa20e4854dbef31d65a7e60",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27266-C029",
+      "origin": "live-description",
+      "text": "`PSTAT_PB_FLUSH_PAGE_FLUSHED` 의 `PERFMON_ACTIVATION_FLAG_PB_VICTIMIZATION` 게이트(`:10894`)를 제거하거나, 이 카운터만 게이트 밖으로 빼서 기본 수집 대상으로 만든다. flush 성공 1회당 원자 증가 1회라 fix/unfix 급 hot path 가 아니므로 상시 수집 비용은 작다.",
+      "sha256": "b531ebe9f9bfd70b7ba16bf4e6afb35dfa8b29f54c5d1187dc6f0457da782a0e",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27266-C030",
+      "origin": "live-description",
+      "text": "`PSTAT_PB_NUM_FLUSHED`(`:4118`)는 victim flusher 전용이라는 사실이 이름에 드러나지 않으므로, 이름을 경로가 드러나게 바꾸거나 checkpoint flush 경로에도 같은 카운터를 추가해 이름대로 만든다. 둘 중 어느 쪽인지는 컬럼 호환성 결정과 함께 정한다.",
+      "sha256": "c65200b400c116a56f4c6429ad83dc004c89f135ddd619f24c6cf9843734674d",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27266-C031",
+      "origin": "live-description",
+      "text": "`pgbuf_scan_bcb_table`(`:17279-17354`)에서 zone 3 판정 뒤의 조건을 두 개로 나눈다.",
+      "sha256": "54adbeee3f03e5a44af86c5f31a773eeefb915ab55585bdbf1dde9a98b6b8d1b",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27266-C032",
+      "origin": "live-description",
+      "text": "| 항목         | 조건                                                               | 대응 컬럼                                |\n|--------------|--------------------------------------------------------------------|------------------------------------------|\n| victim 후보  | zone 3 && `(flags & PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK) == 0` | victim 후보 수                           |\n| flush 필요량 | zone 3 && `(flags & PGBUF_BCB_DIRTY_FLAG) != 0`                    | 현행 `Victim_candidate_pages` 가 세던 값 |",
+      "sha256": "6b20737adf9ab13416dca5cadb5b97f40e60ac9529d599bedb665758154ea20d",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27266-C033",
+      "origin": "live-description",
+      "text": "`clean_pages` / `dirty_pages` 는 invalid zone 을 제외할지 현행을 유지하고 문서로만 설명할지 함께 결정한다. 이 스캔은 BCB mutex 없이 돌면서 `flags` 를 지역 변수에 한 번만 읽는 방식(`:17295`)에 의존하므로, 조건을 추가하더라도 같은 지역 변수를 재사용해 읽기 횟수를 늘리지 않아야 한다.",
+      "sha256": "f0d636c9f5220450fcfd24146e18f95d4351a7ea5af703a0d509c5dfd3d4a490",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27266-C034",
+      "origin": "live-description",
+      "text": "`:8576-8577` 의 `num_pages_created\\\\` 와 `num_hit\\\\` 중 후자를 어떻게 볼지 정한다. NEW_PAGE 는 디스크 read 를 하지 않으므로 \\\"buffer 에서 찾았다\\\" 는 hit 정의와는 다르지만, \\\"요청을 I/O 없이 처리했다\\\" 는 정의로는 hit 에 가깝다. 정의를 문서로 고정하는 선택도 유효하다. 어느 쪽이든 `Hit_rate` 의 분자 정의가 매뉴얼에 명시되어야 한다.",
+      "sha256": "23981b6e9062e55ff6c05a1008a4594a838c0a241490ea5c3920f15347892f3e",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27266-C035",
+      "origin": "live-description",
+      "text": "-   [ ] DWB 활성 기본 설정에서 쓰기 부하를 준 뒤 `SHOW PAGE BUFFER STATUS` 의 write 지표가 0 이 아니고, 같은 구간의 논리 flush 수와 일치한다.",
+      "sha256": "aeef1b2d5d7e771fe1f34d6d9d7643a61f68de4da8d1d9fac8475b4aacfd1095",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27266-C036",
+      "origin": "live-description",
+      "text": "-   [ ] DWB 비활성 설정에서 같은 부하를 주었을 때 논리 flush 지표가 DWB 활성 설정과 같은 규모로 나온다 (물리 write 지표는 약 절반이 되는 것이 정상).",
+      "sha256": "587533d43bc8adc4dcae832cf16445470c9cb17a3c5c2b074c367019356db0a7",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27266-C037",
+      "origin": "live-description",
+      "text": "-   [ ] victim 후보 지표가 각 LRU 리스트의 `count_vict_cand` 합계와 같은 집합을 세고, flush 필요량 지표가 별도로 조회된다.",
+      "sha256": "245e91c37940861253a1fe9c8ea7f3fbb4489a01346f715d57d015d075f489ee",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27266-C038",
+      "origin": "live-description",
+      "text": "-   [ ] `extended_statistics_activation` 을 기본값으로 둔 상태에서 논리 flush 지표가 수집된다.",
+      "sha256": "1f02c20a31a820de07af89d9893b284fb3cf3a67d18e015a319caf06512f0080",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27266-C039",
+      "origin": "live-description",
+      "text": "-   [ ] 기존 컬럼 호환성 결정(재정의 또는 신규 컬럼 추가)이 본문에 기록되고 구현이 그 결정을 따른다.",
+      "sha256": "02ee59beb100273901e5b320e4cac1cdb957fbe038d8a12ccafdfbefb7f9b7fc",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27266-C040",
+      "origin": "live-description",
+      "text": "-   [ ] SHOW 델타 컬럼의 파괴적 읽기 제약이 매뉴얼에 기술된다.",
+      "sha256": "5b7f9070827a393b8279b4416b185d51163a0dc0b4a74f897790a25166d8398c",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27266-C041",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria 충족",
+      "sha256": "0ea4a17918fef8cc37098a111487d52496e3d2ec6ab4b5cbe13fd0d6508e5d5d",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27266-C042",
+      "origin": "live-description",
+      "text": "-   [ ] QA 통과 (`SHOW PAGE BUFFER STATUS` 컬럼을 사용하는 기존 shell/SQL 테스트 기대값 갱신 포함)",
+      "sha256": "3741bb256729f783b42f62e0621c75d6b36730b6834adf170e728e98ae47076f",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27266-C043",
+      "origin": "live-description",
+      "text": "-   [ ] 매뉴얼의 `SHOW PAGE BUFFER STATUS` 컬럼 설명과 statdump 항목 설명 반영",
+      "sha256": "0256205174f82e46d7597bf85f9f3bd2d0fb8455318391b89b7f633648f492ee",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27266-C044",
+      "origin": "live-description",
+      "text": "-   [ ] 컬럼 이름 또는 의미가 바뀐 경우 운영 문서에 이관 안내 추가",
+      "sha256": "df7f1b7126a67e16ff1390a79b8a8da30e982965612f90ff32680f57b7fd5aa2",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27266-C045",
+      "origin": "live-description",
+      "text": "`Num_pages_written` 과 `Victim_candidate_pages` 를 그 자리에서 재정의할지, 정의가 맞는 새 컬럼을 추가하고 기존 컬럼은 유지한 뒤 단계적으로 폐기할지는 `TBD - 합의 미확인` 이다. `SHOW PAGE BUFFER STATUS` 는 `only_for_dba` 이고(`show_meta.c:720`) 컬럼 순서가 고정 배열이라(`show_meta.c:693-713`) 컬럼 추가는 순서 뒤쪽에만 안전하다. 외부 모니터링 스크립트가 컬럼 위치에 의존하는 사례가 있는지 확인이 필요하다.",
+      "sha256": "63711f15cf155c789e75c1f9b53a897c133bdbce04614bbc7819ce6c2bd0c744",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C046",
+      "origin": "live-description",
+      "text": "victim flusher 전용임을 이름에 드러낼지, checkpoint flush 경로까지 집계해 이름대로 만들지는 `TBD - 합의 미확인` 이다. 후자는 checkpoint 성능 지표와 의미가 겹칠 수 있어 log manager 쪽 지표와 함께 봐야 한다.",
+      "sha256": "8bd13f763070f6de19308e3b63f09cd0cf35d587dbace7d7880d4506cf6a700e",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27266-C047",
+      "origin": "live-description",
+      "text": "`Hit_rate` 분자에서 NEW_PAGE 생성을 제외할지, 현행 정의를 문서로 고정할지는 `TBD - 합의 미확인` 이다. 제외하면 기존에 기록된 hit rate 추이와 값이 불연속이 된다.",
+      "sha256": "697d696cb9786017a226f7a263f9b9b907872ce116384b97e84598aedce08f7d",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27266-C048",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:10673-10900` --- `pgbuf_bcb_flush_with_wal`, 쓰기 카운터 집계 지점",
+      "sha256": "6f2708dcce211f2e4f3a246447e9eb1f71f8cc52c326c52547fc9230692c59ee",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C049",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:17279-17354` --- `pgbuf_scan_bcb_table`, snapshot 분류",
+      "sha256": "892be0f8a6132884c3bc173c64cf3b26d2ea4c492cdf8a23da417c0c741b5020",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C050",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:17367-17535` --- `pgbuf_start_scan`, 델타 계산과 `status_old` 갱신",
+      "sha256": "8527d74081e3dc4ddaaf58b4c0c18a6195a53bbf0f2a129743d2c8d1495c3e63",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C051",
+      "origin": "live-description",
+      "text": "-   `src/storage/double_write_buffer.cpp:2115`, `:2150`, `:2339` --- DWB 측 물리 write 집계",
+      "sha256": "53df960819402dfe3bc0b771b81ca77400fdbfd7d96ff59a69b71bd814a98753",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C052",
+      "origin": "live-description",
+      "text": "-   `src/base/perf_monitor.c:209-222`, `:485` --- pgbuf 관련 perfmon 지표 이름",
+      "sha256": "a37a993b0af34b33a928d7032089d38ac5ced8cd3c62c77859267d77d1786eef",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C053",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:4143-4156` --- `extended_statistics_activation` 기본값",
+      "sha256": "5c0b894cf2c9db3be5687afe699c91cfe09277e8946da8ceafca81de50969e97",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C054",
+      "origin": "live-description",
+      "text": "-   `src/parser/show_meta.c:691-724` --- `SHOW PAGE BUFFER STATUS` 컬럼 정의",
+      "sha256": "048f5e989242867bbce5a72c75f903900a3536742fc170b540d72455ab9598b5",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C055",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193",
+      "sha256": "64b84f8f519b14bdeeef560bbd260603d4204093f3570c22acbe0652abdf073a",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27266-C056",
+      "origin": "live-description",
+      "text": "-   죽은 코드·낡은 주석 정리는 B4 로 분리되어 있어 이 이슈에서 다루지 않는다.",
+      "sha256": "818c3010b9d48a088780ca65c7445da083f3044259df178f5d72a26599efcd5d",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27266-C057",
+      "origin": "live-description",
+      "text": "-   `pgbuf_peek_stats`(`page_buffer.c:14686-14782`)가 lock-free 큐가 NULL 일 때 `lfcq_big_prv_num` / `lfcq_prv_num` 출력 인자를 대입하지 않는 문제(`:14771-14779`, 진입부 초기화 목록 `:14697-14705` 에도 없음)도 통계 신뢰성 결함이지만, 이 이슈가 아니라 big private victim queue 이슈(CBRD-27267)가 소유한다. 동작이 있는 결함이라 정리 성격의 B4 범위도 아니다.",
+      "sha256": "331a4104c5051752832ca6cf5cbb57d1b189714ed202ac336dc9c61857a030fb",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27266-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: DWB 가 켜진 기본 설정에서도 page buffer 의 쓰기·읽기·victim 지표가 실제 동작을 반영하도록, 논리 page flush 와 물리 write 를 분리한 통계 계약을 확정하고 미집계 지점을 채운다.",
+      "sha256": "065425413be74567b061ed62236c992baf1c7c34210c16fdd7d16daef3b5a6aa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27266-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | DWB(Double Write Buffer — 원래 위치에 쓰기 전 별도 파일에 page 사본을 먼저 기록하는 torn-write 보호 장치)는 `double_write_buffer_size` 기본값이 2 MiB 라 기본 활성인데(`system_parameter.c:4345`), page buffer 의 쓰기 관련 카운터가 DWB 도입 전의 \"page 1장 flush = 볼륨 write 1회\" 전제로 배치되어 있다. 그 결과 기본 설정에서 \"page buffer 가 page 를 몇 장 내보냈는가\" 를 맞게 답하는 지표가 하나도 없다. 읽기 카운터, `Victim_candidate_pages`, `Num_data_page_flushed`, NEW_PAGE 의 hit 집계도 이름과 실제 집계 조건이 어긋나 있다. 지표별 집계 지점과 실측 근거는 아래 Description 의 불일치 목록에 정리했다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 지표를 논리 축(pgbuf 가 flush 한 page 수)과 물리 축(볼륨에 실제 발생한 write 수)으로 나누어 정의하고, 이름·도움말·집계 지점을 그 정의에 맞춘다. DWB on/off 가 값의 의미를 바꾸지 않는다. 이름과 집계 조건이 어긋난 나머지 항목도 같은 기준으로 정리한다. |\n| **영향** | 설계 의도 훼손 — flush 부하 조사에 쓸 지표가 없다. DBA 가 `SHOW PAGE BUFFER STATUS` 를 보면 write 가 0 이고, `cubrid statdump` 의 `Num_data_page_iowrites` 를 보면 실제 flush 량의 약 2배라, 두 지표 중 어느 쪽도 그대로 읽으면 틀린 결론에 도달한다. |",
+      "sha256": "666dc0916dac5debe73a1259939fa2cf98c9a6c287107f9353febe60f35084e7",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27266-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- `num_pages_written` 미집계(N8)는 집계 지점을 DWB/non-DWB 공통 성공 처리부로 옮겨 수정한다.\n- 나머지 정의 불일치는 지표별 계약을 확정한 뒤 이름·도움말·집계 조건을 맞춘다. 아래 Implementation 의 계약 표가 후보안이다.\n- 기존 `SHOW PAGE BUFFER STATUS` 컬럼을 재정의할지, 새 컬럼을 추가하고 기존 컬럼을 단계적으로 폐기할지는 `TBD - 합의 미확인`.\n- SHOW 델타 컬럼의 파괴적 읽기는 이번 범위에서 동작을 바꾸지 않고 매뉴얼에 제약으로 명시하는 것까지만 한다.",
+      "sha256": "a1280e996bac40b42ba85ec58fb49300596feb3e2a01fd4f09c045d26aea7148",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c`(집계 지점, `pgbuf_scan_bcb_table`, `pgbuf_start_scan`), `src/storage/double_write_buffer.cpp`(물리 write 집계), `src/base/perf_monitor.c`(지표 이름), `src/parser/show_meta.c`(SHOW 컬럼 정의), CUBRID 매뉴얼의 `SHOW PAGE BUFFER STATUS` 와 statdump 항목 설명. 디스크 형식과 클라이언트 API 는 바뀌지 않는다. 다만 컬럼 이름·의미를 바꾸면 이 컬럼을 파싱하는 외부 모니터링 스크립트와 QA 기대값이 깨지므로, 호환성 결정이 구현 범위를 좌우한다.\n- 부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D6(통계 의미 불일치 4건)과 N8(DWB 경유 write 미집계)이다.",
+      "sha256": "3caa0bfea3c5dbe41d4b94e4ba5a928bd4877bb78bb04014aff3cc484cde9cb7",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27266-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "pgbuf(page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)의 통계는 서로 독립한 세 계층에 산다.",
+      "sha256": "a54578520e7eca794f0b8ad709a42c753f74af3e50044f03b2fad95a41be9bf4",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "| 계층 | 저장소 | 노출 경로 |\n|---|---|---|\n| `PGBUF_STATUS` (thread 별 샤드) | `pgbuf_Pool.show_status[]` (`page_buffer.c:395-404`) | `SHOW PAGE BUFFER STATUS` 의 델타 컬럼 |\n| `PGBUF_STATUS_SNAPSHOT` (전수 스캔) | `pgbuf_Pool.show_status_snapshot` (`:406-416`) | `SHOW PAGE BUFFER STATUS` 의 현재값 컬럼 |\n| perfmon `PSTAT_PB_*` | perf_monitor 모듈 | `SHOW EXEC STATISTICS`, `cubrid statdump` |",
+      "sha256": "02a37757e1b3ada4b6c323da26d3f8aba0c3fd4d749c282f328adb14b9ac8937",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "세 계층이 각자 자기 지점에서 카운터를 올리는데, 같은 사건을 세는 카운터들이 서로 다른 분기에 놓여 있어서 이름이 시사하는 의미와 실제 집계 조건이 어긋났다. 특히 DWB 도입 이후 \"page 1장 flush\" 와 \"볼륨 write 1회\" 가 더 이상 1:1 이 아니게 되었는데, 카운터는 그 구분을 반영하지 않았다.",
+      "sha256": "6c803bba2e3443ec3f0d2e43f56352b2e8ca0e325f93de0d671422acbb51d68b",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27266-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "```\npgbuf_bcb_flush_with_wal()                                   page_buffer.c:10673\n  uses_dwb = dwb_is_created () && !is_temp                              :10743\n  ├ TDE 암호화 또는 memcpy 로 iopage 사본 생성                          :10749-10761\n  ├ uses_dwb 면 dwb_set_data_on_next_slot 으로 DWB 슬롯에 복사           :10762-10774\n  ├ BCB unlock → logpb_flush_log_for_wal (WAL 규칙 강제)                :10781-10789\n  ├ if (uses_dwb) → dwb_add_page ()                                     :10811-10825\n  │    ★ show_status->num_pages_written 증가 없음\n  │    ★ PSTAT_PB_NUM_IOWRITES 증가 없음 (실제 write 는 DWB 가 별도 집계)\n  └ else                                                                :10826-10839\n       show_status->num_pages_written++                                 :10828\n       perfmon_inc_stat (PSTAT_PB_NUM_IOWRITES)                         :10833  (write 시도 전)\n       fileio_write ()                                                  :10834\n  ...\n  └ 성공 처리부\n    if (perfmon_is_perf_tracking_and_active (PB_VICTIMIZATION))         :10894\n      perfmon_inc_stat (PSTAT_PB_FLUSH_PAGE_FLUSHED)                    :10896\n      ★ 이 게이트가 기본 off 라 논리 flush 카운터도 기본 0\n```",
+      "sha256": "1d78c4a1db1d5bf3d7813c238726c205834ab1a2df9e6bf3ab3a9692e2f352b8",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "DWB 측 집계는 `double_write_buffer.cpp` 안에 따로 있다. `dwb_flush_block` 이 DWB 파일에 블록을 쓴 뒤 `PSTAT_PB_NUM_IOWRITES` 를 `block->count_wb_pages` 만큼 더하고(`:2339`), 이어서 원위치 볼륨으로 옮겨 쓰는 `dwb_write_block` 이 다시 `count_writes` 만큼 더한다(`:2115`, `:2150`). page 1장이 DWB 를 거치면 물리 write 는 실제로 2회이므로 이 집계 자체는 물리 관점에서 맞다. 문제는 같은 카운터가 DWB off 에서는 page 당 1 이 되어 DWB 설정에 따라 배율이 달라지는 것, 그리고 이 카운터를 논리 flush 량으로 읽는 관행이다.",
+      "sha256": "62fb5f4e53da677b85a4f84f98d441919e42e536c485e9bffbb4c1b01afcdb95",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27266-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "> **요지**: DWB 를 켜면 물리 write 카운터만 남고 논리 flush 카운터는 두 경로(SHOW 컬럼, perfmon 게이트)에서 동시에 0 이 된다. 지표 하나를 고치는 문제가 아니라 논리/물리 축을 나누는 계약 문제다.",
+      "sha256": "7d19fc38435efb6af8194919343d77f23d3b5917d66bc713fc6a0eb1cc5620b1",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "부모 EPIC 의 N8 서술은 `PSTAT_PB_NUM_IOWRITES` 도 DWB 경유 쓰기를 집계하지 않는다고 적었으나, `e6ed61e87` 소스 재확인 결과 이 부분은 사실이 아니다. DWB 가 `double_write_buffer.cpp:2115`, `:2150`, `:2339` 에서 자체적으로 더하고 있으며, 오히려 page 당 2회로 과다 집계된다. 미집계가 확인된 것은 `show_status->num_pages_written` 뿐이다. 구 분석 보고서(commit `5cd4f860e`)의 D6(a) 항목은 이 이중 집계를 이미 지적하고 있었으므로, EPIC 요약 단계에서 두 사실이 섞인 것으로 보인다.",
+      "sha256": "cf8a556d156122b5c6c53115a7ef7ecfcdb72fb4c619bb59fd08804ea5a5a056",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27266-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "아래는 `e6ed61e87` 소스에서 직접 대조한 결과다. 라인은 `page_buffer.c` 기준이며 다른 파일은 별도 표기했다.",
+      "sha256": "dbf029fa223862c91133fb36a4b1e25d04512314f2b78bb52a83441667061161",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "| # | 지표 | 집계 지점 | 실제 의미 | 이름·도움말과의 간극 |\n|---|---|---|---|---|\n| 1 | SHOW `Num_pages_written`, `Pages_written_rate` | :10828 (non-DWB 분기 전용) | DWB 를 거치지 않은 write 만. temp 볼륨 page 와 DWB 비활성 구간만 남는다 | DWB 기본 활성이므로 값이 사실상 0. 이름은 전체 write 를 시사 |\n| 2 | perfmon `Num_data_page_iowrites` | :10833 + `double_write_buffer.cpp:2115`, `:2150`, `:2339` | 물리 write 횟수. DWB on 이면 page 당 2회 | 물리 카운터로는 맞지만 DWB 설정에 따라 논리 page 수 대비 배율이 달라진다. `:10833` 은 `fileio_write` 실패 시에도 이미 증가한 상태 |\n| 3 | perfmon `Num_data_page_writes` (`PSTAT_PB_FLUSH_PAGE_FLUSHED`) | :10896, 게이트 :10894 | pgbuf 가 성공적으로 flush 한 논리 page 수 — 사실상 유일한 논리 지표 | `extended_statistics_activation` 기본값에 `PB_VICTIMIZATION`(0x10)이 없어 기본 0. 이름도 \"writes\" 라 물리 지표처럼 읽힌다 |\n| 4 | perfmon `Num_data_page_flushed` (`PSTAT_PB_NUM_FLUSHED`) | :4118 (`pgbuf_flush_victim_candidates` 종료 시 1회) | victim flush 데몬이 flush 한 page 수만 | checkpoint flush 와 개별 동기 flush 는 빠진다. 이름은 전체 flush 량을 시사 |\n| 5 | SHOW `Victim_candidate_pages` | :17312-17315, 컬럼 값 :17451 | LRU zone 3 이면서 **dirty** 인 BCB 수 | dirty BCB 는 victim 이 될 수 없다(`PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK`, :258-262, 주석 :254). 실제 후보 수는 각 LRU 리스트의 `count_vict_cand` 합계이고 perfmon `Num_data_page_victim_candidate` 로 별도 노출된다(:14756). 같은 이름의 두 지표가 정반대 집합을 센다 |\n| 6 | SHOW `Hit_rate`, `Num_hit` | :2327, :2348, :8577 | :8577 은 NEW_PAGE 생성 경로 — 디스크 read 가 없었던 신규 page 를 hit 으로 계산 | insert 중심 부하에서 hit rate 가 과대. `num_pages_created` 도 같은 지점(:8576)에서 오르므로 중복 계산 관계가 드러나지 않는다 |\n| 7 | SHOW `Num_pages_read`, perfmon `Num_data_page_ioreads` | :8444-8445 | `dwb_read_page`(:8456)와 `fileio_read`(:8466) **이전** 에 증가. DWB 버퍼에서 복사해 온 경우와 read 실패도 포함 | 물리 read 수가 아니라 read 시도 수 |\n| 8 | SHOW `Clean_pages`, `Dirty_pages` | :17297-17310 | invalid zone BCB 까지 포함해 합이 항상 `Pool_size` | `Free_pages`(:17308)와 중복 계산된다. `Clean_pages` 를 \"재사용 가능한 깨끗한 page\" 로 읽으면 틀린다 |\n| 9 | SHOW `Page_size` | :17445 | `PGBUF_IOPAGE_BUFFER_SIZE` — BCB 의 iopage 슬롯 크기(헤더와 `CUBRID_DEBUG` 가드 포함) | `IO_PAGESIZE` 로 오독된다 |\n| 10 | SHOW 델타 컬럼 8개 | :17508-17513 | SHOW 실행이 `status_old` 를 갱신하는 파괴적 읽기 | 두 세션이 동시에 모니터링하면 서로의 구간 값을 갉아먹는다. `show_status_mutex`(:17386, :17518)는 이 갱신을 직렬화할 뿐 간섭 자체를 막지 못한다 |",
+      "sha256": "9f45cbd27370875a0f646a8d150d2ccbd5f6751e79573985dde8f22f517f92e6",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27266-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "기존 상세 분석서(`pgbuf_docs/06-misc-observability.md` §6.4)는 SHOW 컬럼 값 생성 라인을 17425-17501 로, 파괴적 읽기를 17506-17511 로 적었다. `e6ed61e87` 실측은 각각 17421-17502, 17508-17513 이다. 컬럼 순서와 대응 관계는 동일하고 라인만 3 정도 밀려 있다. 이 이슈 본문의 라인은 실측값을 따랐다.",
+      "sha256": "0eed7d6a1345ae024c58078332cd73ce860d3bdd5d0304a922b18dcf292b38bc",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "지표 계약을 아래와 같이 확정하는 것을 전제로 한다. 컬럼 이름 확정과 기존 컬럼 처리 방식은 Open Questions 를 해소한 뒤 정한다.",
+      "sha256": "3d205886ce03fb87d57cfcf4f333ad5dcf1f9b703f964cf66110ae9857e09b0c",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "| 축 | 정의 | 세는 사건 | DWB on 에서의 기대 |\n|---|---|---|---|\n| 논리 flush | pgbuf 가 page 를 buffer 밖으로 내보낸 횟수 | `pgbuf_bcb_flush_with_wal` 성공 1회 = 1 | DWB off 와 같은 값 |\n| 물리 write | 볼륨 파일에 발생한 write 횟수 | `fileio_write` 계열 호출 1회 = 1 | 논리 flush 의 약 2배 (DWB 파일 + 원위치) |\n| victim 후보 | 지금 victim 으로 뽑을 수 있는 BCB 수 | zone 3 이면서 `PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK` 에 걸리지 않는 BCB | flush 대기 중인 dirty 는 제외 |\n| flush 필요량 | victim 이 되려면 flush 가 먼저 필요한 BCB 수 | zone 3 이면서 dirty | 현행 `Victim_candidate_pages` 가 실제로 세던 값 |",
+      "sha256": "03d19bafd00a46b72db77c4434750edef9dc98fbb110fa6b1aeac0c38b0cbfe7",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27266-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "문서 갱신 대상:",
+      "sha256": "ab68e2182b60a71de02aa8b05613c07e96f1df3bcfd86e412f4451be13737a34",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27266-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- `SHOW PAGE BUFFER STATUS` 의 델타 컬럼 8개가 \"마지막 SHOW 이후\" 를 의미하며 SHOW 자체가 카운터를 리셋한다는 제약을 매뉴얼에 명시한다. 동시 모니터링 시 값이 서로 간섭한다는 경고를 포함한다.\n- `Clean_pages` + `Dirty_pages` = `Pool_size` 이고 `Free_pages` 와 중복된다는 점, `Page_size` 가 `IO_PAGESIZE` 가 아니라는 점을 컬럼 설명에 반영한다.\n- statdump 항목 설명에 논리/물리 축 구분을 넣고, DWB 활성 시 `Num_data_page_iowrites` 가 page 당 2회임을 명시한다.",
+      "sha256": "8b743f05194cfc25d8105c95ededab91583cde289586853c41ec07ae127d630d",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27266-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`show_status->num_pages_written` 증가를 `if (uses_dwb)` / `else` 양쪽이 아니라 flush 성공이 확정되는 공통 지점으로 옮긴다. 후보 위치는 `:10848` 의 오류 검사 직후이며, 이 지점은 DWB 경로와 non-DWB 경로가 합류한 뒤이고 실패 경로가 이미 걸러진 곳이다. 같은 지점에 이미 `PSTAT_PB_FLUSH_PAGE_FLUSHED` 가 있으므로(`:10894-10897`) 두 카운터의 의미가 자연스럽게 맞는다.",
+      "sha256": "7dd63652afa1828fb063810b612f0d144e3ec64e5e3909e3fd2887c569c9d752",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27266-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`PSTAT_PB_NUM_IOWRITES` 는 물리 카운터로 두고 `:10833` 위치를 유지한다. 단 `fileio_write` 실패 시에도 증가하는 문제는 write 성공 확인 이후로 옮겨 해소한다.",
+      "sha256": "e99d299f10f112b36f9b784f12f6442cbb35936bbaa20e4854dbef31d65a7e60",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27266-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`PSTAT_PB_FLUSH_PAGE_FLUSHED` 의 `PERFMON_ACTIVATION_FLAG_PB_VICTIMIZATION` 게이트(`:10894`)를 제거하거나, 이 카운터만 게이트 밖으로 빼서 기본 수집 대상으로 만든다. flush 성공 1회당 원자 증가 1회라 fix/unfix 급 hot path 가 아니므로 상시 수집 비용은 작다.",
+      "sha256": "b531ebe9f9bfd70b7ba16bf4e6afb35dfa8b29f54c5d1187dc6f0457da782a0e",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27266-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`PSTAT_PB_NUM_FLUSHED`(`:4118`)는 victim flusher 전용이라는 사실이 이름에 드러나지 않으므로, 이름을 경로가 드러나게 바꾸거나 checkpoint flush 경로에도 같은 카운터를 추가해 이름대로 만든다. 둘 중 어느 쪽인지는 컬럼 호환성 결정과 함께 정한다.",
+      "sha256": "c65200b400c116a56f4c6429ad83dc004c89f135ddd619f24c6cf9843734674d",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27266-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`pgbuf_scan_bcb_table`(`:17279-17354`)에서 zone 3 판정 뒤의 조건을 두 개로 나눈다.",
+      "sha256": "54adbeee3f03e5a44af86c5f31a773eeefb915ab55585bdbf1dde9a98b6b8d1b",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27266-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "| 항목 | 조건 | 대응 컬럼 |\n|---|---|---|\n| victim 후보 | zone 3 && `(flags & PGBUF_BCB_INVALID_VICTIM_CANDIDATE_MASK) == 0` | victim 후보 수 |\n| flush 필요량 | zone 3 && `(flags & PGBUF_BCB_DIRTY_FLAG) != 0` | 현행 `Victim_candidate_pages` 가 세던 값 |",
+      "sha256": "212671277be9d3895096f6ba535093fdff13214c6acb27d2bc71b1219fcd648d",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27266-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`clean_pages` / `dirty_pages` 는 invalid zone 을 제외할지 현행을 유지하고 문서로만 설명할지 함께 결정한다. 이 스캔은 BCB mutex 없이 돌면서 `flags` 를 지역 변수에 한 번만 읽는 방식(`:17295`)에 의존하므로, 조건을 추가하더라도 같은 지역 변수를 재사용해 읽기 횟수를 늘리지 않아야 한다.",
+      "sha256": "f0d636c9f5220450fcfd24146e18f95d4351a7ea5af703a0d509c5dfd3d4a490",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27266-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`:8576-8577` 의 `num_pages_created++` 와 `num_hit++` 중 후자를 어떻게 볼지 정한다. NEW_PAGE 는 디스크 read 를 하지 않으므로 \"buffer 에서 찾았다\" 는 hit 정의와는 다르지만, \"요청을 I/O 없이 처리했다\" 는 정의로는 hit 에 가깝다. 정의를 문서로 고정하는 선택도 유효하다. 어느 쪽이든 `Hit_rate` 의 분자 정의가 매뉴얼에 명시되어야 한다.",
+      "sha256": "c34232720fc5df29e8309a3c5dde27da3456680842208b0de5f7a0606ed09f8a",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27266-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- [ ] DWB 활성 기본 설정에서 쓰기 부하를 준 뒤 `SHOW PAGE BUFFER STATUS` 의 write 지표가 0 이 아니고, 같은 구간의 논리 flush 수와 일치한다.\n- [ ] DWB 비활성 설정에서 같은 부하를 주었을 때 논리 flush 지표가 DWB 활성 설정과 같은 규모로 나온다 (물리 write 지표는 약 절반이 되는 것이 정상).\n- [ ] victim 후보 지표가 각 LRU 리스트의 `count_vict_cand` 합계와 같은 집합을 세고, flush 필요량 지표가 별도로 조회된다.\n- [ ] `extended_statistics_activation` 을 기본값으로 둔 상태에서 논리 flush 지표가 수집된다.\n- [ ] 기존 컬럼 호환성 결정(재정의 또는 신규 컬럼 추가)이 본문에 기록되고 구현이 그 결정을 따른다.\n- [ ] SHOW 델타 컬럼의 파괴적 읽기 제약이 매뉴얼에 기술된다.",
+      "sha256": "9d75b6eaef3ef331b843c3de3c0fc219cf41af8442f86d864151f9c60d15b89c",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27266-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria 충족\n- [ ] QA 통과 (`SHOW PAGE BUFFER STATUS` 컬럼을 사용하는 기존 shell/SQL 테스트 기대값 갱신 포함)\n- [ ] 매뉴얼의 `SHOW PAGE BUFFER STATUS` 컬럼 설명과 statdump 항목 설명 반영\n- [ ] 컬럼 이름 또는 의미가 바뀐 경우 운영 문서에 이관 안내 추가",
+      "sha256": "bba5786c12006098616e5b425341050e9e7a2d4f08db2b9838e5df750b1e9112",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27266-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`Num_pages_written` 과 `Victim_candidate_pages` 를 그 자리에서 재정의할지, 정의가 맞는 새 컬럼을 추가하고 기존 컬럼은 유지한 뒤 단계적으로 폐기할지는 `TBD - 합의 미확인` 이다. `SHOW PAGE BUFFER STATUS` 는 `only_for_dba` 이고(`show_meta.c:720`) 컬럼 순서가 고정 배열이라(`show_meta.c:693-713`) 컬럼 추가는 순서 뒤쪽에만 안전하다. 외부 모니터링 스크립트가 컬럼 위치에 의존하는 사례가 있는지 확인이 필요하다.",
+      "sha256": "63711f15cf155c789e75c1f9b53a897c133bdbce04614bbc7819ce6c2bd0c744",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27266-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "victim flusher 전용임을 이름에 드러낼지, checkpoint flush 경로까지 집계해 이름대로 만들지는 `TBD - 합의 미확인` 이다. 후자는 checkpoint 성능 지표와 의미가 겹칠 수 있어 log manager 쪽 지표와 함께 봐야 한다.",
+      "sha256": "8bd13f763070f6de19308e3b63f09cd0cf35d587dbace7d7880d4506cf6a700e",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27266-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "`Hit_rate` 분자에서 NEW_PAGE 생성을 제외할지, 현행 정의를 문서로 고정할지는 `TBD - 합의 미확인` 이다. 제외하면 기존에 기록된 hit rate 추이와 값이 불연속이 된다.",
+      "sha256": "697d696cb9786017a226f7a263f9b9b907872ce116384b97e84598aedce08f7d",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27266-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- `src/storage/page_buffer.c:10673-10900` — `pgbuf_bcb_flush_with_wal`, 쓰기 카운터 집계 지점\n- `src/storage/page_buffer.c:17279-17354` — `pgbuf_scan_bcb_table`, snapshot 분류\n- `src/storage/page_buffer.c:17367-17535` — `pgbuf_start_scan`, 델타 계산과 `status_old` 갱신\n- `src/storage/double_write_buffer.cpp:2115`, `:2150`, `:2339` — DWB 측 물리 write 집계\n- `src/base/perf_monitor.c:209-222`, `:485` — pgbuf 관련 perfmon 지표 이름\n- `src/base/system_parameter.c:4143-4156` — `extended_statistics_activation` 기본값\n- `src/parser/show_meta.c:691-724` — `SHOW PAGE BUFFER STATUS` 컬럼 정의",
+      "sha256": "057932e41b591af493e340b8fa01db267176da84f6356f98e18ef428be978b6e",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27266-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md",
+      "text": "- 부모 EPIC: CBRD-27193\n- 죽은 코드·낡은 주석 정리는 B4 로 분리되어 있어 이 이슈에서 다루지 않는다.\n- `pgbuf_peek_stats`(`page_buffer.c:14686-14782`)가 lock-free 큐가 NULL 일 때 `lfcq_big_prv_num` / `lfcq_prv_num` 출력 인자를 대입하지 않는 문제(`:14771-14779`, 진입부 초기화 목록 `:14697-14705` 에도 없음)도 통계 신뢰성 결함이지만, 이 이슈가 아니라 big private victim queue 이슈(CBRD-27267)가 소유한다. 동작이 있는 결함이라 정리 성격의 B4 범위도 아니다.",
+      "sha256": "d679c52f585c4858a98d48d1f40d7675433abd6a3c4212b254d5db4891238da1",
+      "disposition_group": 24
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        58
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve requested logical/physical observability and metric contract. Replace presumed missing SHOW increment with remaining current statdump and snapshot semantics; existing gated logical completion counter is available.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L1495-L1512"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        4,
+        23,
+        59,
+        61,
+        76
+      ],
+      "disposition": "non-substantive",
+      "reason": "Opening labels and document-list introductions contain no independent technical claims; current four opening fields replace the template.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        60
+      ],
+      "disposition": "corrected",
+      "reason": "Retain 2 MiB parameter default and justified observability goal; SHOW now returns NULL, not zero. Existing counters have different events and activation, so remove no usable metric at all, automatic always-active DWB, fixed double-count and measured harm assertions.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4168",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4363"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        27,
+        78
+      ],
+      "disposition": "removed",
+      "reason": "Implementation moves deleted show_status->num_pages_written; PR7592 removed the counter. Restoring this code is not established current scope.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        7,
+        21,
+        45,
+        62,
+        74,
+        88
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve contract/compatibility decisions as ANALYSIS questions. PR7592 already selected NULL deprecation with layout preservation; former unselected code moves, default collection and destructive-read documentation are not adopted. No evidence establishes that appending columns alone is safe or external scripts depend on positions.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        24,
+        40
+      ],
+      "disposition": "removed",
+      "reason": "SHOW destructive-delta read and shared status_old no longer exist after PR7592; remove documentation-only plan and acceptance requirement for the old behavior.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        63
+      ],
+      "disposition": "corrected",
+      "reason": "Retain supported modules and monitor/test compatibility consideration; actual implementation scope is ANALYSIS and external consumer exposure is unverified. D6/N8 are historical grouping, not current complete defect list; remove blanket no disk/API impact guarantee.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339"
+      ]
+    },
+    {
+      "ids": [
+        10
+      ],
+      "disposition": "corrected",
+      "reason": "Retain parent relation; replace historical D6/N8 ownership shorthand with the concrete current metric-semantics boundary. SHOW omission is superseded.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        12,
+        13,
+        64,
+        65,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Page buffer role and distinct counting locations remain useful. Replace former three-layer architecture: PGBUF_STATUS and status_old were removed; current report distinguishes snapshot values and perfmon events.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        16,
+        17,
+        67,
+        69,
+        70
+      ],
+      "disposition": "corrected",
+      "reason": "Reconstruct current flush path and keep DWB compensating its own iowrites aggregation. Remove deleted SHOW increment, dual-zero current summary and presumed historical EPIC editing cause. Successful logical processing is not buffer eviction or guaranteed disk persistence; activation and watcher conditions apply.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2757-L2818",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L1495-L1512",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4168"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        26,
+        68
+      ],
+      "disposition": "corrected",
+      "reason": "DWB does aggregate DWB-file and origin page writes. It is page-unit quantity, not syscall count, and not a universal fixed twice-per-logical-flush relationship: staging, duplicate invalidation, volume skips, windows and execution mode matter.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2757-L2818"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        20,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        71,
+        73,
+        91
+      ],
+      "disposition": "non-substantive",
+      "reason": "Historical source-pointer lists, old baseline labels and line-drift notes are reference-only units. Replace their locations with verified immutable f6cac312 links and merged change identity; do not preserve old line numbers as current findings.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4168"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "Original ten-row table is consolidated. Current victim, read attempts, clean/dirty/free overlap, size and gated/victim-only counters remain. SHOW writes/hits/deltas are NULL or deleted. Remove unproved hit-rate inflation, exactly opposite complete sets, physical syscall and fixed ratio readings.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8453-L8484",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14766-L14769",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L251-L262",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L110-L120",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1881-L1886"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        75
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve dimensions to distinguish, not predetermined contract. Logical success does not mean page leaves buffer; physical page quantity differs from a fileio call count; victim candidate accounting is not immediate assignment guarantee; fixed ratio and mandatory new flush-needed metric remain unselected.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2757-L2818",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14766-L14769",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L251-L262"
+      ]
+    },
+    {
+      "ids": [
+        25
+      ],
+      "disposition": "retained",
+      "reason": "Snapshot clean/dirty classification includes free slots, and SHOW Page_size returns buffer-slot size rather than IO_PAGESIZE. Retain as explanation/verification scope.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L110-L120",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        79
+      ],
+      "disposition": "corrected",
+      "reason": "Retain fact that non-DWB counter increments before fileio failure. Final attempt-versus-success contract and counter movement are ANALYSIS, not selected implementation.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        80
+      ],
+      "disposition": "corrected",
+      "reason": "Retain PB_VICTIMIZATION gate and default absence. Remove unmeasured small-cost claim and mandatory removal/default-on prescription; compare usable activation procedure and collection policy in ANALYSIS.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L1495-L1512",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4168"
+      ]
+    },
+    {
+      "ids": [
+        30,
+        46,
+        81,
+        89
+      ],
+      "disposition": "corrected",
+      "reason": "Retain victim-flusher-only scope and rename-versus-broaden as undecided contract question. Do not select checkpoint aggregation or assert measured overlap with log-manager statistics.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L4074-L4090"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        32,
+        37,
+        82,
+        83
+      ],
+      "disposition": "corrected",
+      "reason": "Retain different dirty-versus-internal-candidate sets. A split scan or mandatory separate metric is not yet selected; acceptance requires accurate meanings and supported observation, not an assumed algorithm.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14766-L14769",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L251-L262"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        84
+      ],
+      "disposition": "corrected",
+      "reason": "Retain no-BCB-mutex snapshot and free/clean/dirty overlap. Do not turn local flags single-read implementation detail or invalid-zone exclusion into a predetermined requirement.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        47,
+        85,
+        90
+      ],
+      "disposition": "corrected",
+      "reason": "Old SHOW NEW_PAGE hit increments are removed. Keep definition/compatibility question for current replacement hit ratio based on fetches minus ioreads; no unsupported inflation or measured time-series break claim.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1881-L1886",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8453-L8484",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2521-L2527"
+      ]
+    },
+    {
+      "ids": [
+        35,
+        36,
+        38,
+        39,
+        86
+      ],
+      "disposition": "corrected",
+      "reason": "Rewrite acceptance as observable current contracts/usage for DWB, default versus enabled collection and compatibility. Remove resurrected SHOW nonzero requirement, fixed half/twice ratio, same-workload equality and forced default-on counter.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2757-L2818",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L1495-L1512",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4168"
+      ]
+    },
+    {
+      "ids": [
+        41,
+        42,
+        43,
+        44,
+        87
+      ],
+      "disposition": "corrected",
+      "reason": "Keep verification, documentation and consumer migration conditional on selected change. Replace blanket QA completion checklist with focused definition-aligned evidence, build/settings/mode/workload identities and explicit unexecuted checks.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/parser/show_meta.c#L694-L723",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10817-L10903",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L1495-L1512"
+      ]
+    },
+    {
+      "ids": [
+        55,
+        56
+      ],
+      "disposition": "retained",
+      "reason": "Retain parent relationship and separate general dead-code/stale-comment cleanup boundary.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md"
+      ]
+    },
+    {
+      "ids": [
+        57,
+        92
+      ],
+      "disposition": "corrected",
+      "reason": "Preserve coordination of pgbuf_peek_stats output contracts with queue-policy work in CBRD-27267. NULL guards can leave caller-provided values untouched, but no stale-output runtime incident or independently confirmed bug ownership is established; do not retain the original definite defect/ownership claim.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27266-pgbuf-statistics-semantics_e6ed61e_claude.md"
+      ]
+    },
+    {
+      "ids": [
+        77
+      ],
+      "disposition": "corrected",
+      "reason": "Composite documentation list: remove obsolete SHOW-delta instructions, retain clean/dirty/free and size explanation, replace fixed DWB twice-per-page assertion with page-unit aggregation and conditional differences.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/commit/667f1c8dce9bb4e845edc5e4ad8c9f9092355320",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17299-L17339",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L110-L120",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2037-L2150",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2757-L2818"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

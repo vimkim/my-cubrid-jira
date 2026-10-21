@@ -1,0 +1,847 @@
+{
+  "issue": "CBRD-27265",
+  "reviewer": "/root",
+  "report_sha256": "2e1f92eddaa75b68d3ec85c11d8d549d80c47d3e0af1e5802066448c04e1a67b",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27265-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: `CUBRID_DEBUG` 를 정의한 빌드가 `page_buffer.c` 에서 깨지지 않게 하고, 페이지 dealloc 보상 복구가 debug 로그에 쓰레기 값을 남기지 않게 한다.",
+      "sha256": "8928915d47d6c79a6069ee0a7973417ce8cc9aeab18fc66e950b6789ab2eed85",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27265-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C003",
+      "origin": "live-description",
+      "text": "-   **AS-IS (현재 동작 / 배경)**: `CUBRID_DEBUG` (진단용 검증·덤프 코드를 켜는 컴파일 스위치로, 빌드 스크립트와 CI 어디에서도 정의하지 않는다) 를 정의하면 `page_buffer.c` 컴파일이 오류 13건으로 실패한다. 원인은 `pgbuf_dump` (`:11302-11384`) 가 2017년 volume info 제거(`b634bb442`, CBRD-20897)와 2026년 BCB latch 원자화(`58cef8e01`, CBRD-26425) 이후 사라진 필드 (`pgbuf_Pool.volinfo_mutex`, `bufptr->fcnt`, `bufptr->zone` 등) 를 계속 참조하고, 오타 `consistenet_str` 가 `:3284` 와 `:11370` 두 곳에 남아 있기 때문이다. 별개로 `pgbuf_rv_dealloc_undo_compensate` (`:15252`) 는 대입 한 번 없는 지역 변수 `VPID vpid` (`:15255`) 를 `:15271` 의 TDE 디버그 로그 인자로 읽는다.",
+      "sha256": "5dd46c493b22c83fecc1bd84cd3396656bfa0544b58d02ffa282432de549e089",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27265-C004",
+      "origin": "live-description",
+      "text": "-   **TO-BE (목표 상태 / 기대 동작)**: `CUBRID_DEBUG` 정의 빌드가 통과해 `pgbuf_finalize` 의 fix 잔존 진단(`pgbuf_dump_if_any_fixed`)이 다시 살아나고, 보상 복구 로그가 실제 대상 페이지의 VPID (Volume and Page IDentifier --- 볼륨 번호와 페이지 번호의 쌍) 를 출력한다.",
+      "sha256": "e4a52fe96a7e5adc8fb0cc16962b26cda4cf2d430efc21e36f8fe4f27978fce6",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27265-C005",
+      "origin": "live-description",
+      "text": "-   **영향**: 기술 부채 --- 버퍼 누수와 페이지 내용 불일치를 잡기 위해 만들어 둔 진단 경로가 9년 넘게 사용 불가 상태다. `pgbuf_finalize` 종료 시점의 미해제 fix 점검(`:1888-1890`)과 unfix 시점의 내용 일관성 점검(`:3156-3179`)이 둘 다 이 스위치에 걸려 있어서, 실제로 의심 상황이 생겼을 때 켜려면 먼저 컴파일 오류부터 고쳐야 한다. VPID 쪽은 debug 빌드에서 `er_log_tde` 를 켠 경우에 한해 잘못된 위치를 가리키는 로그가 남아 분석을 오도한다.",
+      "sha256": "2cb98a10107c209274799894e0059a74b858219ce91b6b79887c56d0cdd47bd7",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27265-C006",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C007",
+      "origin": "live-description",
+      "text": "| 대상                                                     | 처리                                                                                                                                                                                                                                              |\n|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `pgbuf_dump` 의 없어진 pool 필드 참조 (`:11320-11338`)   | volume info 캐시는 disk cache 로 이관돼 되살릴 대상이 아니므로 해당 덤프 블록을 삭제한다                                                                                                                                                          |\n| `bufptr->fcnt`, `bufptr->zone` (`:11349`, `:11369`)      | 현행 접근자 `get_fcnt (&bufptr->atomic_latch)` (`:1467`) 와 `pgbuf_zone_str (pgbuf_bcb_get_zone (bufptr))` (`:14921`, `:15933`) 로 바꾼다. `pgbuf_unfix_all` 의 `:3278-3279` 가 같은 정보를 이미 이 형태로 출력하고 있어 그대로 따르면 된다       |\n| 오타 `consistenet_str` (`:3284`, `:11370`)               | 선언된 이름 `consistent_str` 로 정정한다                                                                                                                                                                                                          |\n| `pgbuf_is_consistent` 의 const 위반 (`:11444`, `:11468`) | `pgbuf_is_consistent` 는 `const PGBUF_BCB *` 를 받는데(`:11406`) `get_fcnt` 는 비-const 포인터를 요구한다. `get_fcnt` 계열에 const 오버로드를 추가하는 안과 `pgbuf_is_consistent` 의 매개변수 const 를 떼는 안이 있고, 선택은 `TBD - 합의 미확인` |\n| 미초기화 `VPID vpid` (`:15255`)                          | `pgbuf_get_vpid (rcv->pgptr, &vpid)` 로 채운다. `rcv->pgptr` 은 진입부 assert (`:15258`) 가 non-NULL 을 보장한다                                                                                                                                  |\n| `CUBRID_DEBUG` 빌드의 회귀 방지                          | 이 스위치를 CI 컴파일 검사에 넣을지는 이 이슈의 범위 밖이며 `TBD - 합의 미확인`                                                                                                                                                                   |",
+      "sha256": "d970c7c44c88a790e082d3bc72d1961bd51757735af6e872ad2978bb43e225f9",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27265-C008",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: 수정 대상은 `src/storage/page_buffer.c` 뿐이다. 두 결함 모두 조건부 컴파일 구획 안에 있어 출시 빌드의 기계어에는 흔적이 없다 --- `pgbuf_dump` 쪽은 `#if defined(CUBRID_DEBUG)`, VPID 쪽은 `#if !defined(NDEBUG)` (assert 를 켠 debug 빌드) 이며 `er_log_tde` (`PRM_ID_ER_LOG_TDE`, hidden, 기본 false) 를 켠 경우에만 실행된다. `get_fcnt` 에 const 오버로드를 추가하기로 하면 그 접근자를 쓰는 다른 지점들이 함께 재컴파일 대상이 되므로, 서명 변경 범위는 리뷰에서 확정해야 한다.",
+      "sha256": "054bd2a5f820afc3c7e23a30be9d91ba0ea380d6a571e71ec796c45881b0de38",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27265-C009",
+      "origin": "live-description",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 N4 와 N5 다.",
+      "sha256": "46f0a806228c685e745d82261ac655b21a74ae80724aa5759f5eca807de70cb1",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27265-C010",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 에는 BCB (Buffer Control Block --- frame 에 올라온 page 의 fix 수, latch, dirty 상태를 담은 제어 블록) 전체를 표 형태로 찍는 `pgbuf_dump` 가 있다. 호출자는 두 곳이다.",
+      "sha256": "40d4951fe924917b402c8744a1b5b38da8b6e412372c8348a4c356e2e52a2f7e",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C011",
+      "origin": "live-description",
+      "text": "pgbuf_finalize                                                    :1881\n      └ #if defined(CUBRID_DEBUG) pgbuf_dump_if_any_fixed             :1888-1890\n           ├ fcnt > 0 인 BCB 발견 -> pgbuf_dump                       :11273-11279\n           └ 내용 불일치 발견     -> pgbuf_dump                       :11290-11293",
+      "sha256": "81236b6c294666446284de71d6a9598c1088469f35edc20c90dfe9036c14e8d8",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C012",
+      "origin": "live-description",
+      "text": "pgbuf_unfix                                                       :3026\n      └ #if defined(CUBRID_DEBUG) 페이지 내용 검증 블록               :3156-3179\n           └ PGBUF_CONTENT_BAD -> pgbuf_dump                          :3178",
+      "sha256": "4a7ae65aba892c69d43fcf821df9150e12e71c9d8d6f5a0fc23c20ab1d93ba8d",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C013",
+      "origin": "live-description",
+      "text": "두 진단은 \\\"요청이 끝났는데 fix 가 남아 있다\\\" 와 \\\"dirty 로 표시된 페이지 내용이 디스크와 같다\\\" 처럼 상위 모듈의 버그를 잡는 용도다. 그런데 이 스위치를 켜면 컴파일 자체가 되지 않는다. 오류 13건은 네 갈래다.",
+      "sha256": "5e525dcb996a723f133086a671d38714fa74311f0daa910ecda4e80345026f49",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27265-C014",
+      "origin": "live-description",
+      "text": "| 갈래                                                                                             | 위치                                                                       | 원인                                                                                                                                                                                                 |\n|--------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `pgbuf_Pool.volinfo_mutex`, `last_perm_volid`, `num_permvols_tmparea`, `permvols_tmparea_volids` | `:11321`, `:11322`, `:11323`, `:11325`, `:11328`, `:11334`, `:11338` (7건) | `b634bb442` (2017-01-27, CBRD-20897) 가 pgbuf 의 volume info 캐시를 걷어내고 disk cache 에 위임했다. 같은 커밋이 다른 사용처는 모두 지웠지만 `CUBRID_DEBUG` 안쪽은 컴파일되지 않아 남았다            |\n| `bufptr->fcnt`, `bufptr->zone`                                                                   | `:11349`, `:11369` (2건)                                                   | `58cef8e01` (2026-01-14, CBRD-26425) 이 fix 수와 latch mode 를 하나의 원자 워드 `atomic_latch` 로 옮겼고, zone 은 그 전부터 `flags` 워드에 인코딩돼 있다. 현행 구조체(`:513-545`)에는 두 필드가 없다 |\n| 오타 `consistenet_str`                                                                           | `:3284` (`pgbuf_unfix_all`), `:11370` (2건)                                | 선언은 `consistent_str` (`:3251`, `:11310`) 이다. 두 곳 모두 `CUBRID_DEBUG` 안쪽이라 일반 빌드에서는 드러나지 않는다                                                                                 |\n| `const PGBUF_ATOMIC_LATCH *` -\\> `PGBUF_ATOMIC_LATCH *` 변환                                     | `:11444`, `:11468` (2건)                                                   | `pgbuf_is_consistent` 는 `const PGBUF_BCB *` 를 받는데(`:11406`) `get_fcnt` 의 인자는 비-const 다(`:1467`)                                                                                           |",
+      "sha256": "6366f657aa46ac21fe74fab68d37d9f5bafbf293d166a5b461caca36e0cfc62f",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27265-C015",
+      "origin": "live-description",
+      "text": "한 함수 안에 정답과 오답이 같이 있다는 점이 이 결함의 성격을 잘 보여준다. `pgbuf_dump` 는 `:11361` 과 `:11368` 에서는 `get_fcnt (&bufptr->atomic_latch)` 와 `get_latch (&bufptr->atomic_latch)` 를 제대로 쓰면서, 바로 위 `:11349` 와 옆줄 `:11369` 에서는 옛 필드를 그대로 둔다. `:11369` 는 zone 값을 latch mode 문자열 변환 함수 `pgbuf_latch_mode_str` 에 넘기고 있어서, 필드가 존재하더라도 잘못된 문자열을 찍는다 --- zone 전용 변환 함수 `pgbuf_zone_str` (`:14921`) 가 따로 있다.",
+      "sha256": "81b7fd753718718f580d4051a1a1d81af39b55695a810f44aad0fce51e10abc1",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27265-C016",
+      "origin": "live-description",
+      "text": "페이지 dealloc 의 undo 는 논리적 undo 라서 두 단계로 나뉜다. `pgbuf_rv_dealloc_undo` (`:15202`) 가 페이지를 다시 fix 해 page type 과 pflag (페이지 헤더의 플래그 바이트로, TDE 암호화 여부 비트를 포함) 를 복원하고 보상 로그 `RVPGBUF_COMPENSATE_DEALLOC` 을 기록한다(`:15236`). 그 보상 레코드를 재기동 복구가 다시 적용할 때 실행되는 함수가 `pgbuf_rv_dealloc_undo_compensate` 다 (등록은 `src/transaction/recovery.c:802-807`, 적용은 재기동 복구의 redo 단계 `src/transaction/log_recovery.c:3760`).",
+      "sha256": "b6fc0b2a5477124ee7a7c42a2d0144deea75a87ab1bbd2b4947c372c7adb2f42",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27265-C017",
+      "origin": "live-description",
+      "text": "[트랜잭션 rollback]\n      pgbuf_rv_dealloc_undo                                            :15202\n        vpid = { udata->pageid, udata->volid }                          :15209-15210\n        pgbuf_fix (&vpid, OLD_PAGE_DEALLOCATED, WRITE)                  :15216\n        iopage->prv.pflag = udata->pflag                                :15226\n        tde_er_log (... VPID_AS_ARGS (&vpid) ...)   <- 정상             :15231-15232\n        log_append_compensate_with_undo_nxlsa (RVPGBUF_COMPENSATE_DEALLOC)\n                                                                        :15236\n    [재기동 복구 redo]\n      pgbuf_rv_dealloc_undo_compensate                                 :15252\n        VPID vpid;                 <- 선언만, 대입 없음                 :15255\n        iopage->prv.pflag = udata->pflag                                :15265\n        tde_er_log (... VPID_AS_ARGS (&vpid) ...)                       :15271\n          ★ 스택 쓰레기 값을 volid|pageid 로 출력",
+      "sha256": "797f5d534f9f40da410f7781249ef7ad52a866c536fab23cf68eb0401b3b71c8",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27265-C018",
+      "origin": "live-description",
+      "text": "`pgbuf_rv_dealloc_undo` 에서 복사해 오면서 VPID 를 채우는 두 줄(`:15209-15210`)만 빠진 형태다. 이쪽 함수는 복구 프레임워크가 페이지를 미리 fix 해 주므로(`:15258` 의 `assert (rcv->pgptr != NULL)`) `pgbuf_get_vpid (rcv->pgptr, &vpid)` 한 줄이면 실제 대상 페이지의 값을 얻는다. 보상 레코드의 `rcv->data` 에도 `pageid`/`volid` 가 실려 있어(`PGBUF_DEALLOC_UNDO_DATA`, `:989-995`) `pgbuf_rv_dealloc_undo` 와 같은 방식으로 채워도 결과는 같다.",
+      "sha256": "da6ffd8931c333b91e1e16745684594453cb814e2bf9f27163c4358b8ba41673",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27265-C019",
+      "origin": "live-description",
+      "text": "발현 조건은 세 개가 모두 겹칠 때다 --- assert 를 켠 빌드(`!NDEBUG`), 대상 페이지가 TDE (Transparent Data Encryption --- data page 암호화) 로 암호화됨, `er_log_tde` 활성. 로그 오염에 그치고 페이지 데이터에는 영향이 없지만, 하필 복구 중 TDE 페이지를 추적할 때 나오는 로그라 잘못된 위치로 조사를 끌고 갈 수 있다.",
+      "sha256": "522125d114c8a18abed9e2fbcfc65c8fe28a4a7f1dad2725f6ca59f07b0562ac",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27265-C020",
+      "origin": "live-description",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). Fedora 44 / GCC 16.1.1, `cmake --preset debug` 로 생성한 debug 빌드 트리에서 확인했다.",
+      "sha256": "42724a0caae41bbcf0aa3089669eb9b71578c3b71294a33b4f3c46eedf38e7bc",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27265-C021",
+      "origin": "live-description",
+      "text": "`page_buffer.c` 하나만 검사하면 되므로, debug 빌드의 실제 컴파일 명령에 `-DCUBRID_DEBUG` 를 더해 문법 검사만 돌린다. CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "3d5df8a76a2e725c077b0420506bc89f6cf6ede47b42b0d3b3b79c758fab2603",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27265-C022",
+      "origin": "live-description",
+      "text": "``` bash\n# 1) debug 빌드 트리를 준비한다 (compile_commands.json 이 생성된다)\ncmake --preset debug\ncmake --build build_preset_debug --target cub_server",
+      "sha256": "9ef4a3c38fa149540c8bb8eca6f03c917191953128042ab7854b284e176051c4",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27265-C023",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C024",
+      "origin": "live-description",
+      "text": "standalone (SA_MODE) 변형도 같은 방식으로 확인할 수 있다 --- 위 3 단계에서 `\"SERVER_MODE\"` 를 `\"SA_MODE\"` 로 바꾼다.",
+      "sha256": "3beff5c73c4626e88c560f849b914df6d3e119f75936673ec6d472d77308fe41",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27265-C025",
+      "origin": "live-description",
+      "text": "``` bash\n# 1) 대입 지점이 없음을 확인한다 (선언 :15255, 사용 :15271 사이에 vpid 대입이 없다)\nsed -n '15252,15276p' src/storage/page_buffer.c",
+      "sha256": "5163785c281daa24163e7a571a188464cd1486a407eec1b5442e6f9fd1f1da53",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27265-C026",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C027",
+      "origin": "live-description",
+      "text": "``` bash\n# 3) 런타임 관측: TDE 볼륨을 쓰는 debug 빌드에서 로그를 켠다",
+      "sha256": "fffa19cf6ce8c85ac726f704df67e5482929b18b3153ff33f5099a53e64554d0",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27265-C028",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C029",
+      "origin": "live-description",
+      "text": "-   N4: 3 단계 문법 검사가 오류 없이 끝나고, `CUBRID_DEBUG` 를 정의한 빌드로 `pgbuf_dump_if_any_fixed` 진단을 쓸 수 있다.",
+      "sha256": "b888c5c995dd51c2c4b39276a71ba742c90a71b5acc7f3621bc92f30af24e1ac",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27265-C030",
+      "origin": "live-description",
+      "text": "-   N5: 3 단계 로그의 `VPID = %d|%d` 가 실제로 dealloc 이 취소된 페이지의 volid\\|pageid 와 일치한다. `pgbuf_rv_dealloc_undo` 가 남긴 같은 문구의 로그와 값이 같아야 한다.",
+      "sha256": "d611fbc4775207a3adabdc3f76d6c38c7937dff48d25e99fab71ed1e03a1ff42",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27265-C031",
+      "origin": "live-description",
+      "text": "N4 의 3 단계는 오류 13건으로 실패한다 (GCC 16.1.1, SERVER_MODE 변형). SA_MODE 변형은 11건인데, 비-SERVER_MODE 에서 `pthread_mutex_lock(a)` 이 `0` 으로, `pthread_mutex_unlock(a)` 이 빈 문자열로 치환되면서(`:100-101`) 인자가 평가되지 않아 `volinfo_mutex` 관련 2건이 빠지는 차이뿐이다.",
+      "sha256": "abf50c296de3f7e0ba830b4d9b2566d9726031206721c100aeb0db14d620f0de",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27265-C032",
+      "origin": "live-description",
+      "text": "page_buffer.c:3284:11: error: 'consistenet_str' was not declared in this scope; did you mean 'consistent_str'?\n    page_buffer.c:11321:40: error: 'PGBUF_BUFFER_POOL' {aka 'struct pgbuf_buffer_pool'} has no member named 'volinfo_mutex'\n    page_buffer.c:11322:93: error: 'PGBUF_BUFFER_POOL' ... has no member named 'last_perm_volid'\n    page_buffer.c:11323:30: error: 'PGBUF_BUFFER_POOL' ... has no member named 'num_permvols_tmparea'\n    page_buffer.c:11325:18: error: 'PGBUF_BUFFER_POOL' ... has no member named 'permvols_tmparea_volids'\n    page_buffer.c:11328:34: error: 'PGBUF_BUFFER_POOL' ... has no member named 'num_permvols_tmparea'\n    page_buffer.c:11334:52: error: 'PGBUF_BUFFER_POOL' ... has no member named 'permvols_tmparea_volids'\n    page_buffer.c:11338:37: error: 'PGBUF_BUFFER_POOL' ... has no member named 'volinfo_mutex'\n    page_buffer.c:11349:19: error: 'PGBUF_BCB' {aka 'struct pgbuf_bcb'} has no member named 'fcnt'\n    page_buffer.c:11369:52: error: 'PGBUF_BCB' {aka 'struct pgbuf_bcb'} has no member named 'zone'\n    page_buffer.c:11370:11: error: 'consistenet_str' was not declared in this scope; did you mean 'consistent_str'?\n    page_buffer.c:11444:64: error: invalid conversion from 'const PGBUF_ATOMIC_LATCH*' to 'PGBUF_ATOMIC_LATCH*' [-fpermissive]\n    page_buffer.c:11468:21: error: invalid conversion from 'const PGBUF_ATOMIC_LATCH*' to 'PGBUF_ATOMIC_LATCH*' [-fpermissive]",
+      "sha256": "a7a079a87736b4afeb8a8d054423f731d3ad1df9a080830405125f563b987b2d",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27265-C033",
+      "origin": "live-description",
+      "text": "N5 는 `:15255` 와 `:15271` 사이에 `vpid` 를 대입하는 코드가 없어, 조건이 맞으면 스택에 남아 있던 값이 그대로 `VPID = %d|%d` 로 찍힌다. `pgbuf_rv_dealloc_undo` 가 같은 문구로 남긴 로그와 볼륨·페이지 번호가 어긋난다.",
+      "sha256": "f9613863f9ceee6f9850c1ba0c121f2cb0a2c107c9e13111e2ee9fd9c0dbe25a",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27265-C034",
+      "origin": "live-description",
+      "text": "-   두 결함은 발현 조건과 파일 위치가 다르지만, 둘 다 debug 전용 코드가 리팩터링·복사 과정에서 검증 없이 방치된 사례이고 수정 규모가 작아 하나의 PR 로 묶는다. 리뷰에서 분리를 요구하면 N4 와 N5 로 나눈다.",
+      "sha256": "b07fb5b7aef2d45983902dec40a3248d8fe58f31cd4f677c5a5e409c98a02dbe",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27265-C035",
+      "origin": "live-description",
+      "text": "-   `pgbuf_dump` 의 출력 헤더(`:11341-11342`)는 `Fcnt LatchMode D A F Zone Lsa consistent` 순서인데 현재 코드가 그 순서로 인자를 넘기고 있어, 필드 접근만 고치면 열과 값의 대응은 유지된다.",
+      "sha256": "09050c7ddbc525d766f435dcfa316083faa1b361e231a3d3728d8b5d15768659",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27265-C036",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A5 항목이다.",
+      "sha256": "9ef0951773c39f2b096e63c74ab65c008b443a37e1b5b8624f0af9f51c659a06",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27265-C037",
+      "origin": "live-description",
+      "text": "-   `CUBRID_DEBUG` 는 `src/` 안 67개 파일에서 참조되며, 이 이슈는 `page_buffer.c` 만 다룬다. 다른 파일도 같은 상태인지는 확인하지 않았다.",
+      "sha256": "cdcca8edbeca8f69ae27419ce20fc15513d917becde81809759b5d8fcd404d3b",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27265-C038",
+      "origin": "live-description",
+      "text": "| 위치                                 | 내용                                                             |\n|--------------------------------------|------------------------------------------------------------------|\n| `page_buffer.c:11302-11384`          | `pgbuf_dump` --- 컴파일 오류 10건이 모인 함수                    |\n| `page_buffer.c:11258-11294`          | `pgbuf_dump_if_any_fixed` --- 현행 접근자를 올바르게 쓰는 호출자 |\n| `page_buffer.c:3278-3279`            | `pgbuf_unfix_all` --- latch/zone 문자열 출력의 정답 형태         |\n| `page_buffer.c:11406-11487`          | `pgbuf_is_consistent` --- const 위반 2건                         |\n| `page_buffer.c:15252-15276`          | `pgbuf_rv_dealloc_undo_compensate` --- 미초기화 VPID             |\n| `page_buffer.c:15202-15241`          | `pgbuf_rv_dealloc_undo` --- VPID 를 채우는 원본                  |\n| `src/transaction/recovery.c:802-807` | `RVPGBUF_COMPENSATE_DEALLOC` 복구 함수 등록                      |",
+      "sha256": "fa720a0f88ec1650d75ca0eba5817dafbe40986d941d09713ce8d364b452a5e1",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27265-C039",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: `CUBRID_DEBUG` 를 정의한 빌드가 `page_buffer.c` 에서 깨지지 않게 하고, 페이지 dealloc 보상 복구가 debug 로그에 쓰레기 값을 남기지 않게 한다.",
+      "sha256": "8928915d47d6c79a6069ee0a7973417ce8cc9aeab18fc66e950b6789ab2eed85",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27265-C040",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C041",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "- **AS-IS (현재 동작 / 배경)**: `CUBRID_DEBUG` (진단용 검증·덤프 코드를 켜는 컴파일 스위치로, 빌드 스크립트와 CI 어디에서도 정의하지 않는다) 를 정의하면 `page_buffer.c` 컴파일이 오류 13건으로 실패한다. 원인은 `pgbuf_dump` (`:11302-11384`) 가 2017년 volume info 제거(`b634bb442`, CBRD-20897)와 2026년 BCB latch 원자화(`58cef8e01`, CBRD-26425) 이후 사라진 필드 (`pgbuf_Pool.volinfo_mutex`, `bufptr->fcnt`, `bufptr->zone` 등) 를 계속 참조하고, 오타 `consistenet_str` 가 `:3284` 와 `:11370` 두 곳에 남아 있기 때문이다. 별개로 `pgbuf_rv_dealloc_undo_compensate` (`:15252`) 는 대입 한 번 없는 지역 변수 `VPID vpid` (`:15255`) 를 `:15271` 의 TDE 디버그 로그 인자로 읽는다.\n- **TO-BE (목표 상태 / 기대 동작)**: `CUBRID_DEBUG` 정의 빌드가 통과해 `pgbuf_finalize` 의 fix 잔존 진단(`pgbuf_dump_if_any_fixed`)이 다시 살아나고, 보상 복구 로그가 실제 대상 페이지의 VPID (Volume and Page IDentifier — 볼륨 번호와 페이지 번호의 쌍) 를 출력한다.\n- **영향**: 기술 부채 — 버퍼 누수와 페이지 내용 불일치를 잡기 위해 만들어 둔 진단 경로가 9년 넘게 사용 불가 상태다. `pgbuf_finalize` 종료 시점의 미해제 fix 점검(`:1888-1890`)과 unfix 시점의 내용 일관성 점검(`:3156-3179`)이 둘 다 이 스위치에 걸려 있어서, 실제로 의심 상황이 생겼을 때 켜려면 먼저 컴파일 오류부터 고쳐야 한다. VPID 쪽은 debug 빌드에서 `er_log_tde` 를 켠 경우에 한해 잘못된 위치를 가리키는 로그가 남아 분석을 오도한다.",
+      "sha256": "ae4cdf7ab49e89aee01214c04bf6b443b8e1580caaf27c39c8661de1a2331987",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27265-C042",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27265-C043",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "| 대상 | 처리 |\n|---|---|\n| `pgbuf_dump` 의 없어진 pool 필드 참조 (`:11320-11338`) | volume info 캐시는 disk cache 로 이관돼 되살릴 대상이 아니므로 해당 덤프 블록을 삭제한다 |\n| `bufptr->fcnt`, `bufptr->zone` (`:11349`, `:11369`) | 현행 접근자 `get_fcnt (&bufptr->atomic_latch)` (`:1467`) 와 `pgbuf_zone_str (pgbuf_bcb_get_zone (bufptr))` (`:14921`, `:15933`) 로 바꾼다. `pgbuf_unfix_all` 의 `:3278-3279` 가 같은 정보를 이미 이 형태로 출력하고 있어 그대로 따르면 된다 |\n| 오타 `consistenet_str` (`:3284`, `:11370`) | 선언된 이름 `consistent_str` 로 정정한다 |\n| `pgbuf_is_consistent` 의 const 위반 (`:11444`, `:11468`) | `pgbuf_is_consistent` 는 `const PGBUF_BCB *` 를 받는데(`:11406`) `get_fcnt` 는 비-const 포인터를 요구한다. `get_fcnt` 계열에 const 오버로드를 추가하는 안과 `pgbuf_is_consistent` 의 매개변수 const 를 떼는 안이 있고, 선택은 `TBD - 합의 미확인` |\n| 미초기화 `VPID vpid` (`:15255`) | `pgbuf_get_vpid (rcv->pgptr, &vpid)` 로 채운다. `rcv->pgptr` 은 진입부 assert (`:15258`) 가 non-NULL 을 보장한다 |\n| `CUBRID_DEBUG` 빌드의 회귀 방지 | 이 스위치를 CI 컴파일 검사에 넣을지는 이 이슈의 범위 밖이며 `TBD - 합의 미확인` |",
+      "sha256": "002b114ced30f7768e400a05cd8dfb0979ff031fc361fbd19e514a5524c13ca4",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27265-C044",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: 수정 대상은 `src/storage/page_buffer.c` 뿐이다. 두 결함 모두 조건부 컴파일 구획 안에 있어 출시 빌드의 기계어에는 흔적이 없다 — `pgbuf_dump` 쪽은 `#if defined(CUBRID_DEBUG)`, VPID 쪽은 `#if !defined(NDEBUG)` (assert 를 켠 debug 빌드) 이며 `er_log_tde` (`PRM_ID_ER_LOG_TDE`, hidden, 기본 false) 를 켠 경우에만 실행된다. `get_fcnt` 에 const 오버로드를 추가하기로 하면 그 접근자를 쓰는 다른 지점들이 함께 재컴파일 대상이 되므로, 서명 변경 범위는 리뷰에서 확정해야 한다.",
+      "sha256": "a8918c8b80fb8595db58ed1b2d144ffc77978f839bf28f5d4bd5bbdd42c63439",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27265-C045",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유한 결함은 그 본문의 N4 와 N5 다.",
+      "sha256": "46f0a806228c685e745d82261ac655b21a74ae80724aa5759f5eca807de70cb1",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27265-C046",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈) 에는 BCB (Buffer Control Block — frame 에 올라온 page 의 fix 수, latch, dirty 상태를 담은 제어 블록) 전체를 표 형태로 찍는 `pgbuf_dump` 가 있다. 호출자는 두 곳이다.",
+      "sha256": "aef023fc854f4f77345269a649e42771a543d76f810e81059d980d2142d8d1ee",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C047",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```\npgbuf_finalize                                                    :1881\n  └ #if defined(CUBRID_DEBUG) pgbuf_dump_if_any_fixed             :1888-1890\n       ├ fcnt > 0 인 BCB 발견 -> pgbuf_dump                       :11273-11279\n       └ 내용 불일치 발견     -> pgbuf_dump                       :11290-11293",
+      "sha256": "bb36fb252c1864149c9568626fc0962dfb88455c3552b5f80ad519f24b5cf77f",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C048",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "pgbuf_unfix                                                       :3026\n  └ #if defined(CUBRID_DEBUG) 페이지 내용 검증 블록               :3156-3179\n       └ PGBUF_CONTENT_BAD -> pgbuf_dump                          :3178\n```",
+      "sha256": "41bc050570e99da51ee2d36e1e89d9bbde4fb7bb019f2960b36ee2933120d166",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27265-C049",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "두 진단은 \"요청이 끝났는데 fix 가 남아 있다\" 와 \"dirty 로 표시된 페이지 내용이 디스크와 같다\" 처럼 상위 모듈의 버그를 잡는 용도다. 그런데 이 스위치를 켜면 컴파일 자체가 되지 않는다. 오류 13건은 네 갈래다.",
+      "sha256": "ebba601b2d9e8b9b6c6e17dee811ed0ca545cdb1770104b2d45ec2fe5c348ca0",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27265-C050",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "| 갈래 | 위치 | 원인 |\n|---|---|---|\n| `pgbuf_Pool.volinfo_mutex`, `last_perm_volid`, `num_permvols_tmparea`, `permvols_tmparea_volids` | `:11321`, `:11322`, `:11323`, `:11325`, `:11328`, `:11334`, `:11338` (7건) | `b634bb442` (2017-01-27, CBRD-20897) 가 pgbuf 의 volume info 캐시를 걷어내고 disk cache 에 위임했다. 같은 커밋이 다른 사용처는 모두 지웠지만 `CUBRID_DEBUG` 안쪽은 컴파일되지 않아 남았다 |\n| `bufptr->fcnt`, `bufptr->zone` | `:11349`, `:11369` (2건) | `58cef8e01` (2026-01-14, CBRD-26425) 이 fix 수와 latch mode 를 하나의 원자 워드 `atomic_latch` 로 옮겼고, zone 은 그 전부터 `flags` 워드에 인코딩돼 있다. 현행 구조체(`:513-545`)에는 두 필드가 없다 |\n| 오타 `consistenet_str` | `:3284` (`pgbuf_unfix_all`), `:11370` (2건) | 선언은 `consistent_str` (`:3251`, `:11310`) 이다. 두 곳 모두 `CUBRID_DEBUG` 안쪽이라 일반 빌드에서는 드러나지 않는다 |\n| `const PGBUF_ATOMIC_LATCH *` -> `PGBUF_ATOMIC_LATCH *` 변환 | `:11444`, `:11468` (2건) | `pgbuf_is_consistent` 는 `const PGBUF_BCB *` 를 받는데(`:11406`) `get_fcnt` 의 인자는 비-const 다(`:1467`) |",
+      "sha256": "5157105fae57e18b43a0de04f785185c2e8764a4c5e53b73e7370ee630bb5380",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27265-C051",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "한 함수 안에 정답과 오답이 같이 있다는 점이 이 결함의 성격을 잘 보여준다. `pgbuf_dump` 는 `:11361` 과 `:11368` 에서는 `get_fcnt (&bufptr->atomic_latch)` 와 `get_latch (&bufptr->atomic_latch)` 를 제대로 쓰면서, 바로 위 `:11349` 와 옆줄 `:11369` 에서는 옛 필드를 그대로 둔다. `:11369` 는 zone 값을 latch mode 문자열 변환 함수 `pgbuf_latch_mode_str` 에 넘기고 있어서, 필드가 존재하더라도 잘못된 문자열을 찍는다 — zone 전용 변환 함수 `pgbuf_zone_str` (`:14921`) 가 따로 있다.",
+      "sha256": "c2ca45e245ad33fe7ac72ee819746e9912865b6a2641fb123eff16109165b70a",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27265-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "페이지 dealloc 의 undo 는 논리적 undo 라서 두 단계로 나뉜다. `pgbuf_rv_dealloc_undo` (`:15202`) 가 페이지를 다시 fix 해 page type 과 pflag (페이지 헤더의 플래그 바이트로, TDE 암호화 여부 비트를 포함) 를 복원하고 보상 로그 `RVPGBUF_COMPENSATE_DEALLOC` 을 기록한다(`:15236`). 그 보상 레코드를 재기동 복구가 다시 적용할 때 실행되는 함수가 `pgbuf_rv_dealloc_undo_compensate` 다 (등록은 `src/transaction/recovery.c:802-807`, 적용은 재기동 복구의 redo 단계 `src/transaction/log_recovery.c:3760`).",
+      "sha256": "b6fc0b2a5477124ee7a7c42a2d0144deea75a87ab1bbd2b4947c372c7adb2f42",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27265-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```\n[트랜잭션 rollback]\n  pgbuf_rv_dealloc_undo                                            :15202\n    vpid = { udata->pageid, udata->volid }                          :15209-15210\n    pgbuf_fix (&vpid, OLD_PAGE_DEALLOCATED, WRITE)                  :15216\n    iopage->prv.pflag = udata->pflag                                :15226\n    tde_er_log (... VPID_AS_ARGS (&vpid) ...)   <- 정상             :15231-15232\n    log_append_compensate_with_undo_nxlsa (RVPGBUF_COMPENSATE_DEALLOC)\n                                                                    :15236\n[재기동 복구 redo]\n  pgbuf_rv_dealloc_undo_compensate                                 :15252\n    VPID vpid;                 <- 선언만, 대입 없음                 :15255\n    iopage->prv.pflag = udata->pflag                                :15265\n    tde_er_log (... VPID_AS_ARGS (&vpid) ...)                       :15271\n      ★ 스택 쓰레기 값을 volid|pageid 로 출력\n```",
+      "sha256": "2440464264633d7829acfaea85cbc5b1686e4022a81e39910150c9dce685ee01",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27265-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "`pgbuf_rv_dealloc_undo` 에서 복사해 오면서 VPID 를 채우는 두 줄(`:15209-15210`)만 빠진 형태다. 이쪽 함수는 복구 프레임워크가 페이지를 미리 fix 해 주므로(`:15258` 의 `assert (rcv->pgptr != NULL)`) `pgbuf_get_vpid (rcv->pgptr, &vpid)` 한 줄이면 실제 대상 페이지의 값을 얻는다. 보상 레코드의 `rcv->data` 에도 `pageid`/`volid` 가 실려 있어(`PGBUF_DEALLOC_UNDO_DATA`, `:989-995`) `pgbuf_rv_dealloc_undo` 와 같은 방식으로 채워도 결과는 같다.",
+      "sha256": "da6ffd8931c333b91e1e16745684594453cb814e2bf9f27163c4358b8ba41673",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27265-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "발현 조건은 세 개가 모두 겹칠 때다 — assert 를 켠 빌드(`!NDEBUG`), 대상 페이지가 TDE (Transparent Data Encryption — data page 암호화) 로 암호화됨, `er_log_tde` 활성. 로그 오염에 그치고 페이지 데이터에는 영향이 없지만, 하필 복구 중 TDE 페이지를 추적할 때 나오는 로그라 잘못된 위치로 조사를 끌고 갈 수 있다.",
+      "sha256": "ec62e8bdb33cdacbc996b7a2bfac3a6a19b90756223e437a912de436cf1d3d5a",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27265-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "`CUBRID develop e6ed61e87` (소스 빌드). Fedora 44 / GCC 16.1.1, `cmake --preset debug` 로 생성한 debug 빌드 트리에서 확인했다.",
+      "sha256": "42724a0caae41bbcf0aa3089669eb9b71578c3b71294a33b4f3c46eedf38e7bc",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27265-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "`page_buffer.c` 하나만 검사하면 되므로, debug 빌드의 실제 컴파일 명령에 `-DCUBRID_DEBUG` 를 더해 문법 검사만 돌린다. CUBRID 소스 최상위에서 실행한다.",
+      "sha256": "3d5df8a76a2e725c077b0420506bc89f6cf6ede47b42b0d3b3b79c758fab2603",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27265-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```bash\n# 1) debug 빌드 트리를 준비한다 (compile_commands.json 이 생성된다)\ncmake --preset debug\ncmake --build build_preset_debug --target cub_server",
+      "sha256": "7d28bbd978a284aea385d73ec24705f06bf65226cd7c99ddff510376658b4003",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27265-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "standalone (SA_MODE) 변형도 같은 방식으로 확인할 수 있다 — 위 3 단계에서 `\"SERVER_MODE\"` 를 `\"SA_MODE\"` 로 바꾼다.",
+      "sha256": "f7b6bc84707e8cfe5b7ce3623300fc128f7cd1bb84cc4ba21f6c18fdf991a058",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27265-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```bash\n# 1) 대입 지점이 없음을 확인한다 (선언 :15255, 사용 :15271 사이에 vpid 대입이 없다)\nsed -n '15252,15276p' src/storage/page_buffer.c",
+      "sha256": "b8a302e323ed601161e075ecad9d73e08020fe78fec11e59f6b874a11fe0a3b0",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27265-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```bash\n# 3) 런타임 관측: TDE 볼륨을 쓰는 debug 빌드에서 로그를 켠다\n#    cubrid.conf 의 [common] 아래 er_log_tde=yes 를 넣고 서버를 재기동한 뒤,\n#    TDE 테이블에 페이지 dealloc 이 일어나는 트랜잭션을 rollback 하고\n#    체크포인트 전에 서버를 kill -9 한 다음 재기동해 복구 redo 를 유발한다.\ngrep -n 'reset tde bit in pflag' $CUBRID/log/server/*_*.err\n```",
+      "sha256": "14eee7574bcdedcba6750ff7f79cae33d73e4d5ff1384c2d279930cda9c11d90",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27265-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "- N4: 3 단계 문법 검사가 오류 없이 끝나고, `CUBRID_DEBUG` 를 정의한 빌드로 `pgbuf_dump_if_any_fixed` 진단을 쓸 수 있다.\n- N5: 3 단계 로그의 `VPID = %d|%d` 가 실제로 dealloc 이 취소된 페이지의 volid|pageid 와 일치한다. `pgbuf_rv_dealloc_undo` 가 남긴 같은 문구의 로그와 값이 같아야 한다.",
+      "sha256": "6835153047ea2f3b2173b5b03ff28335f62e5f9b9ad9cbcff3e30c11855c64e8",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27265-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "N4 의 3 단계는 오류 13건으로 실패한다 (GCC 16.1.1, SERVER_MODE 변형). SA_MODE 변형은 11건인데, 비-SERVER_MODE 에서 `pthread_mutex_lock(a)` 이 `0` 으로, `pthread_mutex_unlock(a)` 이 빈 문자열로 치환되면서(`:100-101`) 인자가 평가되지 않아 `volinfo_mutex` 관련 2건이 빠지는 차이뿐이다.",
+      "sha256": "abf50c296de3f7e0ba830b4d9b2566d9726031206721c100aeb0db14d620f0de",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27265-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "```\npage_buffer.c:3284:11: error: 'consistenet_str' was not declared in this scope; did you mean 'consistent_str'?\npage_buffer.c:11321:40: error: 'PGBUF_BUFFER_POOL' {aka 'struct pgbuf_buffer_pool'} has no member named 'volinfo_mutex'\npage_buffer.c:11322:93: error: 'PGBUF_BUFFER_POOL' ... has no member named 'last_perm_volid'\npage_buffer.c:11323:30: error: 'PGBUF_BUFFER_POOL' ... has no member named 'num_permvols_tmparea'\npage_buffer.c:11325:18: error: 'PGBUF_BUFFER_POOL' ... has no member named 'permvols_tmparea_volids'\npage_buffer.c:11328:34: error: 'PGBUF_BUFFER_POOL' ... has no member named 'num_permvols_tmparea'\npage_buffer.c:11334:52: error: 'PGBUF_BUFFER_POOL' ... has no member named 'permvols_tmparea_volids'\npage_buffer.c:11338:37: error: 'PGBUF_BUFFER_POOL' ... has no member named 'volinfo_mutex'\npage_buffer.c:11349:19: error: 'PGBUF_BCB' {aka 'struct pgbuf_bcb'} has no member named 'fcnt'\npage_buffer.c:11369:52: error: 'PGBUF_BCB' {aka 'struct pgbuf_bcb'} has no member named 'zone'\npage_buffer.c:11370:11: error: 'consistenet_str' was not declared in this scope; did you mean 'consistent_str'?\npage_buffer.c:11444:64: error: invalid conversion from 'const PGBUF_ATOMIC_LATCH*' to 'PGBUF_ATOMIC_LATCH*' [-fpermissive]\npage_buffer.c:11468:21: error: invalid conversion from 'const PGBUF_ATOMIC_LATCH*' to 'PGBUF_ATOMIC_LATCH*' [-fpermissive]\n```",
+      "sha256": "5e55d86419c4c53503c47c5213381d2acd5e35ad9999b7f5772676ba1b14801a",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27265-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "N5 는 `:15255` 와 `:15271` 사이에 `vpid` 를 대입하는 코드가 없어, 조건이 맞으면 스택에 남아 있던 값이 그대로 `VPID = %d|%d` 로 찍힌다. `pgbuf_rv_dealloc_undo` 가 같은 문구로 남긴 로그와 볼륨·페이지 번호가 어긋난다.",
+      "sha256": "f9613863f9ceee6f9850c1ba0c121f2cb0a2c107c9e13111e2ee9fd9c0dbe25a",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27265-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "- 두 결함은 발현 조건과 파일 위치가 다르지만, 둘 다 debug 전용 코드가 리팩터링·복사 과정에서 검증 없이 방치된 사례이고 수정 규모가 작아 하나의 PR 로 묶는다. 리뷰에서 분리를 요구하면 N4 와 N5 로 나눈다.\n- `pgbuf_dump` 의 출력 헤더(`:11341-11342`)는 `Fcnt LatchMode D A F Zone Lsa consistent` 순서인데 현재 코드가 그 순서로 인자를 넘기고 있어, 필드 접근만 고치면 열과 값의 대응은 유지된다.\n- 부모 EPIC: CBRD-27193 (page buffer 안정성 개선). 이 이슈는 그 표의 A5 항목이다.\n- `CUBRID_DEBUG` 는 `src/` 안 67개 파일에서 참조되며, 이 이슈는 `page_buffer.c` 만 다룬다. 다른 파일도 같은 상태인지는 확인하지 않았다.",
+      "sha256": "cf23dc56e7dfe866201e4851f64d30c64f0dcf6c6c21945d55e94b28785a7e6e",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27265-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md",
+      "text": "| 위치 | 내용 |\n|---|---|\n| `page_buffer.c:11302-11384` | `pgbuf_dump` — 컴파일 오류 10건이 모인 함수 |\n| `page_buffer.c:11258-11294` | `pgbuf_dump_if_any_fixed` — 현행 접근자를 올바르게 쓰는 호출자 |\n| `page_buffer.c:3278-3279` | `pgbuf_unfix_all` — latch/zone 문자열 출력의 정답 형태 |\n| `page_buffer.c:11406-11487` | `pgbuf_is_consistent` — const 위반 2건 |\n| `page_buffer.c:15252-15276` | `pgbuf_rv_dealloc_undo_compensate` — 미초기화 VPID |\n| `page_buffer.c:15202-15241` | `pgbuf_rv_dealloc_undo` — VPID 를 채우는 원본 |\n| `src/transaction/recovery.c:802-807` | `RVPGBUF_COMPENSATE_DEALLOC` 복구 함수 등록 |",
+      "sha256": "aceb9df8448bf009924a1db3ae233559586b61b5a240f703a328a24437be0e8e",
+      "disposition_group": 27
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        39
+      ],
+      "disposition": "retained",
+      "reason": "Retain both intended outcomes: compile the extra diagnostic code and use an initialized actual target VPID for compensation logging.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11324-L11473",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        6,
+        23,
+        26,
+        28,
+        40,
+        42
+      ],
+      "disposition": "non-substantive",
+      "reason": "Opening labels or isolated Markdown fence fragments; replace with the current four-field template and complete fenced blocks. No technical claim is lost.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        41
+      ],
+      "disposition": "corrected",
+      "reason": "Current source retains all named defect families, but 13 diagnostics belong to the historical e6ed61e87/GCC16.1.1 report. Remove universal claims about every build/CI and unverified historical introduction dates; use pinned current lines.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L219-L242",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11324-L11473",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L151-L169"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        29
+      ],
+      "disposition": "corrected",
+      "reason": "Retain compile restoration as an outcome, but syntax success does not prove the whole runtime diagnostic mode is safe or usable; flag separate activation safety and runtime validation.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L144-L145",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L3126-L3194",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_io.h#L184-L198"
+      ]
+    },
+    {
+      "ids": [
+        5
+      ],
+      "disposition": "corrected",
+      "reason": "Retain diagnosis obstruction and misleading log risk; remove unsupported nine-year continuous unavailability and distinguish CUBRID_DEBUG from ordinary Debug and !NDEBUG.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L219-L242",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1839-L1849",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15279-L15285"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        43
+      ],
+      "disposition": "corrected",
+      "reason": "Original concrete repairs are unconfirmed suggestions, not an agreed design. Report defers member-dump policy, accessor/const signature choice, target VPID source and CI scope to ANALYSIS. Assert checks the contract but does not establish runtime reachability or page validity.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L3248-L3257",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5124-L5148",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L17-L27"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        44
+      ],
+      "disposition": "corrected",
+      "reason": "Use exact separate guards and actual restored encrypted flag/runtime parameter condition. Do not assert every released binary is unaffected or promise the final modification is restricted to one file; named build mode alone is insufficient.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L219-L242",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.h#L139",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4608-L4618",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        36,
+        45
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the live parent and legacy N4/N5 issue identity. Drop obsolete parent table A5 numbering because parent structure is being rewritten, without inventing a dependency.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27265",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        11,
+        12,
+        46,
+        47,
+        48
+      ],
+      "disposition": "retained",
+      "reason": "Retain page-buffer/BCB purpose and two diagnostic caller contexts with current pinned line references; include actual validation setting and documented multi-user limitations.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1839-L1849",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L3126-L3149",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11251-L11298"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        49
+      ],
+      "disposition": "corrected",
+      "reason": "Retain diagnostics purpose and compile defect, but dirty content equal to disk is LIKELY_BAD rather than proof of an upper-module defect; exact error count is historical. Do not conflate dirty with commit/durability.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11397-L11455",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L151-L169"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        50
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the four current defect families. Replace stale line locations and historical refactoring dates/causation with independently verified pinned definitions and uses; historical error-category counts remain explicitly attributed.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L733-L809",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L3215-L3257",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11324-L11473",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1441-L1447",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L151-L169"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        51
+      ],
+      "disposition": "retained",
+      "reason": "Retain mixed old/new accesses and wrong zone-to-latch-string conversion; cite current dump and existing zone getter/string access example. Avoid unexecuted exact output promises.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11348-L11382",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L3248-L3249"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        52
+      ],
+      "disposition": "retained",
+      "reason": "Retain logical deallocation undo, restored page type/pflag, compensation logging, and redo application. Verify current registration uses the undo slot and LOG_COMPENSATE explicitly selects that slot.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15214-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/recovery.c#L796-L807",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_recovery.c#L3767-L3775",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_recovery_redo.hpp#L395-L400"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        53
+      ],
+      "disposition": "corrected",
+      "reason": "Retain initialized ordinary undo versus uninitialized compensation local VPID. Replace guaranteed stack-junk output diagram with C++ undefined-read analysis and exact argument evaluation conditions.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15214-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/compat/dbtype_def.h#L956-L976",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.h#L139"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        54
+      ],
+      "disposition": "corrected",
+      "reason": "Drop unsupported copy-history assertion and unconditional equivalence of log-payload IDs and fixed-page IDs. Keep pgbuf_get_vpid as an existing candidate; assert expresses the contract, not proof of runtime validity or equivalent data.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L5124-L5148",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_recovery_redo.hpp#L599-L646"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        55
+      ],
+      "disposition": "corrected",
+      "reason": "Retain !NDEBUG + restored encrypted flag + er_log_tde gating. Uninitialized C++ integer reads are undefined behavior; remove guaranteed log-only/no-page-effect statements while noting no demonstrated storage corruption and no data-address use of this local.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/compat/dbtype_def.h#L956-L976",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.h#L139"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        56
+      ],
+      "disposition": "retained",
+      "reason": "Preserve e6ed61e87/Fedora44/GCC16.1.1 as the prior report identity, not current execution. Use immutable notes commit rather than overwritten live issue or a self-link.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L91-L94"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        57
+      ],
+      "disposition": "corrected",
+      "reason": "Retain focused actual-command syntax checking, explicitly proposed/unexecuted for current source and insufficient to establish global CUBRID_DEBUG build/runtime safety.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L96-L126",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/cubrid/CMakeLists.txt#L542",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/sa/CMakeLists.txt#L544"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        24,
+        58,
+        59
+      ],
+      "disposition": "corrected",
+      "reason": "Replace personal/untracked CMake preset and root symlink with explicit CMake source/build directory, Debug, compile_commands export, verified cubrid/cubridsa targets and mode-specific actual command selection. Preserve both SERVER_MODE and SA_MODE checks; procedure is unexecuted.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/CMakeLists.txt#L219-L242",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/cubrid/CMakeLists.txt#L717",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/sa/CMakeLists.txt#L716",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L101-L126"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        60
+      ],
+      "disposition": "corrected",
+      "reason": "Retain the static comparison but update sed ranges from historical 15252/15276 to current 15214/15287 and include actual VPID type/macro and log gate.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15214-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/compat/dbtype_def.h#L956-L976",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.h#L139"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        61
+      ],
+      "disposition": "corrected",
+      "reason": "Generic rollback/kill/restart description lacks concrete SQL, persistence state, and proof compensation is reapplied. Mark runtime reproduction TBD and require actual function/record/target evidence; identical log text cannot distinguish ordinary undo from compensation.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L128-L144",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15240-L15285",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_recovery.c#L3767-L3775"
+      ]
+    },
+    {
+      "ids": [
+        30,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "Retain correct target VPID as expected outcome but validate against the actual compensation target, not any matching ordinary-undo log. CUBRID_DEBUG runtime activation requires more than a syntax pass.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15240-L15285",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L144-L145",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_io.h#L184-L198"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        32,
+        63,
+        64
+      ],
+      "disposition": "retained",
+      "reason": "Preserve reported SERVER13/SA11 and exact diagnostic categories through immutable historical notes; verify non-SERVER mutex macros explain two suppressed field expressions. Do not claim current compiler result or copy stale line numbers as current.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L151-L169",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L96-L103"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        65
+      ],
+      "disposition": "corrected",
+      "reason": "No runtime output artifact demonstrates an actual mismatching page ID. Replace deterministic junk/mismatch assertion with statically verified missing initialization and undefined behavior; current reproduction remains unknown.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15264-L15287",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/compat/dbtype_def.h#L956-L976"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "Retain shared child boundary for both diagnostics, but do not preselect one PR, assert small implementation size, freeze exact change scope, or promise column correspondence. Other-file scan counts and historical parent table labels are omitted; implementation and validation decisions remain ANALYSIS.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L173-L178",
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11344-L11382"
+      ]
+    },
+    {
+      "ids": [
+        35
+      ],
+      "disposition": "removed",
+      "reason": "Remove blanket assertion that existing output headers and all argument columns already agree and fixing member access alone preserves correct output. No runtime formatting validation exists, and the expected result now requires actual column correspondence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11344-L11382",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L175-L176"
+      ]
+    },
+    {
+      "ids": [
+        37
+      ],
+      "disposition": "corrected",
+      "reason": "Keep limited page_buffer.c investigation boundary and lack of other-file validation, but omit historical 67-file count because it is not material to triage and was not independently re-counted for the current baseline.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L178",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11223-L11492"
+      ]
+    },
+    {
+      "ids": [
+        38,
+        67
+      ],
+      "disposition": "non-substantive",
+      "reason": "Reference-only tables duplicate prior claims. Replace stale unlinked source line lists with pinned primary links embedded beside the corresponding claims; historical per-function diagnostic count is not presented as current execution.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27265-pgbuf-debug-build-defects_e6ed61e_claude.md#L180-L190",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L11324-L11473"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

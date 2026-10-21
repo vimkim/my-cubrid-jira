@@ -1,0 +1,1392 @@
+{
+  "issue": "CBRD-27193",
+  "reviewer": "/root",
+  "report_sha256": "7f27a70777b4da23c2cfdcd3a17e160998722f0b8cf3de69f31e2f03260eed23",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27193-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 페이지 버퍼의 안정성·운영성·성능 개선을 하나의 EPIC에서 관리하되, 확인된 정확성 결함을 우선 처리하고 구조 변경은 측정 근거가 확보된 경우에만 진행한다.",
+      "sha256": "784e9ebcede3484dc1972d37b6dc1aa6acdf9f8195d50112a0ab7344eee13c15",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27193-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27193-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                            |\n|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | develop `e6ed61e87` 의 `page_buffer.c` 전량(17,535줄) 재분석 결과, 이전 분석(commit `5cd4f860e`)의 상위 결함 D1\\~D3가 그대로 잔존하고 신규 결함 9건(N1\\~N9)이 추가 확인됐다. 최고 심각도 N1은 요청 page 의 dealloc 보호 카운터 등록·해제가 `pgbuf_fix` 와 `pgbuf_ordered_fix` 에 흩어져 있어, 5가지 진입 상황 중 3가지에서 짝이 깨지는 비대칭이다 (lock-free 성공 시 -1, 오류 경로에서 -1 또는 \\\\+1 영구 잔존). |\n| **TO-BE (목표 상태 / 기대 동작)** | 정확성 결함 5건(A1\\~A5)이 각각 추적 가능한 자식 이슈로 수정되고, 운영성 개선과 구조 변경은 측정 근거가 확보된 뒤에만 착수된다. 자식 이슈 구성 상세는 Implementation 표.                                                                                                                                                                                                                                         |\n| **영향**                          | 고객 장애 가능성 --- N1은 vacuum 이 dealloc 을 막으려고 보호해 둔 페이지가 조기 회수될 수 있는 정합성 결함이고, D1(flush 실패 후 BCB 미복구)은 대기 스레드가 깨어나지 못하는 hang 으로 이어질 수 있다.                                                                                                                                                                                                          |",
+      "sha256": "0bbc11f1cff090bc1e7675528512c341f228573906f9318872a110bff5fee9b9",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27193-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: CBRD-27193은 page buffer 자식 이슈를 정확성·운영성·조사/설계 3범주로 묶어 완료까지 관리하는 EPIC으로 유지한다. 자식 이슈 구성은 아래 Implementation의 확정 표를 따르고, 목표 동작이 미결정인 항목(A3·B1·B2)은 Open Questions 에 정리했다. EPIC 본문은 이번 재분석 결과로 갱신한다.",
+      "sha256": "eabcb37becd80fd81b4c59ccbfd8a762f49f0083837e2dee59e3e45f94fe2156",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27193-C005",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c`, `page_buffer.h`, `src/storage/double_write_buffer.cpp`, `src/base/system_parameter.c`, `src/base/perf_monitor.c`, `src/parser/show_meta.c` 가 후보 범위다. EPIC 자체는 디스크 형식과 외부 공개 API를 바꾸지 않지만, 통계 이름·정의 변경(B1)은 모니터링 호환성을 별도로 검토해야 한다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "0415b76690a6aead29664d791c1b8939ddc8fe549ae1b08141d4d3c4d6094568",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27193-C006",
+      "origin": "live-description",
+      "text": "기준 소스는 CUBRID develop commit `e6ed61e87` 이다. 이전 분석(commit `5cd4f860e`, References 참조)의 결함 D1\\~D8을 재검증하고, 이번에는 `page_buffer.c` 를 자료구조·fix/unfix·LRU/victim·flush/WAL·ordered fix·부가기능의 6개 축으로 전량 정독해 신규 결함 N1\\~N9를 추가로 확인했다. D 번호는 이전 분석의 결함 ID다 --- D1 flush 실패 복구 누락, D2 direct_victims memset 크기, D3 direct victim 유지보수 순회 미실행, D4 big private victim queue 생산 경로, D5 `double_write_buffer_size` 단위 문법, D6 통계 의미 불일치, D7 AOUT 강제 비활성, D8 `pgbuf_peek_stats` 헤더 인자명.",
+      "sha256": "c46eaac41e652a0723fc22ac1634bfbcfcde46c89fb8bd7e2088f776ed4f9c13",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27193-C007",
+      "origin": "live-description",
+      "text": "`pgbuf` (page buffer manager --- 디스크 page를 메모리 frame에 캐시하고 fix, latch, 교체, flush를 관리하는 모듈)는 page lookup과 교체뿐 아니라 WAL(Write-Ahead Logging --- data page보다 log를 먼저 기록하는 규칙), DWB(Double Write Buffer --- 원래 위치에 쓰기 전 별도 파일에 page 사본을 기록하는 torn-write 보호 장치), TDE(Transparent Data Encryption --- data page 암호화)를 연결한다. BCB(Buffer Control Block --- frame에 올라온 page의 fix 수, latch, dirty 상태를 보관하는 제어 블록)는 `latch_mode`, `waiter_exists`, `fcnt` 를 하나의 64-bit atomic word에 저장하며, READ fix/unfix의 lock-free 경로와 일반 latch 대기열이 이 word를 함께 사용한다. LRU(Least Recently Used --- 최근 사용 시점 기준의 page 교체 목록)는 shared/private 영역으로 나뉘고, direct victim은 빈 frame을 찾지 못해 대기하는 스레드에 재사용 가능한 BCB를 직접 넘기는 방식이다. ordered fix(`pgbuf_ordered_fix` --- heap 페이지 여러 장을 데드락 없이 잡도록 전역 순서에 따라 래치를 재배열하는 fix 변형)는 heap scan 의 표준 진입로다. AOUT는 2Q 교체 정책에서 main queue에서 밀려난 page identifier의 이력을 보관하는 queue다.",
+      "sha256": "1b67c3998a532a1c78b30ed29523aaf1ae431fc768874dbdd97b5ce67952e933",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27193-C008",
+      "origin": "live-description",
+      "text": "| ID  | 위치 (page_buffer.c)                                          | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 분류                |\n|-----|---------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|\n| N1  | :2425-2428, :2513-2517, :12702, :12850, :12972-12998          | 요청 page 의 dealloc 보호 카운터 등록·해제가 `pgbuf_fix` 와 `pgbuf_ordered_fix` 에 분담되어 있는데, 5가지 진입 상황 중 3가지에서 짝이 깨진다 --- ① 1차 시도가 lock-free fast path 로 성공하면 등록 없이 해제(-1, 타 스레드 보호 절취), ② 등록 도달 전 실패 후 재정렬 성공이면 등록 없는 해제(-1, 드묾), ③ 재정렬 중 실패 시 exit 정리(:12972-12998)가 `has_dealloc_prevent_flag` 를 소비하지 않아 \\\\+1 영구 잔존(해당 page 는 vacuum 회수에서 영구 제외). 회계 표 전체는 아래 \\\"2순위(A2) 오류 흐름\\\" 절과 CBRD-27263 참조.                          | 정합성 (High)       |\n| N2  | :8456-8461                                                    | `pgbuf_claim_bcb_for_fix` 의 `dwb_read_page` 실패 경로가 인접 실패 경로와 달리 BCB mutex를 든 채 반환한다. release 빌드에서 해당 BCB 영구 잠금 + 같은 VPID 대기자의 무한 대기로 이어진다.                                                                                                                                                                                                                                                                                                                                                            | 가용성 (방어 경로)  |\n| N3  | :9407, :9505-9508, :9577, :9586                               | direct victim 긴급 배정 경로 2곳이 실행되지 않는다. `pgbuf_panic_assign_direct_victims_from_lru` 는 호출부(:9407)가 직전에 NULL이 된 `prev_BCB` 를 전달해 NULL 가드(:9505-9508)에서 즉시 0을 반환하고, `pgbuf_direct_victims_maintenance` 의 두 순회(:9577, :9586)는 초기 조건 모순으로 본문이 한 번도 돌지 않는다 (D3와 동일 계열). 관측 가능 증상: 이 경로들만 올리는 `Num_victim_assign_direct_panic` 통계가 어떤 부하에서도 0 이다.                                                                                                              | 기존 D3의 범위 확장 |\n| N4  | :11349, :11369, :11321-11338, :3284, :11444, :11468           | `CUBRID_DEBUG` 정의 시 컴파일 오류 13건 실측 --- atomic latch/flags 개편 이전 필드(`bufptr->fcnt` :11349, `bufptr->zone` :11369; :11361 은 신 접근자 공존), 2017년 volume-info 제거(b634bb442) 잔재 필드 참조 7건(:11321-11338), `pgbuf_unfix_all` 오타(:3284), const 위반 2건(:11444, :11468). finalize 진단 경로가 사장된 상태다.                                                                                                                                                                                                                  | 진단 도구           |\n| N5  | :15255, :15271                                                | `pgbuf_rv_dealloc_undo_compensate` 가 대입된 적 없는 지역 `VPID vpid` 를 debug TDE 로그로 출력한다 (`pgbuf_rv_dealloc_undo` :15209-15210에서 복사된 코드로 보이며 초기화 누락).                                                                                                                                                                                                                                                                                                                                                                      | debug 한정          |\n| N6  | :5851 + :1980, :13949                                         | `Aout_mutex` 가 초기화 실패 경로와 finalize에서 이중 `pthread_mutex_destroy` 되고(미정의 동작), quota 비활성 시 `malloc (0)` 반환값에 의존한다. D2(memset 크기 오류, :1626)와 같은 초기화/종료 위생 계열이다.                                                                                                                                                                                                                                                                                                                                        | D2의 범위 확장      |\n| N7  | :5497-5501                                                    | `pgbuf_is_temporary_volume` 이 `LOG_ISRESTARTED ()` 이전(복구 수행 중)에는 항상 false를 반환해, 복구 중 temp page가 WAL 면제·LRU 승격 억제·DWB 우회 등 temp 특수 처리를 전혀 받지 못한다. 의도된 보수 동작인지 판정이 필요하다.                                                                                                                                                                                                                                                                                                                      | 조사                |\n| N8  | :10828, :10833                                                | `show_status->num_pages_written`(:10828) 증가가 non-DWB 분기에만 있어 DWB(기본 활성) 경유 쓰기가 집계되지 않는다 --- `SHOW PAGE BUFFER STATUS` 의 `Num_pages_written`/`Pages_written_rate` 가 사실상 0. 반면 `PSTAT_PB_NUM_IOWRITES`(:10833)는 DWB 가 자체 집계(double_write_buffer.cpp:2339, :2115, :2150)해 page 당 2회로 과다 집계된다 --- 한 지표는 누락, 한 지표는 이중 (D6 통계 의미 정리와 같은 계열).                                                                                                                                        | D6의 범위 확장      |\n| N9  | :14446, :10585, :300, :771-774, :10772, page_buffer.h:320-326 | 죽은 코드·낡은 주석 --- `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, \\\"garbage LRU\\\" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa`(:10772)는 레이블(:10776)까지 닫는 중괄호만 건너뛰어 fall-through 와 도달 지점이 같아 무의미하다. `pgbuf_fix_without_validation_release` 는 헤더 선언과 release 전용 매크로(page_buffer.h:320-326)만 있고 정의·호출부가 소스 어디에도 없다. | 정리                |",
+      "sha256": "7c187d09b7e422421dfd87ddb8f26027f3451824cac43c0b0b77b8864bd78f73",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27193-C009",
+      "origin": "live-description",
+      "text": "EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 전후 동작, 호환성, 성능 기준을 확정한다.",
+      "sha256": "6cb486668baf582f9ccb730f1ea6b03f0d398b492986a5081b40122b1124c78d",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27193-C010",
+      "origin": "live-description",
+      "text": "CBRD-27193 page buffer EPIC\n    ├─ A. 정확성 (Correct Error) ── 5건: 기존 1건 확장 + 신규 4건\n    ├─ B. 운영성 (Improve) ──────── 4건: 전부 신규\n    └─ C. 조사/설계 (Survey) ────── 기존 3건 + 신규 1건 + 선택 3건",
+      "sha256": "8a8fff8b17561f4261f64774d6786bdbee82097457924992f7a2396161714521",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27193-C011",
+      "origin": "live-description",
+      "text": "| ID  | 제목 (안)                                                              | 이슈 번호     | 포함 결함 | 비고                                                                                                                                                                                                                                                                                                        |\n|-----|------------------------------------------------------------------------|---------------|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| A1  | \\[PGBUF\\] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다            | CBRD-27262    | D1 + N2   | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증.                                                                                                            |\n| A2  | \\[PGBUF\\] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다   | CBRD-27263    | N1        | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조.                                                                                                                                                                                                              |\n| A3  | \\[PGBUF\\] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | CBRD-27264    | D3 + N3   | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조.                                                                                                                                                                                                                                 |\n| A4  | \\[PGBUF\\] 초기화/종료 경로의 위생 결함을 일괄 수정한다                 | CBRD-27194    | D2 + N6   | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함.                                                                                                                                                                                |\n| A5  | \\[PGBUF\\] debug 빌드 전용 결함 2건을 수정한다                          | CBRD-27265    | N4 + N5   | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 --- 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |\n| B1  | \\[PGBUF\\] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다    | CBRD-27266    | D6 + N8   | DWB 사용 시 논리 page flush 와 물리 write 를 구분하고 `Num_pages_written` 미집계를 수정.                                                                                                                                                                                                                    |\n| B2  | \\[PGBUF\\] big private victim queue의 생산 경로를 복구하거나 제거한다   | CBRD-27267    | D4        | `big_private_lrus_with_victims` 의 생산/소비 지점 확정이 선행 작업.                                                                                                                                                                                                                                         |\n| B3  | \\[PGBUF\\] double_write_buffer_size에 크기 단위 문법을 지원한다         | CBRD-27268    | D5        | `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합.                                                                                                                                                                            |\n| B4  | \\[PGBUF\\] 죽은 코드와 낡은 주석을 정리한다                             | CBRD-27269    | N9 + D8   | 동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다.                                                                                                                                                                                                                                  |\n| C1  | \\[PGBUF\\] \\[Survey\\] SX page latch 도입 조사                           | CBRD-27196    | ---       | 설계 논점은 해당 이슈 본문에 이관 완료.                                                                                                                                                                                                                                                                     |\n| C2  | \\[PGBUF\\] \\[Survey\\] direct victim 대기 큐 고정값 4 검증               | CBRD-27211    | ---       | 유지.                                                                                                                                                                                                                                                                                                       |\n| C3  | \\[PGBUF\\] \\[Survey\\] pgbuf default / v2 병행 버전 도입                 | CBRD-27252    | ---       | 조사 본문 게시 완료 (선택 메커니즘 후보 비교, 마일스톤 M0\\~M8, 검증 전략).                                                                                                                                                                                                                                  |\n| C4  | \\[PGBUF\\] \\[Survey\\] 복구 중 temp 볼륨 판정의 영향을 조사한다          | CBRD-27270    | N7        | 복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 \\\"문제 없음\\\"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건.                                                                                                                                                                       |\n| C5  | \\[PGBUF\\] heap/B-tree scan prefetch와 비동기 read 경로 설계            | 선택 (미생성) | ---       | baseline과 목표 수치가 있는 조사로 시작, 이득 확인 시에만 구현 전환.                                                                                                                                                                                                                                        |\n| C6  | \\[PGBUF\\] buffer hash 크기를 data_buffer_size에 맞게 산정              | 선택 (미생성) | ---       | 현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정.                                                                                                                                                                                                                |\n| C7  | \\[PGBUF\\] dirty page index와 checkpoint 비용 개선 검토                 | 선택 (미생성) | ---       | 복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환.                                                                                                                                                                                                                  |",
+      "sha256": "d65e1db6389aee43b66983ad1287283c2047bc485c6c4f602e827c1e59656a88",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27193-C012",
+      "origin": "live-description",
+      "text": "> **요지**: 자식 이슈 13건이 전부 생성·본문 게시 완료됐다 (2026-08-18 기준, C5\\~C7 제외). 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.",
+      "sha256": "62984dcfa65280432020f6ce9865c20f62d12e3841ed2870cc13ee7b6c5c754e",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27193-C013",
+      "origin": "live-description",
+      "text": "즉시 고객 장애로 확인된 건은 없다. 결과의 심각성과 발화 확률을 분리해 평가하면 다음과 같고, 대부분이 수년\\~수개월 잠복해 있었다는 사실 자체가 평상시에는 발화하지 않는다는 방증이다.",
+      "sha256": "b5d91ceec88c8b3f5e2360554f9acd9e1d45ce59ee15d46fd505d3b20e10806e",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27193-C014",
+      "origin": "live-description",
+      "text": "| ID  | 심각도            | 근거 (결과 / 발화 조건)                                                                                                                                                                                                                                                                                                                    |\n|-----|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| A2  | **High**          | 유일한 데이터 정합성급 --- vacuum 보호 페이지의 조기 회수 가능. 단 절취(-1)는 타 스레드 보호 등록과 heap scan 이 같은 page 에서 겹쳐야 성립. lock-free fast path 가 2026-01 atomic latch 개편(CBRD-26425)에서 들어온 **최근 회귀** 이므로, 이 변경이 포함될 릴리스 이전에 수정하면 고객 노출 없이 끝난다 --- 릴리스 일정과 교차 확인 필요. |\n| A1  | **High (조건부)** | 걸리면 체크포인트 무한 대기(hang)로 결과는 심각하지만, 트리거가 TDE 암호화 실패 또는 DWB 내부 오류라는 희귀 오류 경로다. TDE 미사용 환경이면 절반은 발화 불가. DWB 비활성화 감지 시 non-DWB 재시도 분기(:10816-10822)는 정상 코드이며 이 결함과 무관하다.                                                                                  |\n| A3  | Medium            | victim 공급 백업 경로 무력화 --- 평시에는 flush 데몬 주 경로가 커버하므로 극한 버퍼 포화에서의 지연 문제. 정합성 훼손 없음.                                                                                                                                                                                                                |\n| B1  | Medium            | 운영 가시성 왜곡 --- 기본 설정에서 논리 flush 량을 맞게 답하는 지표가 없고, write 지표는 한쪽 누락·한쪽 이중 집계. 장애 분석·용량 산정의 판단 근거가 틀어진다.                                                                                                                                                                             |\n| B2  | Medium            | 대량 스캔 세션이 많은 부하에서 big queue 가 계속 비어 victim 탐색 효율 저하. 기능 오류 아님.                                                                                                                                                                                                                                               |\n| C4  | 조사 (미정)       | TDE 키 선택 축(temp key vs perm key)이 판정에 걸려 있어, 복구 중 temp 접근 존재 여부 확인 전에는 심각도를 정할 수 없다 --- 조사 결과에 따라 High 로 승격될 수 있는 유일한 항목.                                                                                                                                                            |\n| A4  | Low               | 잠재 --- 현재 코드 경로·초기화 순서에서는 발화하지 않고, 필드 추가나 초기화 실패 경로 변경 시 결함이 된다.                                                                                                                                                                                                                                 |\n| A5  | Low               | debug 빌드(CUBRID_DEBUG) 한정 --- 릴리스 바이너리 무영향.                                                                                                                                                                                                                                                                                  |\n| B3  | Low               | 사용성 --- 잘못된 값이면 기동 실패로 즉시 드러나므로 조용한 오동작이 없다.                                                                                                                                                                                                                                                                 |\n| B4  | Low               | 동작 무변경 정리.                                                                                                                                                                                                                                                                                                                          |",
+      "sha256": "eedfe06c88d8de1c7f2bf0882b28f4853b77e9ebf7674727338e96b3a07e2130",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27193-C015",
+      "origin": "live-description",
+      "text": "pgbuf_bcb_flush_with_wal()                                :10673\n      └ pgbuf_bcb_mark_is_flushing()                          :10741\n           ├ FLUSHING_TO_DISK 설정\n           └ DIRTY 해제\n           ├ tde_encrypt_data_page() 실패 ──────────────┐     :10755\n           └ dwb_set_data_on_next_slot() 실패 ─────────┤     :10767\n                                                        ★ 현재: 즉시 return\n                                                          누락: dirty/LSA/flag/waiter 복구",
+      "sha256": "e334902a794ca6893176419f7412c71da989be55817f159adfc808f98cc029c5",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27193-C016",
+      "origin": "live-description",
+      "text": "정상적인 write 실패 분기(:10848-10863)는 `pgbuf_bcb_mark_was_not_flushed`, `oldest_unflush_lsa` 복원, `pgbuf_wake_flush_waiters` 를 수행한다. 두 early return도 같은 정리 경로를 사용해야 분기별 상태 전이가 달라지지 않는다. 방치된 BCB는 victim 후보 마스크에 걸려 영구 회수 불가가 되고, 그 page에 대한 동기 flush 요청(`PGBUF_LATCH_FLUSH` 대기)은 타임아웃이 없어(:7050) 깨워줄 주체 없는 무한 대기가 된다.",
+      "sha256": "035cd11a837bdffb688778a9e98dce4ab03ba953c656a177d7126422b332aa5e",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27193-C017",
+      "origin": "live-description",
+      "text": "요청 page 의 보호 카운터는 `pgbuf_fix`(등록 :2425-2428, 해제 :2513-2517)와 `pgbuf_ordered_fix`(해제 :12702, :12850)가 나눠 맡는다. 진입 상황별 순증감:",
+      "sha256": "a42283b81fc0bd3ba611ac9d0a64d2ea68b8c50ce649ad8caf83972a760e21d6",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C018",
+      "origin": "live-description",
+      "text": "| 진입 상황                                                       | 등록   | 해제          | 순증감                                                    |\n|-----------------------------------------------------------------|--------|---------------|-----------------------------------------------------------|\n| 1차 시도(:12291-12296)가 lock-free fast path(:2311-2313)로 성공 | 건너뜀 | :2516         | **-1 결함** (타 스레드 보호 절취)                         |\n| 1차 시도가 일반 경로로 성공                                     | \\\\+1   | :2516         | 0                                                         |\n| 1차 시도가 조건부 latch 충돌로 실패 → 재정렬 후 재 fix 성공     | \\\\+1   | :12702/:12850 | 0 (의도된 handshake)                                      |\n| 1차 시도가 등록 도달 전 실패(read/BCB 오류) 후 재정렬 성공      | 없음   | :12702/:12850 | **-1 결함** (드묾, 0-방어 주석 :16232-16244 의 감수 범위) |\n| 재정렬 중 실패 → exit 정리(:12972-12998)                        | \\\\+1   | 없음          | **\\\\+1 결함** (page 가 vacuum 회수에서 영구 제외)         |",
+      "sha256": "b5997de0f3f19285a7611787f334ad11c6533e531902ade74673773b631be49a",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C019",
+      "origin": "live-description",
+      "text": "lock-free 행이 가장 위험하다: 스캔의 통상 상태(보유 page 없음)에서 latch 조건이 UNCONDITIONAL(:12280-12284)이 되어 일상적으로 도달하며, 0-방어(:16226-16250)는 자기 마커가 사라진 0 케이스만 방어하고 타 스레드(vacuum 등)가 등록한 카운트는 그대로 감소된다. `OLD_PAGE_PREVENT_DEALLOC` 의 외부 호출부 10곳(`heap_file.c` 9곳과 `locator_sr.c:12788`)은 전부 `pgbuf_ordered_fix` 경유이고 `pgbuf_fix` 직접 호출은 0건이다 (`heap_file.c:17478` 은 WRITE latch 라 fast path 대상 아님). 계측·재현 절차는 CBRD-27263 본문이 정본이다.",
+      "sha256": "c800c20ee72f618a90b485839214929f7ce33fa7f2bcbbf22f8e543ef6397fea",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C020",
+      "origin": "live-description",
+      "text": "| 항목                              | 처리 권장                                                                                                                             |\n|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|\n| AOUT 강제 비활성 D7               | 근본 원인은 기존 CBRD-20741 과 연결돼 있으므로 중복 이슈를 만들지 않는다. 낡은 \\\"LRU + Aout of 2Q\\\" 주석 정리는 B4 범위에서 처리한다. |\n| `pgbuf_peek_stats` 헤더 인자명 D8 | 외부 binary interface와 동작에 영향이 없는 stale parameter name이라 단독 JIRA를 만들지 않고 B4에 포함한다.                            |",
+      "sha256": "3a4451ba03a2de03c17ce9360c254cd6760b07c52b2c26b35eeea7b8c9cf0af6",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27193-C021",
+      "origin": "live-description",
+      "text": "-   [ ] 정확성 A1\\~A5는 각각 독립 자식 이슈로 만들고(A4는 CBRD-27194 범위 확장) 재현 또는 오류 주입 방법과 기대 상태를 적는다.",
+      "sha256": "fd5c056c364725163001acb038313b580e1e2eb2d72a3ab9b01d8e87fc09dacf",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C022",
+      "origin": "live-description",
+      "text": "-   [ ] 운영성 B1\\~B4는 사용자 동작·호환성 또는 대안 선택을 먼저 확정한 뒤 구현 범위를 정한다.",
+      "sha256": "7196757e8c7d94bff5257dd4fa891105f8e1408a209ebc0b02888196fb43d33b",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27193-C023",
+      "origin": "live-description",
+      "text": "-   [ ] C3(CBRD-27252)는 병행 구현의 마일스톤, 테스트 전략, 기존 코드와의 대조 기준을 본문으로 확정한다.",
+      "sha256": "42b887347011dada0bfbea955dc0f7efeed1ba832273e52e7ea526b215f4d6f0",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27193-C024",
+      "origin": "live-description",
+      "text": "-   [ ] C4\\~C7 조사 이슈는 baseline과 목표 수치를 명시하고, 이득이 확인된 경우에만 구현 이슈로 전환한다.",
+      "sha256": "35813217df8c38d7bb4696c65c77c8e7656caffc16cd97172fe641d6516b42ce",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27193-C025",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria를 충족하는 독립 자식 이슈와 담당 범위가 정해진다.",
+      "sha256": "6a5c97672f94ca68dc58d868d1a3e81ef4877d5423cf0c1cd041aaa1424b1778",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C026",
+      "origin": "live-description",
+      "text": "-   [ ] 선정된 자식 이슈의 검증 통과 기준과 회귀 성능 측정 항목이 정의된다.",
+      "sha256": "929f36a904150675cf146850bf893b5e2cbb64f84a2dc4d623cb7871122fecb0",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27193-C027",
+      "origin": "live-description",
+      "text": "-   [ ] 선정된 자식 이슈가 완료되고 EPIC 링크와 상태가 최신으로 유지된다.",
+      "sha256": "5683102105ec6827bbc55e453029111552ec6d2425e5207f4a74a894b04d2656",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27193-C028",
+      "origin": "live-description",
+      "text": "-   [ ] 통계 또는 설정 변경 시 운영 문서와 매뉴얼이 반영된다.",
+      "sha256": "5889dc043aa88b2e2de0445dd3482f3f18311f63af7d8a5b9413ce7392d3ad2b",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27193-C029",
+      "origin": "live-description",
+      "text": "수정 후보 3안 중 선택은 `TBD - 합의 미확인` 이다: ① 요청 page 보호의 등록·해제를 `pgbuf_ordered_fix` 가 전담하도록 이관(5가지 진입 상황이 한 함수에서 정리됨 --- 권장 후보), ② 현행 분담을 유지하되 깨지는 3곳을 개별로 메우고 두 함수 간 계약을 주석으로 명시, ③ fast path 진입 조건(:2311-2313)에서 `OLD_PAGE_PREVENT_DEALLOC` 제외(-1 결함 1행만 해결되므로 단독으로는 불충분). vacuum 의 보호 기간 요구와 겹치는 쪽이 없는지 확인 후 결정한다.",
+      "sha256": "e587e13217cf59301f350e77a770b2bd888b38042f0bb778187e4d2d9ac4c657",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27193-C030",
+      "origin": "live-description",
+      "text": "direct victim 긴급 배정 순회를 의도대로 복구할지, 현재 동작(미실행)에 맞춰 dead path를 제거할지는 `TBD - 합의 미확인` 이다. 저활동 direct-victim workload에서 대기 시간 분포를 비교해 결정한다.",
+      "sha256": "4a266610a435961ddf91352daba12bde2f11514ff51785fdb81c3c13935e60f1",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27193-C031",
+      "origin": "live-description",
+      "text": "queue 생산자를 복구할지, 현재 동작에 맞춰 queue와 2단계 탐색을 제거할지는 `TBD - 합의 미확인` 이다. over-quota 경쟁 workload로 두 안의 victim 탐색 비용과 shared LRU 침범량을 비교해야 한다.",
+      "sha256": "623ec2f2ae45bf877f694cdd380693d207711d1c16b7877467a4dda214973bfc",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27193-C032",
+      "origin": "live-description",
+      "text": "기존 `SHOW PAGE BUFFER STATUS` 컬럼을 바로 재정의할지, 새 컬럼을 추가하고 기존 컬럼을 단계적으로 폐기할지는 `TBD - 합의 미확인` 이다.",
+      "sha256": "84f5e5592f65ef45c1a8014a94820890413f3f118b3d2bd01ddc87445773de39",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27193-C033",
+      "origin": "live-description",
+      "text": "-   이전 분석 (commit `5cd4f860e` 기준):",
+      "sha256": "83633a86de23f707dd41daf8923f6f692a17a54e854af81d321baf2b62cf4a72",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C034",
+      "origin": "live-description",
+      "text": "-   [page buffer 결함 보고서](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/pgbuf-defects-report_5cd4f860e_claude.md)",
+      "sha256": "f73f3c1f39170782624d2a87bb3dd6ae1b0686b90d9aa6eebd71065a3753bdda",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C035",
+      "origin": "live-description",
+      "text": "-   [CUBRID 구조·fix/unfix 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-structs-fix.md)",
+      "sha256": "93089aaaea90f5de705daf435ebf144678a5039920d5a8e56ab26b3025267a18",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C036",
+      "origin": "live-description",
+      "text": "-   [CUBRID LRU·victim 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-lru-victim.md)",
+      "sha256": "adada26e2134183550c899eedcf639ff71ff00cc0822a5969ce4f5556ef08fc9",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C037",
+      "origin": "live-description",
+      "text": "-   [CUBRID flush·WAL·DWB 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-flush-wal-dwb.md)",
+      "sha256": "6749860d9183505bf682dd1e64039d4c6ace9601cf9ec4ec9661dbd61e08fecd",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C038",
+      "origin": "live-description",
+      "text": "-   [PostgreSQL buffer manager 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/postgres-bufmgr.md)",
+      "sha256": "a667afc8078e354696a86f0a49818a2c9a36fc6bf1db1067eb1ff989cb43fddf",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C039",
+      "origin": "live-description",
+      "text": "-   [InnoDB buffer pool 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/innodb-bufpool.md)",
+      "sha256": "49ef78f9e84788c81c28dc653062e2c4a259b1a5938409d43517b1d10e6c9fe0",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C040",
+      "origin": "live-description",
+      "text": "-   신규 분석 (commit `e6ed61e87` 기준) --- `page_buffer.c` 전량 정독 분석서 세트:",
+      "sha256": "92b1fedd2a3ae9489be0e89c94e14509d1b91a95d3f175027ed1f15149020e2a",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C041",
+      "origin": "live-description",
+      "text": "-   [00 총론 (아키텍처·불변식·결함 통합표)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/00-overview.md)",
+      "sha256": "02f0146e48d53b6e1b2b6a11a7ce692a8613c48bc92ed6063f57bd1ddca450aa",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C042",
+      "origin": "live-description",
+      "text": "-   [01 자료구조·초기화](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/01-structures.md)",
+      "sha256": "668a89daced198f14c7c300042518d72a5f07bc3ff1c156f16f0bf5b96c7335c",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C043",
+      "origin": "live-description",
+      "text": "-   [02 fix/unfix·래치](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/02-fix-unfix-latch.md)",
+      "sha256": "4578cc5aa3f3bfe77f465a16b5195af566bb94b84c49bf84386918eff656e2b9",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C044",
+      "origin": "live-description",
+      "text": "-   [03 LRU·victim·quota](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/03-lru-victim-quota.md)",
+      "sha256": "76a3a2ec3b0c4fdd85c5107bd096e6d1584cb9f19811d1dd4e3cc394d2b13230",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C045",
+      "origin": "live-description",
+      "text": "-   [04 flush·WAL·데몬](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/04-flush-wal-daemons.md)",
+      "sha256": "b203758c0bec7cec5f4f2524e49be77a4afeb60de5ea46efb5249c0d60666f49",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C046",
+      "origin": "live-description",
+      "text": "-   [05 ordered fix·dealloc](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/05-ordered-fix-dealloc.md)",
+      "sha256": "e47714f15a1195ae49cecca6568f45b87478ba11d403291632060eda15d7c423",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C047",
+      "origin": "live-description",
+      "text": "-   [06 관측성·부가기능](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/06-misc-observability.md)",
+      "sha256": "d4cb46456f088565e7a555162f2a1b4f6012a0b9d19390e669afbb983382160c",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C048",
+      "origin": "live-description",
+      "text": "-   [07 문답 워크북](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/07-qa-workbook.md)",
+      "sha256": "9d0f2eed93046664e8a0b32b2e55169c71aeb4084a32c16b1b9527aa231f971d",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C049",
+      "origin": "live-description",
+      "text": "-   [08 재구현 계획 (M0\\~M8)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/08-page-buffer-new-plan.md)",
+      "sha256": "8acdc89e3aa2b229edcbb4b8cf0bcc835a97ee09287ffa4fdb3c0b7d75b0c578",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C050",
+      "origin": "live-description",
+      "text": "-   [09 이슈 제안 원본](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/09-issue-proposals.md)",
+      "sha256": "170466f1de11d6abf47b8942509f45a11629bc42764e7569f66e5709c2ac8631",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C051",
+      "origin": "live-description",
+      "text": "-   기준 소스: [`page_buffer.c`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.c), [`page_buffer.h`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.h)",
+      "sha256": "d84344f0a26c674d69f68b66ca6fa4fa005f6937b3ab76e08ade9bd61dbc3ecb",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "**이슈 수행 목적**: 페이지 버퍼의 안정성·운영성·성능 개선을 하나의 EPIC에서 관리하되, 확인된 정확성 결함을 우선 처리하고 구조 변경은 측정 근거가 확보된 경우에만 진행한다.",
+      "sha256": "784e9ebcede3484dc1972d37b6dc1aa6acdf9f8195d50112a0ab7344eee13c15",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27193-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27193-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "| 구분 | 내용 |\n|------|------|\n| **AS-IS (현재 동작 / 배경)** | CBRD-27193에는 상세 범위와 자식 이슈가 없으며, 분석에서 확인된 정확성 결함·운영 지표 불일치·장기 성능 아이디어의 근거 수준과 우선순위도 구분돼 있지 않다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 자식 이슈로 선정한 확정 결함은 Correct Error로 먼저 완료하고, 구조 변경은 적용 지점·정합성·성능 기준을 합의한 조사 또는 설계 이슈를 거쳐 구현 여부를 결정한다. |\n| **영향** | 고객 장애 가능성 — 비정상적인 page flush 실패 뒤 메모리 page 상태와 대기 스레드가 복구되지 않는 결함이 미추적 상태라, 같은 frame을 재사용하지 못하거나 수정 내용이 디스크에 반영되지 않을 수 있다. |",
+      "sha256": "9e447d684bad07e6cd07bcd6897ce94baeaf1b791d84ee52da967cecec19bdae",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27193-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "**이슈 수행 방안**: CBRD-27193은 page buffer 자식 이슈를 묶어 완료까지 관리하는 EPIC으로 유지한다. 확정 결함, 운영성 개선, 구조 연구의 세 범주로 나누는 방안을 권장하며, 실제 자식 이슈 생성 범위와 순서는 `TBD - 합의 미확인` 으로 둔다.",
+      "sha256": "a46658039e33863d6f9696042f2c1064b6ed47459c04b60ca8d69c134ce98da5",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27193-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c`, `page_buffer.h`, `src/storage/double_write_buffer.cpp`, `src/base/system_parameter.c`, `src/base/perf_monitor.c`, `src/parser/show_meta.c` 가 후보 범위다. EPIC 자체는 디스크 형식과 외부 공개 interface를 바꾸지 않지만, 통계 이름·정의 변경은 모니터링 호환성을 별도로 검토해야 한다.",
+      "sha256": "ca4a4db60de50b2c0ee11b6e4651cbe47fc0844bc94ac843e033144f9f2c8894",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27193-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "기준 소스는 CUBRID commit `5cd4f860ec5dcdae732bd340728c0fe4aa709a4d` 다. `my-cubrid-docs/pgbuf-analysis` 의 CUBRID 구조·fix/unfix, page 교체, flush 팩트시트와 PostgreSQL 20devel, InnoDB 26.7 비교 자료를 함께 검토했다.",
+      "sha256": "ca0f744dc5dc4406e7646719aa91e0f51e1f673417abda4d60a1f9477a4f791a",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27193-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page를 메모리 frame에 캐시하고 fix, latch, 교체, flush를 관리하는 모듈)는 page lookup과 교체뿐 아니라 WAL(Write-Ahead Logging — data page보다 log를 먼저 기록하는 규칙), DWB(Double Write Buffer — 원래 위치에 쓰기 전 별도 파일에 page 사본을 기록하는 torn-write 보호 장치), TDE(Transparent Data Encryption — data page 암호화)를 연결한다. BCB(Buffer Control Block — frame에 올라온 page의 fix 수, latch, dirty 상태를 보관하는 제어 블록)는 `latch_mode`, `waiter_exists`, `fcnt` 를 하나의 64-bit atomic word에 저장한다. READ fix/unfix의 lock-free 경로와 일반 latch 대기열도 이 word를 함께 사용한다.",
+      "sha256": "784d4def2a748f860fa8a9ac014239a6d853d616fa455c38c4f277b1edef184a",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27193-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "LSA(Log Sequence Address — log에서 record의 위치를 나타내는 주소)는 WAL 순서를 판단하는 기준이다.",
+      "sha256": "bcc8800f4e10681c65e6c9a8ea41d1726b6c9a7df89da2bbff9848b6837f656f",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27193-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "LRU(Least Recently Used — 최근 사용 시점을 기준으로 page 교체 순서를 관리하는 목록)는 private/shared 영역으로 나뉜다. direct victim은 빈 frame을 찾지 못해 대기하는 스레드에 재사용 가능한 BCB를 직접 넘기는 방식이고, big private victim queue는 큰 private LRU에서 회수할 대상을 관리하는 목록이다.",
+      "sha256": "f044e8e688871c29afea0664db2a553fbfdfcc1fec7000f1a00ecbee9d2e37bf",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27193-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "이 문서의 SX(shared-exclusive)는 여러 READ와 공존하지만 다른 SX 및 WRITE와 충돌하는 page latch 후보를 뜻한다. AIO(Asynchronous I/O)는 요청 스레드가 각 read 완료를 동기적으로 기다리지 않는 입출력 방식이다. 두 용어 모두 확정된 CUBRID 스펙이 아니라 조사할 설계 후보다.",
+      "sha256": "b761435b9b03db5bcf279aff604ca490fc32a8c13401d389bb1671ba47f4e832",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27193-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 전후 동작, 호환성, 성능 기준을 확정한다.",
+      "sha256": "6cb486668baf582f9ccb730f1ea6b03f0d398b492986a5081b40122b1124c78d",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27193-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "```\nCBRD-27193 page buffer\n├─ 정확성: 상태 누수, 실행 불가 경로, 초기화 오류\n├─ 운영성: 통계 의미, 설정 문법, 사문화 경로 정리\n└─ 설계/성능: SX latch, scan prefetch/AIO, hash·dirty 추적 구조\n```",
+      "sha256": "48ef1466f3058ba0d1a8b3f8a80d103d1b290ed28b156978ebe94b3f505fc1d1",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27193-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "| 순위 | 권장 유형 | 후보 제목 | 근거와 권장 범위 |\n|------|-----------|-----------|------------------|\n| 1 | Correct Error | `[PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다` | 확정 결함 D1. 두 early return을 기존 write 실패 정리 경로로 합치고 TDE·DWB 오류를 각각 주입해 상태 복구를 검증한다. |\n| 2 | Correct Error | `[PGBUF] direct victim 유지보수 순회가 실행되지 않는 오류를 처리한다` | 확정 결함 D3. private/shared 순회 본문이 한 번도 실행되지 않는다. 의도대로 순회를 복구할지 dead path를 제거할지는 `TBD - 합의 미확인` 이며, 선택한 동작을 저활동 direct-victim workload로 검증한다. |\n| 3 | Correct Error | `[PGBUF] direct_victims 초기화 크기를 실제 타입과 일치시킨다` | 확정 결함 D2. 대상 표현식을 기준으로 전체 구조체를 초기화하고 초기화 중간 실패 정리 경로를 검사한다. |\n| 4 | Improve Function/Performance | `[PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다` | 확정된 의미 불일치 D6을 한 계약 이슈로 묶는다. DWB 사용 시 논리 page flush와 DWB/home 물리 write를 구분하고, `Num_data_page_flushed`, `Victim_candidate_pages`, `NEW_PAGE` hit의 정의를 이름·도움말·집계 지점에 맞춘다. 기존 모니터링 컬럼 호환성은 별도 결정이 필요하다. |\n| 5 | Improve Function/Performance | `[PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다` | 결함 D4의 현상은 확정됐지만 목표 설계는 미확정이다. `big_private_lrus_with_victims` 를 실제로 seed해 over-quota 세션이 큰 private LRU부터 회수하게 할지, 사용되지 않는 2단계를 제거할지 부하 시험으로 선택한다. |\n| 6 | Improve Function/Performance | `[PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다` | 실측 D5. `PRM_INTEGER` 라 `2M` 을 거부하면서 서버 시작까지 실패하지만 `data_buffer_size=16M` 은 허용한다. `0`, byte 정수, `K/M` 입력과 32 MiB 상한의 동작을 다른 size parameter와 맞춘다. |\n| 7 | Development Subject | `[PGBUF] SX page latch의 적용 지점과 성능 효과를 검증한다` | 구조 개선 후보. 바로 enum을 추가하지 않고 public fix latch와 내부 writeback 상태 중 어느 경계가 필요한지 먼저 정한다. plain page 경로의 copy 감소 가능성, TDE/DWB 출력 사본의 필요성, writer 대기, I/O 중 frame 안정성을 함께 측정한다. |\n| 8 | Development Subject | `[PGBUF] heap/B-tree scan prefetch와 비동기 read 경로를 설계한다` | 비교 분석에서 도출한 성능 후보. 다음 page identifier 기반 prefetch가 operating-system readahead보다 이득인 조건, private quota에 미치는 pollution, parallel scan과의 중복을 먼저 측정한다. 단일 `pgbuf_fix` 의 동기 동작은 유지하고 scan 단위 read stream을 별도 검토한다. |\n| 9 | Improve Function/Performance | `[PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정한다` | 구조 개선 후보. 현재 hash는 pool 크기와 무관하게 `1<<20` bucket과 mutex를 만들며 분석상 약 56 MiB 고정 비용이 든다. 작은 pool의 메모리·초기화 비용과 큰 pool의 chain 길이를 측정해 bucket 산정식을 정한다. |\n| 10 | Development Subject | `[PGBUF] dirty page index와 checkpoint 비용 개선 가능성을 검토한다` | 장기 조사 후보. 현재 flush/checkpoint가 LRU 또는 BCB를 스캔하는 구조와 dirty 전용 index를 비교한다. 복구 LSA 정확성, dirty 전환 비용, checkpoint latency의 세 축에서 이득이 확인될 때만 구현 이슈로 전환한다. |",
+      "sha256": "686234b80dffa490fe1e3e7780f90d90d10feffd2b5885a38ea2084f7aaa4dcf",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27193-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "```\npgbuf_bcb_flush_with_wal()\n  └ pgbuf_bcb_mark_is_flushing()\n       ├ FLUSHING_TO_DISK 설정\n       └ DIRTY 해제\n       ├ tde_encrypt_data_page() 실패 ──────────────┐\n       └ dwb_set_data_on_next_slot() 실패 ─────────┤\n                                                    ★ 현재: 즉시 return\n                                                      누락: dirty/LSA/flag/waiter 복구\n```",
+      "sha256": "26af86df1db5038ff7c025a2677162f0ce6995a708b4f005aa6a7a2acd997dd3",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27193-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "정상적인 write 실패 분기는 `pgbuf_bcb_mark_was_not_flushed`, `oldest_unflush_lsa` 복원, `pgbuf_wake_flush_waiters` 를 수행한다. 두 early return도 같은 정리 경로를 사용해야 분기별 상태 전이가 달라지지 않는다.",
+      "sha256": "cfea69c42edfb4bedd91475561742eca5e0da1e3a2cbee72fece58eb1c940ff3",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27193-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "여기서 권장 용어는 `SX` (shared-exclusive — 여러 READ와 공존하지만 SX끼리 및 WRITE와 충돌하는 page latch)다. `SIX` 는 보통 다중 단위 lock 계층의 shared-with-intention-exclusive를 뜻하므로, CUBRID page latch에 그대로 쓰면 transaction lock과 혼동하기 쉽다.",
+      "sha256": "9cd00f62aff1165d65f8b50695751734df0fa63dc8929274f42db8446154d80e",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27193-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "첫 결정은 SX를 `pgbuf_fix` 호출자가 요청하는 public content latch로 추가할지, flush/writeback 내부에서만 사용하는 배타 상태로 둘지다. public latch라면 모든 fix·unfix 및 대기 경로의 계약이 바뀌고, 내부 상태라면 실제 writeback 호출자와 보호 대상에 맞춘 더 좁은 변경이 가능하다.",
+      "sha256": "187b8ecf01d5bdc0f9fb6c45721f11f410c785b36386f980dd23a84266cb8a61",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "권장 compatibility matrix는 서로 다른 holder 사이의 설계 검증 출발점일 뿐 확정 스펙은 아니다. 같은 holder의 재귀 획득과 READ→SX→WRITE promotion은 별도 정책으로 정해야 한다.",
+      "sha256": "27c51f1b44d077e44d66cd0415165731ca028d0a7806313d98e34f8e4e88d6d5",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "| 보유 mode / 요청 mode | READ | SX | WRITE |\n|------------------------|------|----|-------|\n| READ | 허용 | 허용 | 대기 |\n| SX | 허용 | 대기 | 대기 |\n| WRITE | 대기 | 대기 | 대기 |",
+      "sha256": "2793aba9b16d8475541f36a2bffc990b6ea505a1eec482836cc41b05bdd930a2",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "현재 `PGBUF_LATCH_FLUSH` 는 page를 fix할 때 얻는 content latch가 아니라 flush 완료를 기다리는 queue mode다. 새 SX는 이를 이름만 바꾸는 작업이 아니다. public latch로 선택할 경우 최소한 다음 경로가 함께 바뀐다.",
+      "sha256": "0c185b1fbd955b7d9a8b0fee2e9a8460cefde91426563a9776fc08a9a261a310",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "```\nPGBUF_LATCH_MODE\n  ├ pgbuf_fix 입력 검증\n  ├ pgbuf_latch_bcb_upon_fix 호환성·재귀·promotion\n  ├ pgbuf_block_bcb 대기열 등록\n  ├ pgbuf_wakeup_reader_writer 묶음 wakeup\n  ├ lock-free READ fix/unfix 허용 조건\n  └ holder/perfmon latch mode 집계\n```",
+      "sha256": "3c71715699d26c06fec853f5ffe079cd812de1fe240ea52a18e9978650a0e7c8",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "현재 BCB의 64-bit atomic word는 aggregate `latch_mode`, `waiter_exists`, `fcnt` 만 보관하고 holder에는 획득 mode가 남지 않는다. READ와 SX가 공존하면 unfix 시 해제되는 holder의 mode, 남은 READ/SX 수, 마지막 SX 해제 뒤 READ로의 downgrade를 식별할 수 있어야 한다. 설계 이슈에서 다음 상태·소유권 규칙을 먼저 확정한다.",
+      "sha256": "2bc9f27c158ab5c32f6e059e5221a520b899b2a8f682c6826f182313eecada5c",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "1. SX를 public fix latch로 노출할지 writeback 내부 상태로 제한할지\n2. SX owner와 READ/SX별 획득 수를 어느 구조에 기록할지\n3. unfix, downgrade, recursion, READ→SX→WRITE promotion을 어떻게 처리할지\n4. page holder가 아닌 flusher가 SX를 소유할 수 있는지와 wakeup 순서를 어떻게 정의할지",
+      "sha256": "6e89b5e7d394c80df0482899fdfc5ba7c09226c0f06a289cab7ee703dc49dd21",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "`pgbuf_bcb_flush_with_wal` 은 현재 16 KiB page의 snapshot을 만든 뒤 BCB mutex를 풀고 WAL flush와 data write를 진행한다. 암호화하지 않는 plain page는 `memcpy` 로 snapshot을 만들지만, TDE 경로에는 암호화 출력 buffer가 필요하고 DWB도 별도 slot에 write image를 보관한다. 따라서 SX가 plain page의 frame 직접 쓰기를 가능하게 하더라도 모든 copy를 제거할 수 있다고 전제하면 안 된다. 또한 느린 I/O 동안 WRITE를 막는 비용이 생긴다. 다음 검증이 없는 \"SX mode 추가\"는 완료로 보지 않는다.",
+      "sha256": "ee288b4c02999f43c6c9ca59a687af9a5b0b5938264b4711e20d192830e2af53",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27193-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "1. 실제 CUBRID 호출자와 보호할 data 및 public/internal 경계\n2. 기존 snapshot-copy 대비 정합성 증명과 TDE/DWB별 data flow\n3. read-heavy, write-heavy, flush-pressure workload의 성능 비교",
+      "sha256": "6768a017183a94199ffe280b4d8e3ceed2c32d0e0965b5e8574c3c609e47c2cb",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "AOUT는 2Q 교체 정책에서 main queue에서 밀려난 page identifier의 이력을 보관하는 queue다.",
+      "sha256": "63c44e67c579eaf8e8c36f9c0b47a6637a4e95b345da8e458782858d245700fd",
+      "disposition_group": 35
+    },
+    {
+      "id": "CBRD-27193-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "| 항목 | 처리 권장 |\n|------|-----------|\n| AOUT 강제 비활성 D7 | 근본 원인은 기존 `CBRD-20741` 과 연결돼 있으므로 중복 이슈를 만들지 않는다. 설정을 0으로 덮어쓸 때 경고할지와 오래된 \"LRU + Aout of 2Q\" 주석을 고칠지는 해당 이슈 또는 문서 정리 범위에서 결정한다. |\n| `pgbuf_peek_stats` 헤더 인자명 D8 | 외부 binary interface와 동작에는 영향이 없는 stale parameter name이다. 인접한 page-buffer cleanup 변경에 포함하고 단독 JIRA는 만들지 않는다. |",
+      "sha256": "50515407986217bcff0b0cc56a7d30db7ae8a5a8fe61877ebaa4072b6f502c71",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27193-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "- [ ] 우선순위 협의에서 선정된 순위 1~3의 결함은 각각 독립 자식 이슈로 만들고 재현 또는 오류 주입 방법과 기대 상태를 적는다. 순위 2를 선정하면 순회 복구와 dead path 제거 중 선택한 목표 동작을 명시한다.\n- [ ] 순위 4~6은 사용자 동작·호환성 또는 대안 선택을 먼저 확정한 뒤 구현 범위를 정한다.\n- [ ] SX latch 자식 이슈는 public latch와 내부 상태 중 경계, owner와 mode별 count, release/downgrade, compatibility matrix, 실제 호출자, promotion/wakeup 정책, 성능 기준을 명시한다.\n- [ ] prefetch, hash sizing, dirty index 후보는 baseline과 목표 수치가 있는 조사 이슈로 시작하며, 이득이 확인된 경우에만 구현 이슈로 전환한다.\n- [ ] AOUT 항목은 `CBRD-20741` 의 범위와 상태를 확인해 중복 티켓을 만들지 않는다.",
+      "sha256": "ca56473db365ce1c5218f4ac33667deb104096ce5a0f32bb46d79ca8a951d5e5",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "- [ ] 위 Acceptance Criteria를 충족하는 독립 자식 이슈와 담당 범위가 정해진다.\n- [ ] 선정된 자식 이슈의 검증 통과 기준과 회귀 성능 측정 항목이 정의된다.\n- [ ] 선정된 자식 이슈가 완료되고 EPIC 링크와 상태가 최신으로 유지된다.\n- [ ] 통계 또는 설정 변경 시 운영 문서와 매뉴얼이 반영된다.",
+      "sha256": "e3925db9763984b468d6ceaf1ac59028a938d290fdb59781fe6590216491ddab",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "page latch 명칭을 `SX` 로 정할지 `SIX` semantics가 실제로 필요한지, 그리고 flush write path를 최초 대상으로 삼을지는 `TBD - 합의 미확인` 이다. 다중 단위 intent semantics가 없다면 `SX` 를 권장한다.",
+      "sha256": "8510392803aa3c0cead5fcb7baf101e1d58b2980c5757b6338a190d544d8660a",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27193-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "queue 생산자를 복구할지, 현재 동작에 맞춰 queue와 2단계 탐색을 제거할지는 `TBD - 합의 미확인` 이다. over-quota 경쟁 workload로 두 안의 victim 탐색 비용과 shared LRU 침범량을 비교해야 한다.",
+      "sha256": "623ec2f2ae45bf877f694cdd380693d207711d1c16b7877467a4dda214973bfc",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27193-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "기존 `SHOW PAGE BUFFER STATUS` 컬럼을 바로 재정의할지, 새 컬럼을 추가하고 기존 컬럼을 단계적으로 폐기할지는 `TBD - 합의 미확인` 이다.",
+      "sha256": "84f5e5592f65ef45c1a8014a94820890413f3f118b3d2bd01ddc87445773de39",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27193-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-improvement-roadmap_5cd4f86_codex.md",
+      "text": "- [page buffer 결함 보고서](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/pgbuf-defects-report_5cd4f860e_claude.md)\n- [CUBRID 구조·fix/unfix 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-structs-fix.md)\n- [CUBRID LRU·victim 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-lru-victim.md)\n- [CUBRID flush·WAL·DWB 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-flush-wal-dwb.md)\n- [PostgreSQL buffer manager 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/postgres-bufmgr.md)\n- [InnoDB buffer pool 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/innodb-bufpool.md)\n- 기준 소스: [`page_buffer.c`](https://github.com/CUBRID/cubrid/blob/5cd4f860ec5dcdae732bd340728c0fe4aa709a4d/src/storage/page_buffer.c), [`page_buffer.h`](https://github.com/CUBRID/cubrid/blob/5cd4f860ec5dcdae732bd340728c0fe4aa709a4d/src/storage/page_buffer.h)",
+      "sha256": "f277cb35b55d42391fac6d11eac0d398ee1cd6cf3d292ce9483e8de08c65dd3d",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: 페이지 버퍼의 안정성·운영성·성능 개선을 하나의 EPIC에서 관리하되, 확인된 정확성 결함을 우선 처리하고 구조 변경은 측정 근거가 확보된 경우에만 진행한다.",
+      "sha256": "784e9ebcede3484dc1972d37b6dc1aa6acdf9f8195d50112a0ab7344eee13c15",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27193-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27193-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | develop `e6ed61e87` 의 `page_buffer.c` 전량(17,535줄) 재분석 결과, 이전 분석(commit `5cd4f860e`)의 상위 결함 D1~D3가 그대로 잔존하고 신규 결함 9건(N1~N9)이 추가 확인됐다. 최고 심각도 N1은 요청 page 의 dealloc 보호 카운터 등록·해제가 `pgbuf_fix` 와 `pgbuf_ordered_fix` 에 흩어져 있어, 5가지 진입 상황 중 3가지에서 짝이 깨지는 비대칭이다 (lock-free 성공 시 -1, 오류 경로에서 -1 또는 +1 영구 잔존). |\n| **TO-BE (목표 상태 / 기대 동작)** | 정확성 결함 5건(A1~A5)이 각각 추적 가능한 자식 이슈로 수정되고, 운영성 개선과 구조 변경은 측정 근거가 확보된 뒤에만 착수된다. 자식 이슈 구성 상세는 Implementation 표. |\n| **영향** | 고객 장애 가능성 — N1은 vacuum 이 dealloc 을 막으려고 보호해 둔 페이지가 조기 회수될 수 있는 정합성 결함이고, D1(flush 실패 후 BCB 미복구)은 대기 스레드가 깨어나지 못하는 hang 으로 이어질 수 있다. |",
+      "sha256": "73d6a43b6d46b67230b05c325f71eb71d7ae45556bb1248a5cb20d58765e148e",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27193-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**: CBRD-27193은 page buffer 자식 이슈를 정확성·운영성·조사/설계 3범주로 묶어 완료까지 관리하는 EPIC으로 유지한다. 자식 이슈 구성은 아래 Implementation의 확정 표를 따르고, 목표 동작이 미결정인 항목(A3·B1·B2)은 Open Questions 에 정리했다. EPIC 본문은 이번 재분석 결과로 갱신한다.",
+      "sha256": "eabcb37becd80fd81b4c59ccbfd8a762f49f0083837e2dee59e3e45f94fe2156",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27193-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c`, `page_buffer.h`, `src/storage/double_write_buffer.cpp`, `src/base/system_parameter.c`, `src/base/perf_monitor.c`, `src/parser/show_meta.c` 가 후보 범위다. EPIC 자체는 디스크 형식과 외부 공개 API를 바꾸지 않지만, 통계 이름·정의 변경(B1)은 모니터링 호환성을 별도로 검토해야 한다. 아래 라인 번호는 별도 표기가 없으면 develop `e6ed61e87` 의 `page_buffer.c` 기준이다.",
+      "sha256": "c64524a149b0df972e293a2668e998a00513eb26650c09e896f64faf78ec3ed2",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27193-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "기준 소스는 CUBRID develop commit `e6ed61e87` 이다. 이전 분석(commit `5cd4f860e`, References 참조)의 결함 D1~D8을 재검증하고, 이번에는 `page_buffer.c` 를 자료구조·fix/unfix·LRU/victim·flush/WAL·ordered fix·부가기능의 6개 축으로 전량 정독해 신규 결함 N1~N9를 추가로 확인했다. D 번호는 이전 분석의 결함 ID다 — D1 flush 실패 복구 누락, D2 direct_victims memset 크기, D3 direct victim 유지보수 순회 미실행, D4 big private victim queue 생산 경로, D5 `double_write_buffer_size` 단위 문법, D6 통계 의미 불일치, D7 AOUT 강제 비활성, D8 `pgbuf_peek_stats` 헤더 인자명.",
+      "sha256": "fd68115b9e002753ab38cf9362ff3998a7be892b2875a93aa1105d8939cdbd28",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27193-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "`pgbuf` (page buffer manager — 디스크 page를 메모리 frame에 캐시하고 fix, latch, 교체, flush를 관리하는 모듈)는 page lookup과 교체뿐 아니라 WAL(Write-Ahead Logging — data page보다 log를 먼저 기록하는 규칙), DWB(Double Write Buffer — 원래 위치에 쓰기 전 별도 파일에 page 사본을 기록하는 torn-write 보호 장치), TDE(Transparent Data Encryption — data page 암호화)를 연결한다. BCB(Buffer Control Block — frame에 올라온 page의 fix 수, latch, dirty 상태를 보관하는 제어 블록)는 `latch_mode`, `waiter_exists`, `fcnt` 를 하나의 64-bit atomic word에 저장하며, READ fix/unfix의 lock-free 경로와 일반 latch 대기열이 이 word를 함께 사용한다. LRU(Least Recently Used — 최근 사용 시점 기준의 page 교체 목록)는 shared/private 영역으로 나뉘고, direct victim은 빈 frame을 찾지 못해 대기하는 스레드에 재사용 가능한 BCB를 직접 넘기는 방식이다. ordered fix(`pgbuf_ordered_fix` — heap 페이지 여러 장을 데드락 없이 잡도록 전역 순서에 따라 래치를 재배열하는 fix 변형)는 heap scan 의 표준 진입로다. AOUT는 2Q 교체 정책에서 main queue에서 밀려난 page identifier의 이력을 보관하는 queue다.",
+      "sha256": "1d27558539ab8a710a38c5c95d26e49a36933e3c8989f175c52fbf4afe051397",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27193-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| ID | 위치 (page_buffer.c) | 내용 | 분류 |\n|---|---|---|---|\n| N1 | :2425-2428, :2513-2517, :12702, :12850, :12972-12998 | 요청 page 의 dealloc 보호 카운터 등록·해제가 `pgbuf_fix` 와 `pgbuf_ordered_fix` 에 분담되어 있는데, 5가지 진입 상황 중 3가지에서 짝이 깨진다 — ① 1차 시도가 lock-free fast path 로 성공하면 등록 없이 해제(-1, 타 스레드 보호 절취), ② 등록 도달 전 실패 후 재정렬 성공이면 등록 없는 해제(-1, 드묾), ③ 재정렬 중 실패 시 exit 정리(:12972-12998)가 `has_dealloc_prevent_flag` 를 소비하지 않아 +1 영구 잔존(해당 page 는 vacuum 회수에서 영구 제외). 회계 표 전체는 아래 \"2순위(A2) 오류 흐름\" 절과 CBRD-27263 참조. | 정합성 (High) |\n| N2 | :8456-8461 | `pgbuf_claim_bcb_for_fix` 의 `dwb_read_page` 실패 경로가 인접 실패 경로와 달리 BCB mutex를 든 채 반환한다. release 빌드에서 해당 BCB 영구 잠금 + 같은 VPID 대기자의 무한 대기로 이어진다. | 가용성 (방어 경로) |\n| N3 | :9407, :9505-9508, :9577, :9586 | direct victim 긴급 배정 경로 2곳이 실행되지 않는다. `pgbuf_panic_assign_direct_victims_from_lru` 는 호출부(:9407)가 직전에 NULL이 된 `prev_BCB` 를 전달해 NULL 가드(:9505-9508)에서 즉시 0을 반환하고, `pgbuf_direct_victims_maintenance` 의 두 순회(:9577, :9586)는 초기 조건 모순으로 본문이 한 번도 돌지 않는다 (D3와 동일 계열). 관측 가능 증상: 이 경로들만 올리는 `Num_victim_assign_direct_panic` 통계가 어떤 부하에서도 0 이다. | 기존 D3의 범위 확장 |\n| N4 | :11349, :11369, :11321-11338, :3284, :11444, :11468 | `CUBRID_DEBUG` 정의 시 컴파일 오류 13건 실측 — atomic latch/flags 개편 이전 필드(`bufptr->fcnt` :11349, `bufptr->zone` :11369; :11361 은 신 접근자 공존), 2017년 volume-info 제거(b634bb442) 잔재 필드 참조 7건(:11321-11338), `pgbuf_unfix_all` 오타(:3284), const 위반 2건(:11444, :11468). finalize 진단 경로가 사장된 상태다. | 진단 도구 |\n| N5 | :15255, :15271 | `pgbuf_rv_dealloc_undo_compensate` 가 대입된 적 없는 지역 `VPID vpid` 를 debug TDE 로그로 출력한다 (`pgbuf_rv_dealloc_undo` :15209-15210에서 복사된 코드로 보이며 초기화 누락). | debug 한정 |\n| N6 | :5851 + :1980, :13949 | `Aout_mutex` 가 초기화 실패 경로와 finalize에서 이중 `pthread_mutex_destroy` 되고(미정의 동작), quota 비활성 시 `malloc (0)` 반환값에 의존한다. D2(memset 크기 오류, :1626)와 같은 초기화/종료 위생 계열이다. | D2의 범위 확장 |\n| N7 | :5497-5501 | `pgbuf_is_temporary_volume` 이 `LOG_ISRESTARTED ()` 이전(복구 수행 중)에는 항상 false를 반환해, 복구 중 temp page가 WAL 면제·LRU 승격 억제·DWB 우회 등 temp 특수 처리를 전혀 받지 못한다. 의도된 보수 동작인지 판정이 필요하다. | 조사 |\n| N8 | :10828, :10833 | `show_status->num_pages_written`(:10828) 증가가 non-DWB 분기에만 있어 DWB(기본 활성) 경유 쓰기가 집계되지 않는다 — `SHOW PAGE BUFFER STATUS` 의 `Num_pages_written`/`Pages_written_rate` 가 사실상 0. 반면 `PSTAT_PB_NUM_IOWRITES`(:10833)는 DWB 가 자체 집계(double_write_buffer.cpp:2339, :2115, :2150)해 page 당 2회로 과다 집계된다 — 한 지표는 누락, 한 지표는 이중 (D6 통계 의미 정리와 같은 계열). | D6의 범위 확장 |\n| N9 | :14446, :10585, :300, :771-774, :10772, page_buffer.h:320-326 | 죽은 코드·낡은 주석 — `monitor.victim_rich` 는 계산되지만 소비처가 없고(:9046-9053 주석은 이를 재시도 조건으로 설명해 코드와 불일치), `pgbuf_remove_private_from_aout_list` 는 호출부가 없으며, `UINT16MAX` 매크로 미사용, \"garbage LRU\" 구획 주석은 현재 코드에 없는 설명, `goto copy_unflushed_lsa`(:10772)는 레이블(:10776)까지 닫는 중괄호만 건너뛰어 fall-through 와 도달 지점이 같아 무의미하다. `pgbuf_fix_without_validation_release` 는 헤더 선언과 release 전용 매크로(page_buffer.h:320-326)만 있고 정의·호출부가 소스 어디에도 없다. | 정리 |",
+      "sha256": "0f0a045ca14fb59f545e26a8b07a3d495e7a2d76453b834d06c29a9f8c2a94d1",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27193-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "EPIC 자체의 실행 스펙 변경은 없다. 각 자식 이슈에서 변경 전후 동작, 호환성, 성능 기준을 확정한다.",
+      "sha256": "6cb486668baf582f9ccb730f1ea6b03f0d398b492986a5081b40122b1124c78d",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27193-C094",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "CBRD-27193 page buffer EPIC\n    ├─ A. 정확성 (Correct Error) ── 5건: 기존 1건 확장 + 신규 4건\n    ├─ B. 운영성 (Improve) ──────── 4건: 전부 신규\n    └─ C. 조사/설계 (Survey) ────── 기존 3건 + 신규 1건 + 선택 3건",
+      "sha256": "8a8fff8b17561f4261f64774d6786bdbee82097457924992f7a2396161714521",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27193-C095",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| ID | 제목 (안) | 이슈 번호 | 포함 결함 | 비고 |\n|---|---|---|---|---|\n| A1 | [PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다 | CBRD-27262 | D1 + N2 | 두 early return을 기존 write 실패 정리 경로(`pgbuf_bcb_mark_was_not_flushed` + LSA 복원 + waiter 기상)로 합치고, `dwb_read_page` 실패 시 mutex 해제·정리를 추가한다. TDE·DWB 오류 주입으로 검증. |\n| A2 | [PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다 | CBRD-27263 | N1 | heap scan + vacuum 동시 수행 시나리오로 검증. 수정 후보 3안 비교와 선택은 Open Questions 참조. |\n| A3 | [PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다 | CBRD-27264 | D3 + N3 | 저활동 direct-victim workload로 검증. 목표 동작 선택은 Open Questions 참조. |\n| A4 | [PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다 | CBRD-27194 | D2 + N6 | memset 대상 타입 크기 일치, mutex destroy 소유권을 finalize로 단일화, 개수 0이면 할당 생략. 초기화 중간 실패 경로 검사 포함. |\n| A5 | [PGBUF] debug 빌드 전용 결함 2건을 수정한다 | CBRD-27265 | N4 + N5 | `pgbuf_dump` 를 현행 접근자(`get_fcnt`, `pgbuf_bcb_get_zone`)로 재작성 — 함수가 `#if defined(CUBRID_DEBUG)`(:11219) 안에 있고 :11361 은 이미 신 접근자를 쓰는 점이 범위 판단 근거. 미초기화 VPID는 `rcv->pgptr` 에서 채운다. CUBRID_DEBUG 정의 빌드 통과로 검증. 영역이 달라 분리 요구 시 2건으로 나눈다. |\n| B1 | [PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다 | CBRD-27266 | D6 + N8 | DWB 사용 시 논리 page flush 와 물리 write 를 구분하고 `Num_pages_written` 미집계를 수정. |\n| B2 | [PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다 | CBRD-27267 | D4 | `big_private_lrus_with_victims` 의 생산/소비 지점 확정이 선행 작업. |\n| B3 | [PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다 | CBRD-27268 | D5 | `PRM_INTEGER` 라 `2M` 입력을 거부하며 서버 시작까지 실패. `0`, byte 정수, `K/M` 입력과 32 MiB 상한을 다른 size parameter와 정합. |\n| B4 | [PGBUF] 죽은 코드와 낡은 주석을 정리한다 | CBRD-27269 | N9 + D8 | 동작 무변경 정리라 A/B 결함 수정과 분리해 revert 단위를 깨끗하게 유지한다. |\n| C1 | [PGBUF] [Survey] SX page latch 도입 조사 | CBRD-27196 | — | 설계 논점은 해당 이슈 본문에 이관 완료. |\n| C2 | [PGBUF] [Survey] direct victim 대기 큐 고정값 4 검증 | CBRD-27211 | — | 유지. |\n| C3 | [PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 | CBRD-27252 | — | 조사 본문 게시 완료 (선택 메커니즘 후보 비교, 마일스톤 M0~M8, 검증 전략). |\n| C4 | [PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다 | CBRD-27270 | N7 | 복구 중 temp 접근 존재 여부와 non-temp 취급의 안전성 판정. 결론이 \"문제 없음\"이라도 코드 주석으로 근거를 남기는 것까지가 완료 조건. |\n| C5 | [PGBUF] heap/B-tree scan prefetch와 비동기 read 경로 설계 | 선택 (미생성) | — | baseline과 목표 수치가 있는 조사로 시작, 이득 확인 시에만 구현 전환. |\n| C6 | [PGBUF] buffer hash 크기를 data_buffer_size에 맞게 산정 | 선택 (미생성) | — | 현재 hash는 pool 크기와 무관하게 `1<<20` bucket으로 약 56 MiB 고정 비용. bucket 산정식 결정. |\n| C7 | [PGBUF] dirty page index와 checkpoint 비용 개선 검토 | 선택 (미생성) | — | 복구 LSA 정확성, dirty 전환 비용, checkpoint latency 세 축에서 이득 확인 시에만 구현 전환. |",
+      "sha256": "326abb405c344e06a1d42f25388ead7060d74ea9cc031e58be1a5e0f96c93c9a",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27193-C096",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "> **요지**: 자식 이슈 13건이 전부 생성·본문 게시 완료됐다 (2026-08-18 기준, C5~C7 제외). 착수 우선순위는 A1 → A2 → A3 → A4 → A5 순의 정확성 결함 우선이다.",
+      "sha256": "49c4f242a5bc168952bb1b17e0330bae8fd3f45dbb26f25c0aaa4456666042ac",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27193-C097",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "즉시 고객 장애로 확인된 건은 없다. 결과의 심각성과 발화 확률을 분리해 평가하면 다음과 같고, 대부분이 수년~수개월 잠복해 있었다는 사실 자체가 평상시에는 발화하지 않는다는 방증이다.",
+      "sha256": "73e34aea7ef94c46bb31c9afecee4b286273654d1bcba2fe987ab3ce759094e3",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27193-C098",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| ID | 심각도 | 근거 (결과 / 발화 조건) |\n|---|---|---|\n| A2 | **High** | 유일한 데이터 정합성급 — vacuum 보호 페이지의 조기 회수 가능. 단 절취(-1)는 타 스레드 보호 등록과 heap scan 이 같은 page 에서 겹쳐야 성립. lock-free fast path 가 2026-01 atomic latch 개편(CBRD-26425)에서 들어온 **최근 회귀**이므로, 이 변경이 포함될 릴리스 이전에 수정하면 고객 노출 없이 끝난다 — 릴리스 일정과 교차 확인 필요. |\n| A1 | **High (조건부)** | 걸리면 체크포인트 무한 대기(hang)로 결과는 심각하지만, 트리거가 TDE 암호화 실패 또는 DWB 내부 오류라는 희귀 오류 경로다. TDE 미사용 환경이면 절반은 발화 불가. DWB 비활성화 감지 시 non-DWB 재시도 분기(:10816-10822)는 정상 코드이며 이 결함과 무관하다. |\n| A3 | Medium | victim 공급 백업 경로 무력화 — 평시에는 flush 데몬 주 경로가 커버하므로 극한 버퍼 포화에서의 지연 문제. 정합성 훼손 없음. |\n| B1 | Medium | 운영 가시성 왜곡 — 기본 설정에서 논리 flush 량을 맞게 답하는 지표가 없고, write 지표는 한쪽 누락·한쪽 이중 집계. 장애 분석·용량 산정의 판단 근거가 틀어진다. |\n| B2 | Medium | 대량 스캔 세션이 많은 부하에서 big queue 가 계속 비어 victim 탐색 효율 저하. 기능 오류 아님. |\n| C4 | 조사 (미정) | TDE 키 선택 축(temp key vs perm key)이 판정에 걸려 있어, 복구 중 temp 접근 존재 여부 확인 전에는 심각도를 정할 수 없다 — 조사 결과에 따라 High 로 승격될 수 있는 유일한 항목. |\n| A4 | Low | 잠재 — 현재 코드 경로·초기화 순서에서는 발화하지 않고, 필드 추가나 초기화 실패 경로 변경 시 결함이 된다. |\n| A5 | Low | debug 빌드(CUBRID_DEBUG) 한정 — 릴리스 바이너리 무영향. |\n| B3 | Low | 사용성 — 잘못된 값이면 기동 실패로 즉시 드러나므로 조용한 오동작이 없다. |\n| B4 | Low | 동작 무변경 정리. |",
+      "sha256": "c8b665e5adb819c23f33f26eb68e0797c1889cf886de974f75e88e094c3a6680",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27193-C099",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "pgbuf_bcb_flush_with_wal()                                :10673\n      └ pgbuf_bcb_mark_is_flushing()                          :10741\n           ├ FLUSHING_TO_DISK 설정\n           └ DIRTY 해제\n           ├ tde_encrypt_data_page() 실패 ──────────────┐     :10755\n           └ dwb_set_data_on_next_slot() 실패 ─────────┤     :10767\n                                                        ★ 현재: 즉시 return\n                                                          누락: dirty/LSA/flag/waiter 복구",
+      "sha256": "e334902a794ca6893176419f7412c71da989be55817f159adfc808f98cc029c5",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27193-C100",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "정상적인 write 실패 분기(:10848-10863)는 `pgbuf_bcb_mark_was_not_flushed`, `oldest_unflush_lsa` 복원, `pgbuf_wake_flush_waiters` 를 수행한다. 두 early return도 같은 정리 경로를 사용해야 분기별 상태 전이가 달라지지 않는다. 방치된 BCB는 victim 후보 마스크에 걸려 영구 회수 불가가 되고, 그 page에 대한 동기 flush 요청(`PGBUF_LATCH_FLUSH` 대기)은 타임아웃이 없어(:7050) 깨워줄 주체 없는 무한 대기가 된다.",
+      "sha256": "035cd11a837bdffb688778a9e98dce4ab03ba953c656a177d7126422b332aa5e",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27193-C101",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "요청 page 의 보호 카운터는 `pgbuf_fix`(등록 :2425-2428, 해제 :2513-2517)와 `pgbuf_ordered_fix`(해제 :12702, :12850)가 나눠 맡는다. 진입 상황별 순증감:",
+      "sha256": "a42283b81fc0bd3ba611ac9d0a64d2ea68b8c50ce649ad8caf83972a760e21d6",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C102",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| 진입 상황 | 등록 | 해제 | 순증감 |\n|---|---|---|---|\n| 1차 시도(:12291-12296)가 lock-free fast path(:2311-2313)로 성공 | 건너뜀 | :2516 | **-1 결함** (타 스레드 보호 절취) |\n| 1차 시도가 일반 경로로 성공 | +1 | :2516 | 0 |\n| 1차 시도가 조건부 latch 충돌로 실패 → 재정렬 후 재 fix 성공 | +1 | :12702/:12850 | 0 (의도된 handshake) |\n| 1차 시도가 등록 도달 전 실패(read/BCB 오류) 후 재정렬 성공 | 없음 | :12702/:12850 | **-1 결함** (드묾, 0-방어 주석 :16232-16244 의 감수 범위) |\n| 재정렬 중 실패 → exit 정리(:12972-12998) | +1 | 없음 | **+1 결함** (page 가 vacuum 회수에서 영구 제외) |",
+      "sha256": "8f734ccdcf5e90411f3b5d4ed36e80625c49b0c1eb9679d2b6016dcaef7b6608",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C103",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "lock-free 행이 가장 위험하다: 스캔의 통상 상태(보유 page 없음)에서 latch 조건이 UNCONDITIONAL(:12280-12284)이 되어 일상적으로 도달하며, 0-방어(:16226-16250)는 자기 마커가 사라진 0 케이스만 방어하고 타 스레드(vacuum 등)가 등록한 카운트는 그대로 감소된다. `OLD_PAGE_PREVENT_DEALLOC` 의 외부 호출부 10곳(`heap_file.c` 9곳과 `locator_sr.c:12788`)은 전부 `pgbuf_ordered_fix` 경유이고 `pgbuf_fix` 직접 호출은 0건이다 (`heap_file.c:17478` 은 WRITE latch 라 fast path 대상 아님). 계측·재현 절차는 CBRD-27263 본문이 정본이다.",
+      "sha256": "c800c20ee72f618a90b485839214929f7ce33fa7f2bcbbf22f8e543ef6397fea",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27193-C104",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "| 항목 | 처리 권장 |\n|---|---|\n| AOUT 강제 비활성 D7 | 근본 원인은 기존 CBRD-20741 과 연결돼 있으므로 중복 이슈를 만들지 않는다. 낡은 \"LRU + Aout of 2Q\" 주석 정리는 B4 범위에서 처리한다. |\n| `pgbuf_peek_stats` 헤더 인자명 D8 | 외부 binary interface와 동작에 영향이 없는 stale parameter name이라 단독 JIRA를 만들지 않고 B4에 포함한다. |",
+      "sha256": "bd52778d6139c93d042cfe1d4756a37c69af978bc7d263e005dbb060b50d2fde",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27193-C105",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 정확성 A1~A5는 각각 독립 자식 이슈로 만들고(A4는 CBRD-27194 범위 확장) 재현 또는 오류 주입 방법과 기대 상태를 적는다.",
+      "sha256": "ece7262d096b98e1dac4898f20dadd670a7cbc48621684eadac844bfe015af30",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C106",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 운영성 B1~B4는 사용자 동작·호환성 또는 대안 선택을 먼저 확정한 뒤 구현 범위를 정한다.",
+      "sha256": "f1bf07e40375576918166e1d9ca46d755a080f9fe1e3d796823cc54c6000f814",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27193-C107",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] C3(CBRD-27252)는 병행 구현의 마일스톤, 테스트 전략, 기존 코드와의 대조 기준을 본문으로 확정한다.",
+      "sha256": "2be710f6c9f2410a23e25887923e9b0ac7d2d41c20df8afb448008362332cf33",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27193-C108",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] C4~C7 조사 이슈는 baseline과 목표 수치를 명시하고, 이득이 확인된 경우에만 구현 이슈로 전환한다.",
+      "sha256": "18ac3f31fc65d326fa1ca83714e346697448f258b022aad31542c78b11fbff53",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27193-C109",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria를 충족하는 독립 자식 이슈와 담당 범위가 정해진다.",
+      "sha256": "27954e5ca481546ce9c82b6ba0b82624a5e544a0873e07874e1de37c190b692c",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27193-C110",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 선정된 자식 이슈의 검증 통과 기준과 회귀 성능 측정 항목이 정의된다.",
+      "sha256": "6b133324efe34ee21c0d2ce9404be4231b02b8dda856307c9addc44531c62a82",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27193-C111",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 선정된 자식 이슈가 완료되고 EPIC 링크와 상태가 최신으로 유지된다.",
+      "sha256": "559681dd32e3c57c5ec57b39d90f4964403f5f54cdf1a9040d46d0a8ac0e0777",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27193-C112",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- [ ] 통계 또는 설정 변경 시 운영 문서와 매뉴얼이 반영된다.",
+      "sha256": "7ca9833edfc3e304342d8fcf43526fa50f789dfbeebd2e9af5ebb4c4f9bbef8e",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27193-C113",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "수정 후보 3안 중 선택은 `TBD - 합의 미확인` 이다: ① 요청 page 보호의 등록·해제를 `pgbuf_ordered_fix` 가 전담하도록 이관(5가지 진입 상황이 한 함수에서 정리됨 — 권장 후보), ② 현행 분담을 유지하되 깨지는 3곳을 개별로 메우고 두 함수 간 계약을 주석으로 명시, ③ fast path 진입 조건(:2311-2313)에서 `OLD_PAGE_PREVENT_DEALLOC` 제외(-1 결함 1행만 해결되므로 단독으로는 불충분). vacuum 의 보호 기간 요구와 겹치는 쪽이 없는지 확인 후 결정한다.",
+      "sha256": "81bf3ebb652cfa1435c9c52d1df41c237f5640a7b84b543e80a744b150f1ca39",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27193-C114",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "direct victim 긴급 배정 순회를 의도대로 복구할지, 현재 동작(미실행)에 맞춰 dead path를 제거할지는 `TBD - 합의 미확인` 이다. 저활동 direct-victim workload에서 대기 시간 분포를 비교해 결정한다.",
+      "sha256": "4a266610a435961ddf91352daba12bde2f11514ff51785fdb81c3c13935e60f1",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27193-C115",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "queue 생산자를 복구할지, 현재 동작에 맞춰 queue와 2단계 탐색을 제거할지는 `TBD - 합의 미확인` 이다. over-quota 경쟁 workload로 두 안의 victim 탐색 비용과 shared LRU 침범량을 비교해야 한다.",
+      "sha256": "623ec2f2ae45bf877f694cdd380693d207711d1c16b7877467a4dda214973bfc",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27193-C116",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "기존 `SHOW PAGE BUFFER STATUS` 컬럼을 바로 재정의할지, 새 컬럼을 추가하고 기존 컬럼을 단계적으로 폐기할지는 `TBD - 합의 미확인` 이다.",
+      "sha256": "84f5e5592f65ef45c1a8014a94820890413f3f118b3d2bd01ddc87445773de39",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27193-C117",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27193-page-buffer-epic_e6ed61e_claude.md",
+      "text": "- 이전 분석 (commit `5cd4f860e` 기준):\n  - [page buffer 결함 보고서](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/pgbuf-defects-report_5cd4f860e_claude.md)\n  - [CUBRID 구조·fix/unfix 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-structs-fix.md)\n  - [CUBRID LRU·victim 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-lru-victim.md)\n  - [CUBRID flush·WAL·DWB 분석](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/cubrid-flush-wal-dwb.md)\n  - [PostgreSQL buffer manager 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/postgres-bufmgr.md)\n  - [InnoDB buffer pool 비교](https://github.com/vimkim/my-cubrid-docs/blob/343ecc9c8e246cb15c19de0cb6c34117950955e6/pgbuf-analysis/research/innodb-bufpool.md)\n- 신규 분석 (commit `e6ed61e87` 기준) — `page_buffer.c` 전량 정독 분석서 세트:\n  - [00 총론 (아키텍처·불변식·결함 통합표)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/00-overview.md)\n  - [01 자료구조·초기화](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/01-structures.md)\n  - [02 fix/unfix·래치](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/02-fix-unfix-latch.md)\n  - [03 LRU·victim·quota](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/03-lru-victim-quota.md)\n  - [04 flush·WAL·데몬](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/04-flush-wal-daemons.md)\n  - [05 ordered fix·dealloc](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/05-ordered-fix-dealloc.md)\n  - [06 관측성·부가기능](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/06-misc-observability.md)\n  - [07 문답 워크북](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/07-qa-workbook.md)\n  - [08 재구현 계획 (M0~M8)](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/08-page-buffer-new-plan.md)\n  - [09 이슈 제안 원본](https://github.com/vimkim/my-cubrid-docs/blob/a5ab19a15ca6b3eb41e2112dae6fc3da4f2b0dd7/pgbuf-analysis/e6ed61e_claude/09-issue-proposals.md)\n- 기준 소스: [`page_buffer.c`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.c), [`page_buffer.h`](https://github.com/CUBRID/cubrid/blob/e6ed61e87d68baf1c38cee83ddd3bb4b2fa71b2e/src/storage/page_buffer.h)",
+      "sha256": "5801895bd8e5651e0f4c9b2d7c34506c0bf295947967c771163386103f542f86",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27193-C118",
+      "origin": "comment:4775680",
+      "text": "개선 시\r\nhttp://jira.cubrid.org/browse/CBRD-27188\r\nhttp://jira.cubrid.org/browse/CBRD-27191\r\n등 TPC-H 성능도 함께 고려",
+      "sha256": "22cb85fb3c1d05b158ab310d85b56d1f492879ee7b8cafcf182ab1ad712eb75b",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27193-C119",
+      "origin": "comment:4775935",
+      "text": "버퍼매니저 유닛테스트 프래임워크 개발 고려\r\n버퍼매니저에 부하를 많이 발생하고 병목이 되는 지점 + 시나리오 찾아서 성능 개선 이슈",
+      "sha256": "c71ce87bfeb0ea3da40f0c12b96723eb1b31060559b4685367b6cb35eb75bd43",
+      "disposition_group": 37
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        52,
+        85
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated umbrella purpose is preserved. The rewrite removes a preselected correctness order and a blanket measurement prerequisite for every operational or structural task; triage sets priority and each task uses proportionate evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6495",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://jira.cubrid.org/browse/CBRD-27423"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        53,
+        86
+      ],
+      "disposition": "non-substantive",
+      "reason": "These are repeated opening-field labels with no substantive claim. The current four-field format supplies the reason and impact directly.",
+      "evidence": []
+    },
+    {
+      "ids": [
+        3,
+        87,
+        54
+      ],
+      "disposition": "corrected",
+      "reason": "The live and local historical AS-IS/TO-BE tables are replaced with the current pinned baseline and nineteen children. Earlier no-children/only-five-bugs descriptions are obsolete. Source paths and attributed execution reports justify work, but highest severity, exact negative-count cases, customer corruption, global implementation gates and a preapproved outcome are not established.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6495",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L56-L92",
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        55,
+        88
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated management proposals become coordination of all nineteen direct children and their explicit dispositions. A historical confirmed configuration table is not treated as design approval; the implementation remains ANALYSIS except for independently recorded capability decisions.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://github.com/vimkim/volmap/blob/c9ed4ccaae4310fad380384a5808ee1e14e8d14c/.scratch/pgbuf-overlay/issues/04-define-gating-matrix.md",
+        "https://github.com/vimkim/volmap/blob/c9ed4ccaae4310fad380384a5808ee1e14e8d14c/.scratch/pgbuf-overlay/issues/05-define-wire-contract-v1.md"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        56,
+        89
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated candidate file lists are reduced to subsystem and child responsibility boundaries. Monitoring/configuration/consumer compatibility remains a requirement. The report does not guarantee that every eventual child change preserves public API or disk format before analysis.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://jira.cubrid.org/browse/CBRD-27252",
+        "https://jira.cubrid.org/browse/CBRD-27268",
+        "https://jira.cubrid.org/browse/CBRD-27398"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        57,
+        90
+      ],
+      "disposition": "corrected",
+      "reason": "The old whole-file audit and D1-D8/N1-N9 discovery narrative is historical context, not a new exhaustive current audit. Current behavior is pinned to f6cac312310f39f46711693da157a08f0e725693, and old engine/document/build identities remain distinct in their child evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L56-L92",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        58,
+        91
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated subsystem explanations are retained in a shorter glossary. BCB slot state, VPID, usage accounting, page latch, transaction lock, dirty/LSA and flush are separated. Ordered fix is not advertised as a universal deadlock proof, and detailed AOUT/atomic-layout facts remain in their owning child analyses.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        92
+      ],
+      "disposition": "corrected",
+      "reason": "The duplicate N1-N9 tables are replaced by current child outcomes. N1 maps to request-owned protection (27263), not proved corruption or permanent exclusion; N2 is a defensive DWB-read branch without normal nonzero return; N3 is unreachable backup supply (27264), not failure of all direct victims; N4/N5 map to separately gated diagnostic defects (27265), not ordinary Debug failure or log-only impact guarantee; N6 maps to partial-failure lifetime review (27194); N7 requires constructor/reuse/mount/LSA-marker reachability analysis (27270); N8 is corrected for nine deprecated NULL SHOW columns and page-unit DWB/origin aggregation (27266); N9 remains item-by-item behavior-preserving cleanup (27269). Historical compiler counts are not current rerun results.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8430-L8517",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2085-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_global.c#L49-L64",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L1039-L1049",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L2452-L2484",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L4942-L5006",
+        "https://jira.cubrid.org/browse/CBRD-27194",
+        "https://jira.cubrid.org/browse/CBRD-27265",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        62,
+        93
+      ],
+      "disposition": "retained",
+      "reason": "The repeated requirement to decide each child behavior and compatibility in that child is preserved. The parent specifies needed outcomes and coordination rather than an engine-wide runtime design.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://jira.cubrid.org/browse/CBRD-27252"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        63,
+        94
+      ],
+      "disposition": "corrected",
+      "reason": "Historical tree diagrams are replaced by the verified nineteen direct children and no deeper descendants. Correctness, operations and investigations remain concerns, but the old optional prefetch/hash/dirty-index candidates are not silently added as children or mandatory product work.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        64,
+        95
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated historical roadmap tables are replaced by the full nineteen-child scope/outcome table. Existing requested capabilities are preserved; exact fixes, ordering, severity, obligatory learning milestones and optional uncreated work are not approved. Queue producers, SHOW deprecation, debug gating, recovery lifecycle and evidence limits follow current primary context. Restore/remove choices remain in the owning analyses; 27264 must share one repair/result with existing duplicate 24029.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6495",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16384-L16469",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30",
+        "https://jira.cubrid.org/browse/CBRD-24029",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        96
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated thirteen-created-children statement is obsolete. Current discovery has nineteen direct children; creation is not a remaining acceptance requirement. The historical A1-through-A5 launch order is not a current priority or owner commitment.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        97
+      ],
+      "disposition": "removed",
+      "reason": "The repeated inference that long latency in source proves low occurrence probability is unsupported. No current customer or release exposure is established by this writing task; no global absence-of-customer-incidents claim is substituted.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L56-L92",
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561",
+        "https://jira.cubrid.org/browse/CBRD-27263"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        98
+      ],
+      "disposition": "corrected",
+      "reason": "The duplicated risk ranking is replaced by conditions, observations and unknowns in each child. There is no unique-data-integrity ranking, zero-customer-exposure promise, universal data-safety or zero-effect guarantee, fixed rare-error probability, always-empty big queue, or stale SHOW missing-versus-double-counting premise. Current diagnostic/recovery and release scope must be assessed rather than inherited from historical labels.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6495",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2085-L2352",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16384-L16469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/log_global.c#L49-L64",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L1039-L1049",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/disk_manager.c#L2452-L2484",
+        "https://jira.cubrid.org/browse/CBRD-27356?focusedCommentId=4776561&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4776561"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        65,
+        99
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated flush diagram is summarized as phase-aware preparation-error recovery. First-entry preparation errors occur before LSA save/reset; DWB-disabled retries may re-enter after that transition. The parent does not prescribe unconditional LSA restoration or conflate the prepare-state defect with a permanently held BCB mutex.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://jira.cubrid.org/browse/CBRD-27262"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        66,
+        100
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated flush consequences and prescribed common-cleanup implementation become required state/progress outcomes. Later dirtying, synchronous-flush selection and interruption affect waiting; current infinite hang, checkpoint failure, shutdown failure and lost data are not independently reproduced. The child owns reachable production errors versus injected/defensive failures.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://jira.cubrid.org/browse/CBRD-27262"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        18,
+        19,
+        101,
+        102,
+        103
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated protection-count narrative and five-case table are reduced to the 27263 ownership result. A registration-free release need not decrement when zero. Existing ordered handoff can be legitimate, early exits require analysis, and a BCB reset/replacement limits retention. Historical pre-CAS/VPID aggregates do not prove exact successful foreign-owner decrements, a negative live BCB count or permanent page exclusion. Current source and runtime scheduling remain separate.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://jira.cubrid.org/browse/CBRD-27263"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        78,
+        104
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated nonseparate-issue recommendations remain cleanup boundaries through 27269. AOUT activation/removal policy is not absorbed into stale-comment cleanup, and header parameter naming is not claimed to swap current runtime output. Supporting CBRD-20741 is not a discovered child or a second new task.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27269",
+        "https://jira.cubrid.org/browse/CBRD-20741"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        25,
+        79,
+        80,
+        105,
+        109
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated historical create-children and completion checklists are replaced by outcomes and explicit dispositions for all nineteen existing children. Necessary regression, comparison and compatibility evidence remain proportional to selected work. New mandatory SX design, every optional proposal, universal benchmark targets and global gates are removed.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://jira.cubrid.org/browse/CBRD-27196",
+        "https://jira.cubrid.org/browse/CBRD-27423"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        106
+      ],
+      "disposition": "retained",
+      "reason": "Repeated operational acceptance intent is preserved: define needed user behavior, compatibility and policy choices before implementing changes. Existing capability requests such as DWB size suffixes remain requirements rather than generic surveys.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27266",
+        "https://jira.cubrid.org/browse/CBRD-27267",
+        "https://jira.cubrid.org/browse/CBRD-27268"
+      ]
+    },
+    {
+      "ids": [
+        23,
+        107
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated default/v2 comparison-strategy requirement is preserved, including selection, comparison, rollback and validation stages. The historical M0-M8 plan is a learning proposal whose stated non-goals include engine integration and performance equivalence; it is not the mandatory product milestone plan.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30",
+        "https://jira.cubrid.org/browse/CBRD-27252"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        108
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated survey criteria are changed to bounded questions and explicit adoption/keep/no-defect/defer/follow-up decisions. Not every survey needs a preinvented numeric target or implementation. Historical optional C5-C7 ideas are retained as possible supporting material, not current mandatory descendants.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30",
+        "https://jira.cubrid.org/browse/CBRD-27196",
+        "https://jira.cubrid.org/browse/CBRD-27270",
+        "https://jira.cubrid.org/browse/CBRD-27316"
+      ]
+    },
+    {
+      "ids": [
+        26,
+        110
+      ],
+      "disposition": "retained",
+      "reason": "Repeated selected-child validation intent remains: observable acceptance and relevant regression/performance checks must be defined and evidenced for the change actually selected. No unsupported universal threshold is inherited.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27423",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        111
+      ],
+      "disposition": "corrected",
+      "reason": "The repeated parent-completion criterion is expanded from selected children to accounting for all nineteen children. Completion distinguishes fixes/features, investigation results, duplication, accepted deferral and scoped transfer; transferring or closing a survey is not falsely reported as product implementation.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193",
+        "https://jira.cubrid.org/browse/CBRD-24029",
+        "https://jira.cubrid.org/browse/CBRD-27423"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        112
+      ],
+      "disposition": "retained",
+      "reason": "The repeated conditional requirement to update operational/user documentation for statistics or configuration changes is preserved in acceptance and definition of done, with affected consumer compatibility.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27266",
+        "https://jira.cubrid.org/browse/CBRD-27268"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        113
+      ],
+      "disposition": "removed",
+      "reason": "Detailed repeated 27263 patch candidates and a preferred ownership move are omitted from the parent. The owning child preserves an analysis comparison and must prove protection timing, ownership and error cleanup. No unreviewed parent recommendation chooses its algorithm.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2266-L2469",
+        "https://jira.cubrid.org/browse/CBRD-27263"
+      ]
+    },
+    {
+      "ids": [
+        30,
+        114
+      ],
+      "disposition": "corrected",
+      "reason": "The open restore-versus-remove decision is preserved but is tied to low-activity progress evidence, valid alternatives and the existing duplicate CBRD-24029 single-repair/result responsibility. Deleting an unreachable path alone is not proof of the required outcome.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://jira.cubrid.org/browse/CBRD-27264",
+        "https://jira.cubrid.org/browse/CBRD-24029"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        82,
+        115
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated big-queue choices are reframed as a bounded policy investigation. A producer exists after ordinary-private consumption, and seeded entries can be consumed/reproduced by restricted callers. Restore/remove is therefore not repair/removal of an always-empty dead queue; effects and compatibility require evidence.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16384-L16469",
+        "https://jira.cubrid.org/browse/CBRD-27267"
+      ]
+    },
+    {
+      "ids": [
+        32,
+        83,
+        116
+      ],
+      "disposition": "corrected",
+      "reason": "Repeated SHOW migration questions now start from the merged nine-column NULL contract. Metric definition, collection gates, page units, logical operations and physical/device I/O must be separated; new output or redefinition requires a consumer/compatibility decision.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L17422-L17488",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2085-L2352",
+        "https://jira.cubrid.org/browse/CBRD-27266"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        84,
+        117
+      ],
+      "disposition": "non-substantive",
+      "reason": "These units are reference-only labels/lists, including duplicate historical bibliography variants, not additional technical claims. The parent uses focused immutable current primary links and attributed historical links. Full child evidence retains its original revisions; no old reference is silently presented as a current rerun.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L56-L92",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30"
+      ]
+    },
+    {
+      "ids": [
+        59
+      ],
+      "disposition": "retained",
+      "reason": "The LSA glossary is preserved: it identifies a position in the log. Dirty/LSA/flush are kept distinct from transaction commit or durable device completion.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866"
+      ]
+    },
+    {
+      "ids": [
+        60
+      ],
+      "disposition": "corrected",
+      "reason": "The LRU/direct-victim background is retained, with the big-private queue correctly described as carrying LRU indices rather than pages. Candidate discovery/supply and waiting-thread recipient selection remain distinct.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9561-L9602",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16384-L16469",
+        "https://jira.cubrid.org/browse/CBRD-27211"
+      ]
+    },
+    {
+      "ids": [
+        61,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "SX remains an unadopted page-latch survey distinct from transaction lock. The current B-tree split/merge question replaces a flush-first rationale. AIO terminology is not converted into an approved capability; it remains historical supporting material outside the nineteen-child mandatory scope.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27196",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/e6ed61e_claude/08-page-buffer-new-plan.md#L1-L30"
+      ]
+    },
+    {
+      "ids": [
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        76,
+        81
+      ],
+      "disposition": "removed",
+      "reason": "These local-only detailed SX candidate boundaries, matrix, ownership representation, public/internal choice, promotion/wakeup checklist and naming recommendation are not copied as parent design. CBRD-27196 owns applicability and tradeoffs. Current FLUSH block-mode semantics remain primary source context; no matrix or flush-first adoption is approved by the parent.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27196",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L189-L203",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L439-L522",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866"
+      ]
+    },
+    {
+      "ids": [
+        75
+      ],
+      "disposition": "corrected",
+      "reason": "The snapshot/TDE/DWB observation is retained only as the constraint that existing snapshot flush does not require SX for correctness. Copy-elimination or throughput benefits are not established, and slow-I/O writer tradeoffs belong in the selected child comparison rather than a universal parent acceptance requirement.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L10747-L10866",
+        "https://jira.cubrid.org/browse/CBRD-27196"
+      ]
+    },
+    {
+      "ids": [
+        77
+      ],
+      "disposition": "retained",
+      "reason": "AOUT is retained as replaced-page identifier history in the initialization boundary. Its reactivation is not made an implicit scope extension.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27194",
+        "https://jira.cubrid.org/browse/CBRD-27269"
+      ]
+    },
+    {
+      "ids": [
+        118
+      ],
+      "disposition": "retained",
+      "reason": "Actual comment 4775680 is preserved with author/date and the CBRD-27188/27191 TPC-H consideration request. It is not treated as a measured regression cause, result or fixed benchmark gate.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193?focusedCommentId=4775680&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4775680",
+        "https://jira.cubrid.org/browse/CBRD-27423"
+      ]
+    },
+    {
+      "ids": [
+        119
+      ],
+      "disposition": "retained",
+      "reason": "Actual comment 4775935 is preserved with author/date and the unit-test-framework plus bottleneck-workload consideration request. It is not treated as framework adoption or a prerequisite for every child.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27193?focusedCommentId=4775935&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel#comment-4775935",
+        "https://jira.cubrid.org/browse/CBRD-27423"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

@@ -1,0 +1,852 @@
+{
+  "root": "CBRD-27193",
+  "source_commit": "f6cac312310f39f46711693da157a08f0e725693",
+  "source_repository": "https://github.com/CUBRID/cubrid",
+  "source_checkout": "/home/vimkim/gh/cb/develop",
+  "artifact_checkout": "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite",
+  "branch": "CBRD-27193-rewrite",
+  "destination_checkout": "/home/vimkim/gh/my-cubrid-jira",
+  "destination_branch": "main",
+  "starting_commit": "da39b0f3ee0bc1c55d2063588c3969a808a95687",
+  "work_tracker": 466,
+  "snapshot_directory": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021",
+  "hierarchy_queries": [
+    {
+      "jql": "parent in (CBRD-27193,CBRD-27194,CBRD-27196,CBRD-27211,CBRD-27252,CBRD-27262,CBRD-27263,CBRD-27264,CBRD-27265,CBRD-27266,CBRD-27267,CBRD-27268,CBRD-27269,CBRD-27270,CBRD-27316,CBRD-27356,CBRD-27370,CBRD-27398,CBRD-27423,CBRD-27630) ORDER BY key ASC",
+      "startAt": 0,
+      "total": 19,
+      "keys": [
+        "CBRD-27194",
+        "CBRD-27196",
+        "CBRD-27211",
+        "CBRD-27252",
+        "CBRD-27262",
+        "CBRD-27263",
+        "CBRD-27264",
+        "CBRD-27265",
+        "CBRD-27266",
+        "CBRD-27267",
+        "CBRD-27268",
+        "CBRD-27269",
+        "CBRD-27270",
+        "CBRD-27316",
+        "CBRD-27356",
+        "CBRD-27370",
+        "CBRD-27398",
+        "CBRD-27423",
+        "CBRD-27630"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "key": "CBRD-27193",
+      "relationship": "root",
+      "parent": null,
+      "live_title": "[EPIC] page buffer",
+      "live_type": "Development Subject",
+      "live_status": "Open",
+      "writer": "writer_27193",
+      "report_path": "issues/CBRD-27193-page-buffer-program_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27193-evidence.txt",
+      "writer_agent": "/root/writer_27193",
+      "categories": [
+        "Correctness",
+        "Reliability / recovery",
+        "Operability / observability",
+        "Performance",
+        "Maintainability",
+        "Test quality"
+      ],
+      "components": [
+        "Page buffer",
+        "Storage and recovery integration"
+      ],
+      "report_sha256": "7f27a70777b4da23c2cfdcd3a17e160998722f0b8cf3de69f31e2f03260eed23",
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      },
+      "recommended_type": "Development Subject (umbrella development scope; retain live type)",
+      "major_changes": "All 19 child outcomes reconciled; unsupported gates, priorities and adopted-design claims removed.",
+      "uncertainties": "Actual engine/release exposure, policy choices, duplicate ownership and overlay budget decision."
+    },
+    {
+      "key": "CBRD-27194",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] 초기화/종료 경로의 위생 결함을 일괄 수정한다",
+      "live_type": "Sub-task",
+      "live_status": "Confirmed",
+      "writer": "writer_27194",
+      "report_path": "issues/CBRD-27194-initialization-finalization_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27194-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "Initialization lifetime and zero-private behavior verified; AOUT recipe corrected.",
+      "uncertainties": "AOUT supported reachability, runtime cleanup and platform/release exposure.",
+      "writer_agent": "/root/writer_27194",
+      "report_sha256": "14f9e96e2d9dffc0a7dbb072a7d830abb32c056a3a30e2baf0e71210bd7da175",
+      "categories": [
+        "Reliability / recovery",
+        "Maintainability",
+        "Compatibility"
+      ],
+      "components": [
+        "Page buffer initialization/finalization",
+        "Transaction-table cleanup"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27196",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "(C1) [PGBUF] [Survey] Introduce SX latch",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27196",
+      "report_path": "issues/CBRD-27196-sx-latch-survey_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27196-evidence.txt",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "SX case rebuilt around current B-tree split/merge; stale OID and experimental counter claims corrected.",
+      "uncertainties": "Contended workload evidence, adoption scope and costs.",
+      "writer_agent": "/root/writer_27196",
+      "report_sha256": "9cb3202676554813ae618a92528f3be3d5ed98224424217dbec7b19391e25247",
+      "categories": [
+        "Investigation / feasibility",
+        "Performance / resource efficiency"
+      ],
+      "components": [
+        "Page buffer",
+        "B-tree"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27211",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "(C2) [PGBUF] [PERF] [SURVEY] thread waiting for direct victim - my_count % 4",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27211",
+      "report_path": "issues/CBRD-27211-direct-victim-wait-policy_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27211-evidence.txt",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "Global selector cadence and fallback verified; invented thresholds removed.",
+      "uncertainties": "Original rationale for 4, current CPU/wait effects and decision criteria.",
+      "writer_agent": "/root/writer_27211",
+      "report_sha256": "3525feb4e0a519f25497c1053568a2519a7ddd89ad77d368cffd9c6918a2b54b",
+      "categories": [
+        "Investigation / feasibility",
+        "Performance / resource efficiency"
+      ],
+      "components": [
+        "Page buffer direct-victim waiting-thread selection"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27252",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] [Survey] pgbuf default / v2 병행 버전 도입 전략을 설계한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27252",
+      "report_path": "issues/CBRD-27252-parallel-v2-strategy_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27252-evidence.txt",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "Requested parallel default/v2 strategy separated from learning-plan implementation.",
+      "uncertainties": "Initial scope, selection/coexistence, compatibility, cost and adoption.",
+      "writer_agent": "/root/writer_27252",
+      "report_sha256": "2b040277ae3068d258bd92763914e1bfb87401eca8356f70ece8f3152ed40ef8",
+      "categories": [
+        "Investigation / feasibility",
+        "Compatibility / migration",
+        "Maintainability",
+        "Test quality"
+      ],
+      "components": [
+        "Page buffer",
+        "Build/test integration"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27262",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] flush 준비 후 TDE/DWB 오류 시 BCB 상태를 복구한다",
+      "live_type": "Sub-task",
+      "live_status": "Confirmed",
+      "writer": "writer_27262",
+      "report_path": "issues/CBRD-27262-flush-error-recovery_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27262-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "categories": [
+        "Reliability / recovery",
+        "Correctness / data integrity"
+      ],
+      "major_changes": "Phase-aware flush recovery; DWB reachability and historical evidence limits corrected.",
+      "uncertainties": "Real TDE/DWB error reachability; current runtime and release exposure.",
+      "writer_agent": "/root/writer_27262",
+      "report_sha256": "55b1c6240f6d19d31d5bb3df95ad9cd693c9f56470bfdb93bfec0b6d6bf01879",
+      "components": [
+        "Page buffer",
+        "TDE/DWB interfaces"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27263",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] lock-free fix 경로의 dealloc 보호 카운터 비대칭을 수정한다",
+      "live_type": "Sub-task",
+      "live_status": "Confirmed",
+      "writer": "writer_27263",
+      "report_path": "issues/CBRD-27263-deallocation-protection-accounting_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27263-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "Request-owned protection and BCB residency; historical counts and permanent-loss claims corrected.",
+      "uncertainties": "Actual CAS ownership sequence, current vacuum/runtime effects and release exposure.",
+      "writer_agent": "/root/writer_27263",
+      "report_sha256": "bbf387e637b5280af330bde2d44766cf986e2d914499b3e47ea1af66167d70b6",
+      "categories": [
+        "Correctness / data integrity",
+        "Reliability / recovery",
+        "Test quality"
+      ],
+      "components": [
+        "Page buffer",
+        "Heap",
+        "Vacuum"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27264",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27264",
+      "report_path": "issues/CBRD-27264-direct-victim-emergency-path_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27264-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "Unreachable backup supply verified; duplicate CBRD-24029 owner/result reconciliation preserved.",
+      "uncertainties": "Low-activity reachability, actual delays, alternative progress and release scope.",
+      "writer_agent": "/root/writer_27264",
+      "report_sha256": "17bf45cc7b18b7a4393b31e0aa116b8d418c714a49bb8e4a1fcf18bbccd1caf2",
+      "categories": [
+        "Reliability / recovery",
+        "Investigation / feasibility"
+      ],
+      "components": [
+        "Buffer Pool",
+        "SM"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27265",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] debug 빌드 전용 결함 2건을 수정한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27265",
+      "report_path": "issues/CBRD-27265-debug-build-defects_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27265-evidence.txt",
+      "writer_agent": "/root/writer_27265",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "CUBRID_DEBUG vs !NDEBUG conditions, diagnostic defects and undefined VPID read verified.",
+      "uncertainties": "Current compile/recovery evidence, exposure and diagnostic reactivation safety.",
+      "report_sha256": "2e1f92eddaa75b68d3ec85c11d8d549d80c47d3e0af1e5802066448c04e1a67b",
+      "categories": [
+        "Build / CI / developer tooling",
+        "Operability / observability",
+        "Test quality"
+      ],
+      "components": [
+        "Storage / Page buffer diagnostics"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27266",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] page buffer 통계의 논리 페이지와 물리 I/O 의미를 정리한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27266",
+      "report_path": "issues/CBRD-27266-statistics-semantics_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27266-evidence.txt",
+      "recommended_type": "Sub-task (Improve Function/Performance technical category)",
+      "major_changes": "SHOW deprecation and page-unit DWB/statdump semantics verified.",
+      "uncertainties": "Runtime values/cost, error contract, manual and consumers.",
+      "writer_agent": "/root/writer_27266",
+      "report_sha256": "67d8b82274f892cf272df249ddf94657097c9e0df4790a069685bdfbb945ee5d",
+      "categories": [
+        "Operability / observability",
+        "Documentation / specification consistency"
+      ],
+      "components": [
+        "Page buffer",
+        "Perfmon/statdump",
+        "DWB",
+        "SHOW"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27267",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] big private victim queue의 생산 경로를 복구하거나 제거한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27267",
+      "report_path": "issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-evidence.txt",
+      "writer_agent": "/root/writer_27267",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "Producer exists; bootstrap/re-registration and restricted-consume policy rebuilt.",
+      "uncertainties": "Workload frequency/effect and NULL-queue output contract.",
+      "report_sha256": "8651aa8cf66109e21aa62e9ecb20cb167c93e5b866f8ff82972a7323c4b0bd2a",
+      "categories": [
+        "Investigation / feasibility",
+        "Performance / resource efficiency",
+        "Operability / observability"
+      ],
+      "components": [
+        "Page buffer private-LRU index queues"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27268",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] double_write_buffer_size에 크기 단위 문법을 지원한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27268",
+      "report_path": "issues/CBRD-27268-dwb-size-unit-syntax_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27268-evidence.txt",
+      "writer_agent": "/root/writer_27268",
+      "recommended_type": "Sub-task (Improve Function/Performance technical category)",
+      "major_changes": "Requested size-unit capability preserved; parser, range, rounding and output constraints verified.",
+      "uncertainties": "Final syntax/type/output contract, runtime and consumer compatibility.",
+      "report_sha256": "f2f83000e1f8c06f49b64602ca53495d7e7daa3591df34c4c9dece7e60ccc18f",
+      "categories": [
+        "Usability",
+        "Operability / observability",
+        "Compatibility",
+        "Documentation / specification consistency"
+      ],
+      "components": [
+        "System parameters",
+        "DWB",
+        "Server initialization"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27269",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] 죽은 코드와 낡은 주석을 정리한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27269",
+      "report_path": "issues/CBRD-27269-dead-code-comments_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27269-evidence.txt",
+      "writer_agent": "/root/writer_27269",
+      "recommended_type": "Sub-task (Refactoring technical category)",
+      "major_changes": "All nine candidate groups rechecked across full commit; false merge dependency removed.",
+      "uncertainties": "External consumers and validation after concrete changes.",
+      "report_sha256": "5ad506b975f74db6eb1935e1500ea43f9a51fb4eaf18401bb24ec53792b0d4b8",
+      "categories": [
+        "Maintainability / technical debt",
+        "Documentation / specification consistency"
+      ],
+      "components": [
+        "Page buffer"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27270",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] [Survey] 복구 중 temp 볼륨 판정의 영향을 조사한다",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27270",
+      "report_path": "issues/CBRD-27270-recovery-temp-volume-survey_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27270-evidence.txt",
+      "writer_agent": "/root/writer_27270",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "Recovery lifecycle/mount claims corrected; real metadata and marker paths preserved.",
+      "uncertainties": "Encrypted temporary payload access, runtime consequences and safety conclusion.",
+      "report_sha256": "24e4de998bb4310d3f5c95562620d518437b04bb35c93a59452d07f30d6486cf",
+      "categories": [
+        "Investigation / feasibility",
+        "Reliability / recovery",
+        "Documentation / specification consistency"
+      ],
+      "components": [
+        "Page buffer",
+        "Disk manager",
+        "Boot/log recovery",
+        "TDE/DWB"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27316",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "(작성중) [PGBUF] parallel fix + private LRU survey (victimize pattern) ",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27316",
+      "report_path": "issues/CBRD-27316-parallel-fix-private-lru-survey_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316-evidence.txt",
+      "writer_agent": "/root/writer_27316",
+      "recommended_type": "Sub-task (Investigation / feasibility technical category)",
+      "major_changes": "Empty live body rebuilt as bounded concurrent fix/private-LRU victim-pattern survey.",
+      "uncertainties": "Original motivation/execution path, workload, costs and improvement need.",
+      "report_sha256": "f13959d1233161b04d5358f437fa8a81bd3edeb5d51132f5f1e97188234e5725",
+      "categories": [
+        "Investigation / feasibility",
+        "Performance / resource efficiency"
+      ],
+      "components": [
+        "Storage / Page buffer"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27356",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] transaction lock timeout과 page latch 정책 분리 Issue Triage",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27356",
+      "report_path": "issues/CBRD-27356-page-latch-timeout-policy_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27356-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "Current override/error contract and attributed debug-abort evidence rebuilt.",
+      "uncertainties": "Current debug/release reproduction; environment, policy and affected versions.",
+      "writer_agent": "/root/writer_27356",
+      "report_sha256": "cb5833e27f82f5fb4e4076a217d989b508b1e937dbd0bb57683ae81cf560e5a1",
+      "categories": [
+        "Reliability / recovery",
+        "Compatibility",
+        "Maintainability",
+        "Investigation / feasibility"
+      ],
+      "components": [
+        "Page buffer",
+        "Transaction/lock",
+        "Vacuum/postpone validation"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27370",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] [Regression] Ordinary nested READ-to-WRITE fix resets BCB fix count and desynchronizes holder debt",
+      "live_type": "Sub-task",
+      "live_status": "Confirmed",
+      "writer": "writer_27370",
+      "report_path": "issues/CBRD-27370-nested-read-write-accounting_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27370-evidence.txt",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "BCB/holder accounting and historical raw logs verified; API policy left open.",
+      "uncertainties": "Promotion contract, SQL/concurrent reachability and current runtime.",
+      "writer_agent": "/root/writer_27370",
+      "report_sha256": "66808ddf05da3fd81acbbb3192bfaaf378015c41940d9cb15e319cf503213e31",
+      "categories": [
+        "Correctness / data integrity",
+        "Regression",
+        "Reliability",
+        "API contract"
+      ],
+      "components": [
+        "Page buffer"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27398",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] overlay",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27398",
+      "report_path": "issues/CBRD-27398-page-buffer-overlay_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27398-evidence.txt",
+      "recommended_type": "Sub-task (Development Subject technical category)",
+      "major_changes": "Actual subsequent overlay decisions recovered; Draft and baseline separated.",
+      "uncertainties": "100ms/1500ms traversal decision, platform and release/performance evidence.",
+      "writer_agent": "/root/writer_27398",
+      "report_sha256": "77e5bb66c09475e54b1dd16dc3dcf659cc18384a42804d0541a6f640de7eb84f",
+      "categories": [
+        "Operability / observability",
+        "Compatibility"
+      ],
+      "components": [
+        "Page buffer",
+        "System parameters",
+        "Server lifecycle"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27423",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] [Survey] page buffer 성능 분석 프레임워크 ",
+      "live_type": "Sub-task",
+      "live_status": "Open",
+      "writer": "writer_27423",
+      "report_path": "issues/CBRD-27423-performance-analysis-framework_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27423-evidence.txt",
+      "recommended_type": "Sub-task (Development Subject technical category)",
+      "major_changes": "Real-engine comparison requirement preserved; proposals/measurements/gates separated.",
+      "uncertainties": "First workload/environment, assets, metrics and implementation boundary.",
+      "writer_agent": "/root/writer_27423",
+      "report_sha256": "dc27428611e53cbf3d2577fe0b346c87a644baaf423c028b255364e9b05c84a9",
+      "categories": [
+        "Performance",
+        "Test quality",
+        "Operability / observability",
+        "Investigation / feasibility"
+      ],
+      "components": [
+        "Page buffer",
+        "Test/benchmark tooling"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    },
+    {
+      "key": "CBRD-27630",
+      "relationship": "subtask",
+      "parent": "CBRD-27193",
+      "live_title": "[PGBUF] pgbuf_simple_fix 실패 후 중복 정리가 다른 스레드의 로딩 기록을 삭제할 수 있다",
+      "live_type": "Sub-task",
+      "live_status": "Confirmed",
+      "writer": "writer_27630",
+      "report_path": "issues/CBRD-27630-simple-fix-loading-cleanup_f6cac31_codex.md",
+      "progress": "writer complete; orchestrator reviewed",
+      "review": "passed",
+      "publication": "not authorized",
+      "evidence_index": "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27630-evidence.txt",
+      "writer_agent": "/root/writer_27630",
+      "recommended_type": "Sub-task (Correct Error technical category)",
+      "major_changes": "Cleanup ownership verified; pinned Lean/source identity and model limits preserved.",
+      "uncertainties": "Same-VPID concurrent cold miss, natural failure/scheduling and release scope.",
+      "report_sha256": "bcb4645cc5c6b97150927d1b770634564b18f4e73eeb896bafc94cae91217405",
+      "categories": [
+        "Reliability / recovery",
+        "Correctness / data integrity"
+      ],
+      "components": [
+        "Page buffer",
+        "Loading-record management"
+      ],
+      "publication_stages": {
+        "approval": "pending",
+        "integrated": "pending",
+        "pushed": "pending",
+        "target_verified": "pending",
+        "fresh_dry_run": "pending",
+        "description_updated": "pending",
+        "live_readback": "pending",
+        "protected_metadata_verified": "pending"
+      }
+    }
+  ],
+  "docs_evidence_commit": "fd2e244e585de7a78dfccbbdfde722eef1b49210",
+  "referenced_only_keys": [
+    "CBRD-20074",
+    "CBRD-20741",
+    "CBRD-20897",
+    "CBRD-24029",
+    "CBRD-26242",
+    "CBRD-26425",
+    "CBRD-27084",
+    "CBRD-27188",
+    "CBRD-27191",
+    "CBRD-27198",
+    "CBRD-27486",
+    "CBRD-27576"
+  ],
+  "scope_verified": "All fields.subtasks sets match recursive unfiltered JQL; 19 direct children; no deeper descendants.",
+  "writer_count": 20,
+  "latest_observed_destination_commit": "c1a7b2e58ae5c13aedfa085bb7aa89b82aaef73e",
+  "publication_order": [
+    "CBRD-27194",
+    "CBRD-27196",
+    "CBRD-27211",
+    "CBRD-27252",
+    "CBRD-27262",
+    "CBRD-27263",
+    "CBRD-27264",
+    "CBRD-27265",
+    "CBRD-27266",
+    "CBRD-27267",
+    "CBRD-27268",
+    "CBRD-27269",
+    "CBRD-27270",
+    "CBRD-27316",
+    "CBRD-27356",
+    "CBRD-27370",
+    "CBRD-27398",
+    "CBRD-27423",
+    "CBRD-27630",
+    "CBRD-27193"
+  ],
+  "review_summary": {
+    "reports": 20,
+    "children": 19,
+    "reviewed_in_full_by": "/root",
+    "dedicated_fresh_context_writers": 20,
+    "approval": "pending",
+    "description_publication_allowlist_only": true
+  }
+}

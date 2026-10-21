@@ -1,0 +1,30 @@
+[
+  {
+    "path": "/home/vimkim/.agents/skills/cubrid-jira-issue-write/SKILL.md",
+    "sha256": "5586c7195e94f1550e0c95e639f252f0b85b0987ff23be8f45a7b5aa01f1b0f8"
+  },
+  {
+    "path": "/home/vimkim/.agents/skills/cubrid-jira-issue-write/references/publication.md",
+    "sha256": "4053557ebde1394b5f6fb2697eb091cc353dbca1b9a6a4a2357c5555292e098b"
+  },
+  {
+    "path": "/home/vimkim/.agents/skills/cubrid-jira-issue-write/references/issue-classification.md",
+    "sha256": "8b900ebbe19f3082e82a157cf92ec2ad61407650938b6d0a38dfc34151bff861"
+  },
+  {
+    "path": "/home/vimkim/.agents/skills/cubrid-common/references/document-git-workflow.md",
+    "sha256": "56d764577901d7c8a85709146b9080c331367b0fafef232471b2382468d8591c"
+  },
+  {
+    "path": "/home/vimkim/.agents/skills/cubrid-jira/SKILL.md",
+    "sha256": "ef10cbc9d94a483dac5b35c14a4e2be5a6b56d1bfc2ad4051da0c8db234ab4b8"
+  },
+  {
+    "path": "/home/vimkim/.agents/skills/track-work/SKILL.md",
+    "sha256": "0cb7eac84526239914443be5d4f623ca1844af53cfccf449d9cedea0b3a78414"
+  },
+  {
+    "path": "/home/vimkim/my-cubrid/CUBRID.md",
+    "sha256": "3454200baad2954506ed27a4bbac930addb5e67bac11ec608c61719fed2b5e46"
+  }
+]

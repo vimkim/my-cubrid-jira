@@ -1,0 +1,846 @@
+{
+  "issue": "CBRD-27370",
+  "reviewer": "/root",
+  "report_sha256": "66808ddf05da3fd81acbbb3192bfaaf378015c41940d9cb15e319cf503213e31",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27370-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 중첩된 page fix와 unfix의 회계가 끝까지 일치하도록 READ-to-WRITE 경로를 수정한다.",
+      "sha256": "0166d2552f670cbcc7d582aa623fa4db003a3e5204e3e97a1bfb32bf9f5f01d3",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 동작                                                                                                                                  |\n|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | 같은 스레드의 중첩 READ 뒤에 일반 `pgbuf_fix(..., PGBUF_LATCH_WRITE, ...)` 가 성공하면 BCB와 스레드의 fix count가 서로 달라진다.      |\n| **TO-BE (목표 상태 / 기대 동작)** | 일반 READ-to-WRITE fix를 허용하면 모든 성공 호출을 계상하고, 허용하지 않으면 기존 READ 상태를 바꾸지 않은 채 WRITE 요청을 실패시킨다. |\n| **영향**                          | 설계 의도 훼손 - 래치가 남은 fix보다 먼저 풀리거나 정상적인 unfix가 내부 오류로 처리될 수 있다.                                       |",
+      "sha256": "9c6743ffbd7355203f6928508dcc28da89bea7aa7b0e4ecc20b848bc5c03e387",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27370-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: 성공한 `pgbuf_fix` 수와 BCB/스레드별 fix count를 항상 일치시킨다. 일반 READ-to-WRITE 요청을 허용할지, 전용 `pgbuf_promote_read_latch` 만 허용할지는 `TBD - 합의 미확인` 이다.",
+      "sha256": "6292eb856d4d9ab1d9ddb03ea019e028659349064e3dec76f6b05dd8b1baf20c",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C005",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c` 의 `pgbuf_latch_bcb_upon_fix` 와 관련 회귀 테스트가 대상이다. 문제 분기는 `SERVER_MODE`(서버 프로세스 빌드)와 `SA_MODE`(서버 기능을 프로세스 안에서 실행하는 standalone 빌드)가 공유하며 디스크 형식이나 공개 SQL 호환성 변경은 예상하지 않는다.",
+      "sha256": "159067c9e35364b88e25b17c9205fe03a2678483a41a603df9a357e961972dc3",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27370-C006",
+      "origin": "live-description",
+      "text": "`pgbuf_fix` 는 페이지 버퍼의 페이지를 고정하고 래치(latch - 페이지의 물리적 일관성을 보호하는 잠금)를 얻는다. 성공한 호출마다 BCB(Buffer Control Block - 버퍼 페이지의 상태 구조체)의 전역 `fcnt` 와 해당 스레드의 `PGBUF_HOLDER::fix_count` 가 함께 증가해야 한다. 각 호출자는 같은 횟수만큼 `pgbuf_unfix` 를 실행하며, 마지막 unfix에서만 래치가 풀린다.",
+      "sha256": "a0d8690ce85e88fe4a2da7ecd277dcdd2947bc77bbd2d31d3bb95a57a3953e08",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27370-C007",
+      "origin": "live-description",
+      "text": "문제는 이미 READ 래치를 가진 스레드가 일반 `pgbuf_fix` 로 WRITE를 요청할 때 발생한다.",
+      "sha256": "f0ea17dd1a81eb3447d1c3be58b2541033b4845ad6d7d9c011af3270a97c4895",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C008",
+      "origin": "live-description",
+      "text": "pgbuf_fix(READ) 반복            global fcnt == holder fix_count\n      └ pgbuf_fix(WRITE)\n          ├ 단독 holder 확인        old fcnt == holder fix_count\n          ├ WRITE로 변경\n          ├ global fcnt = 1          ★ 이전 READ 회계를 덮어씀\n          └ 공통 성공 처리           holder fix_count++",
+      "sha256": "6060e424583c2729252543bfcce998c6a209e7d1fa0fe55c00ecc215f202d8e8",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C009",
+      "origin": "live-description",
+      "text": "`pgbuf_latch_bcb_upon_fix` 는 `old_impl.impl.fcnt == holder->fix_count` 이면 즉시 승격 가능한 단독 holder로 판단한다. 이때 `new_impl.impl.fcnt = 1` 을 저장한 뒤, 공통 성공 처리에서 `holder->fix_count` 를 1 증가시킨다. 서로 같아야 할 두 회계가 한 번의 성공 경로 안에서 어긋난다.",
+      "sha256": "524ddc3a61b41fc11ba94b5f77d37e119ce1f21048a7f791a0b134689895e8e2",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C010",
+      "origin": "live-description",
+      "text": "회귀는 CBRD-26425 atomic latch 개편 커밋 `58cef8e01fcf121acbe3a35b7249deda54217532` 에서 들어왔다. 개편 전 release 빌드는 이 경로에서 `bufptr->fcnt` 와 `holder->fix_count` 를 각각 1 증가시켰다. 반면 debug 빌드는 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae` 가 추가한 검사로 일반 중첩 WRITE 요청을 `ER_FAILED` 로 거부했다. 개편 후에는 두 빌드 모두 요청을 성공시키면서 전역 값만 초기화한다. 2026-09-02 기준 develop HEAD `5f3a30d0998beafcc3932ed8cf65e66020a53c4c` 에도 이 대입이 남아 있다.",
+      "sha256": "bc0aa1f960e615202bb3290bd2eb94987ed3ece58bcd54847cde9d5cff95a531",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27370-C011",
+      "origin": "live-description",
+      "text": "| 확인 항목        | 환경                                                                      |\n|------------------|---------------------------------------------------------------------------|\n| 최신 소스 확인   | Linux, develop `5f3a30d0998beafcc3932ed8cf65e66020a53c4c`                 |\n| SA runtime probe | Linux, CUBRID `11.5.0.2431-198b42a`, 64-bit debug build                   |\n| 최초 교차 확인   | Linux, `f799e05d77d5300c6ea5753b4a6cc7caee6d8912`, debug/release SA build |",
+      "sha256": "92a83d85b86725ec12c5c064d9badd032b841e12f572a177ee0c3a46839316fb",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27370-C012",
+      "origin": "live-description",
+      "text": "`/tmp/vs18_probe.cpp`:",
+      "sha256": "2ede068d14d53971e131dc9916eb64e635920ee050cdf855415bb5b2c0d91184",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C013",
+      "origin": "live-description",
+      "text": "#include \"config.h\"\n    #include \"dbi.h\"\n    #include \"page_buffer.h\"\n    #include \"storage_common.h\"\n    #include \"thread_manager.hpp\"",
+      "sha256": "54b3506f71938c3407fca36ff1cb6cc1807001b1bf44b23849a04887803bc864",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C014",
+      "origin": "live-description",
+      "text": "#include <cstdio>\n    #include <cstdlib>",
+      "sha256": "a56fcc318a33810d52217f3e798fc7b4562902be38e433b5f82b746a4d94419e",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C015",
+      "origin": "live-description",
+      "text": "__attribute__ ((noinline)) static void\n    probe_point (const char *label, THREAD_ENTRY *thread_p, PAGE_PTR page)\n    {\n      std::printf (\"%s: global_fcnt=%d latch=%d\\n\", label, pgbuf_get_fix_count (page),\n                   static_cast<int> (pgbuf_get_latch_mode (page)));\n    }",
+      "sha256": "f90ef7ca404d781617ec580042432b27fd7c216fec717303d003fda55661c5f4",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C016",
+      "origin": "live-description",
+      "text": "int\n    main (int argc, char **argv)\n    {\n      if (argc != 2)\n        {\n          return 2;\n        }",
+      "sha256": "324b411a4075878311be391aa5f94b0b1677c1089108bcb67427eb858722cfe2",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C017",
+      "origin": "live-description",
+      "text": "std::setvbuf (stdout, nullptr, _IONBF, 0);\n      db_login (\"dba\", nullptr);\n      if (db_restart (argv[0], 0, argv[1]) != NO_ERROR)\n        {\n          return 3;\n        }",
+      "sha256": "61e2d4eeb451d4fc842c15e5ce23477886851dfdccf7bc70592cf4189c8067eb",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C018",
+      "origin": "live-description",
+      "text": "THREAD_ENTRY *thread_p = thread_get_thread_entry_info ();\n      VPID vpid = { 0, 0 };",
+      "sha256": "f1e9884216467b6969416e833f5ba89b12d7d0ceedcf0cf7e5f023d690fba566",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C019",
+      "origin": "live-description",
+      "text": "PAGE_PTR p1 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                               PGBUF_LATCH_READ, PGBUF_UNCONDITIONAL_LATCH);\n      probe_point (\"after READ 1\", thread_p, p1);",
+      "sha256": "835166572bad24555938c3f55aa5fb4c081639a977459e93f81dcdb39350703c",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C020",
+      "origin": "live-description",
+      "text": "PAGE_PTR p2 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                               PGBUF_LATCH_READ, PGBUF_UNCONDITIONAL_LATCH);\n      probe_point (\"after READ 2\", thread_p, p2);",
+      "sha256": "84fa33e6a97afcb8f1b83943f424a2edad6533f4c18ee99f9745c2adc12709ff",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C021",
+      "origin": "live-description",
+      "text": "PAGE_PTR p3 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                               PGBUF_LATCH_WRITE, PGBUF_UNCONDITIONAL_LATCH);\n      probe_point (\"after WRITE\", thread_p, p3);",
+      "sha256": "b64d28395563b6c412404e717164c3bed0c611d541d17094e30b4beff5107c25",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C022",
+      "origin": "live-description",
+      "text": "std::_Exit (p1 == p2 && p2 == p3 ? 0 : 4);\n    }",
+      "sha256": "21746ba006869aaf2bb634c47b90b721deb8c9518562033f0774b6f3cf575174",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C023",
+      "origin": "live-description",
+      "text": "`/tmp/vs18_probe.gdb`:",
+      "sha256": "1678ac8333ec680427192be8da2b771fe130e3789f0b5dee02327413e32270dc",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C024",
+      "origin": "live-description",
+      "text": "set pagination off\n    set breakpoint pending on\n    break probe_point\n    commands\n      silent\n      set $iop = (pgbuf_iopage_buffer *) ((char *) page - (long) &((pgbuf_iopage_buffer *) 0)->iopage.page)\n      set $holder = pgbuf_find_thrd_holder (thread_p, $iop->bcb)\n      printf \"GDB %s: holder_fix_count=%d\\n\", label, $holder->fix_count\n      continue\n    end\n    run cbrd27370_probe",
+      "sha256": "c955f05238b7e26b6cfced8bcada3071cdc973db7df61b332479ca733d723cff",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C025",
+      "origin": "live-description",
+      "text": "``` bash\nSOURCE_ROOT=$(pwd)\nSA_LIB=$(find \"$SOURCE_ROOT\" -path '*/sa/libcubridsa.so' -print -quit)\nBUILD_ROOT=$(dirname \"$(dirname \"$SA_LIB\")\")\nPROBE_INSTALL=$(mktemp -d /tmp/cbrd27370-install.XXXXXX)\nPROBE_DATA=$(mktemp -d /tmp/cbrd27370-data.XXXXXX)",
+      "sha256": "15e5d8e69bd5c4bd2cf245ffc7dc40e8b2cd3b9df13fc73ac134dcc8162e3e0b",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C026",
+      "origin": "live-description",
+      "text": "cmake --build \"$BUILD_ROOT\"\ncmake --install \"$BUILD_ROOT\" --prefix \"$PROBE_INSTALL\"",
+      "sha256": "0d6e0e9bf6870fbfc1a6e847233ca51de992d017ecba605c15dcd1c67db2181e",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C027",
+      "origin": "live-description",
+      "text": "g++ -std=gnu++17 -g -O0 -DSA_MODE -DLINUX -DGCC -DI386 -DX86 -DSYSV \\\n  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_REENTRANT \\\n  -I\"$BUILD_ROOT\" -I\"$SOURCE_ROOT/include\" -I\"$SOURCE_ROOT/src/api\" \\\n  -I\"$SOURCE_ROOT/src/base\" -I\"$SOURCE_ROOT/src/compat\" -I\"$SOURCE_ROOT/src/storage\" \\\n  -I\"$SOURCE_ROOT/src/thread\" -I\"$SOURCE_ROOT/src/transaction\" \\\n  -I\"$SOURCE_ROOT/src/communication\" -I\"$SOURCE_ROOT/src/connection\" \\\n  -I\"$SOURCE_ROOT/src/monitor\" -I\"$SOURCE_ROOT/src/object\" -I\"$SOURCE_ROOT/src/query\" \\\n  -I\"$SOURCE_ROOT/src/xasl\" -I\"$SOURCE_ROOT/cubrid-cci/src/cci\" \\\n  -I\"$BUILD_ROOT/3rdparty/include\" -I\"$BUILD_ROOT/3rdparty/Source/lz4/lib\" \\\n  -I\"$BUILD_ROOT/3rdparty/Source/rapidjson/include\" \\\n  /tmp/vs18_probe.cpp -L\"$(dirname \"$SA_LIB\")\" -L\"$BUILD_ROOT\" \\\n  -L\"$BUILD_ROOT/3rdparty/lib\" -Wl,-rpath,\"$(dirname \"$SA_LIB\")\" \\\n  -lcubridsa -lpthread -ldl -o /tmp/vs18_probe",
+      "sha256": "265054acfc3009062f2aae51f7b41eb2b0f3b34d5c737544f24f0237253b3011",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C028",
+      "origin": "live-description",
+      "text": "mkdir \"$PROBE_DATA/db\"\nCUBRID=\"$PROBE_INSTALL\" CUBRID_DATABASES=\"$PROBE_INSTALL/databases\" \\\nLD_LIBRARY_PATH=\"$PROBE_INSTALL/lib:$PROBE_INSTALL/cci/lib\" \\\n  \"$PROBE_INSTALL/bin/cubrid\" createdb -F \"$PROBE_DATA/db\" -L \"$PROBE_DATA/db\" \\\n  cbrd27370_probe en_US.utf8",
+      "sha256": "ab9887dc8bac1eba7781e2c0de35b3499f4168af1aa4109a0bba23eca7aa163c",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C029",
+      "origin": "live-description",
+      "text": "cd \"$PROBE_DATA/db\"\nCUBRID=\"$PROBE_INSTALL\" CUBRID_DATABASES=\"$PROBE_INSTALL/databases\" \\\nLD_LIBRARY_PATH=\"$PROBE_INSTALL/lib:$PROBE_INSTALL/cci/lib\" \\\n  gdb -q -batch -x /tmp/vs18_probe.gdb /tmp/vs18_probe",
+      "sha256": "b67bbfcf448b327e0f85220bc008255b81dc09520374dde6227aacd072f49b37",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C030",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C031",
+      "origin": "live-description",
+      "text": "일반 READ-to-WRITE fix를 지원하는 계약이라면 출력은 `fcnt=1 -> 2 -> 3` 이고 세 포인터가 같으며 최종 래치는 WRITE여야 한다. 세 번의 unfix는 `fcnt=2 -> 1 -> 0` 으로 진행하고 마지막 호출에서만 래치를 해제해야 한다.",
+      "sha256": "eeaa5df0fd847effa5366215db313c2715f7551a281a60ec7c0b1e756223b5d9",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27370-C032",
+      "origin": "live-description",
+      "text": "일반 READ-to-WRITE fix를 금지하는 계약이라면 세 번째 호출은 실패하고 기존 상태 `fcnt=2`, `holder->fix_count=2`, READ를 그대로 유지해야 한다. 이후 두 번의 unfix로 정상 해제해야 한다.",
+      "sha256": "c8cf71e5ef192c9e1add365b41760ea4954a76895972f6a1efff4b66e240e285",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27370-C033",
+      "origin": "live-description",
+      "text": "GDB after READ 1: holder_fix_count=1\n    after READ 1: global_fcnt=1 latch=1\n    GDB after READ 2: holder_fix_count=2\n    after READ 2: global_fcnt=2 latch=1\n    GDB after WRITE: holder_fix_count=3\n    after WRITE: global_fcnt=1 latch=2",
+      "sha256": "6ed1107fca73817861349d52248bf6a7804239425f030f4a47edc25f8795e002",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27370-C034",
+      "origin": "live-description",
+      "text": "세 번째 호출은 성공하고 공통 성공 경로가 `holder->fix_count` 를 `3` 으로 올리지만 전역 `fcnt` 는 `1` 로 되돌아간다. release 빌드에서는 첫 unfix 직후 `fcnt=0`, `PGBUF_NO_LATCH` 가 되었고, 나머지 두 호출에서 내부 값이 음수가 된 뒤 `0` 으로 보정되었다. debug 빌드는 음수 방어 assertion에서 중단되었다.",
+      "sha256": "3e3ed4f17e9a43746c45facb1a3eb34171adeb28b6e242f7824c5a46ebcb5ebf",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27370-C035",
+      "origin": "live-description",
+      "text": "출력의 latch 값 `1` 은 READ, `2` 는 WRITE다.",
+      "sha256": "c81def358d7d75bd9a219159619edcb000fbee162da934e2be3f3f873b4ad950",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27370-C036",
+      "origin": "live-description",
+      "text": "| 위치                                  | 의미                                                          |\n|---------------------------------------|---------------------------------------------------------------|\n| `src/storage/page_buffer.c:6310-6319` | 단독 READ holder의 일반 WRITE 요청 분기                       |\n| `src/storage/page_buffer.c:6392-6408` | 즉시 획득 후 공통 성공 처리                                   |\n| `src/storage/page_buffer.c:6573-6601` | 일반 unfix의 전역 count 처리                                  |\n| `src/storage/page_buffer.c:2740-2924` | 기존 fix 회계를 보존하는 전용 `pgbuf_promote_read_latch` 경로 |",
+      "sha256": "ad1e61738ffe63bbb7f97cc49c50c959646de23128b4da93e3ecc84ac19b35be",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27370-C037",
+      "origin": "live-description",
+      "text": "| 후보           | 동작                                                                                    | 고려사항                                                                                                                                                 |\n|----------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 일반 승격 유지 | `new_impl.impl.fcnt` 를 기존 값에서 1 증가시켜 공통 holder 증가와 맞춘다.               | 개편 전 동작과 일치한다. 동일 스레드 READ 1회/다회 및 대기자 유무를 모두 검증해야 한다.                                                                  |\n| 일반 승격 금지 | 상태를 변경하지 않고 WRITE fix를 실패시키며 `pgbuf_promote_read_latch` 사용을 강제한다. | 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae` 의 \\\"do not permit nested write mode fix operation\\\" 의도와 맞지만 호출부 호환성 조사가 필요하다. |",
+      "sha256": "d67249ae03c043163bd07a77f51f784a699c15ca74fff2ba69785bbf05d8ed03",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27370-C038",
+      "origin": "live-description",
+      "text": "정책 선택과 무관하게 다음 회귀 검증이 필요하다.",
+      "sha256": "7740cec9a9eb89e70b78c1318347ddbd5e758dc72fefc1fc76b1f69f316a6659",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C039",
+      "origin": "live-description",
+      "text": "-   READ 1회 후 일반 WRITE fix",
+      "sha256": "989846307496e08023b7fb0265ccaf7f1911abb9012cbe5a525e8436c3aa4e02",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C040",
+      "origin": "live-description",
+      "text": "-   READ 2회 후 일반 WRITE fix",
+      "sha256": "4dbdf01b556ed82ef1ff3c56bf67fce4b570d98559d83d72c5ce6a28ca29116e",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C041",
+      "origin": "live-description",
+      "text": "-   성공한 fix 수만큼 unfix했을 때 전역/스레드 count와 래치 상태",
+      "sha256": "a28d8d992fc5bcc47e132599c65610433b1a06cd9db5e43e92a23b01bac65538",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C042",
+      "origin": "live-description",
+      "text": "-   WRITE 대기자가 있는 상태에서 조기 깨우기나 인계가 없는지 확인",
+      "sha256": "eeddda0f5b67b0ac11522b46be67e177e4ec8c3f7cebc7e1208ffe3be300c1e8",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C043",
+      "origin": "live-description",
+      "text": "-   `pgbuf_promote_read_latch` 대조군에서 기존 fix 회계 보존 확인",
+      "sha256": "ac9d08d4dbe8543accec92d4c9b2ac0cf5d6da9c9b50c6bf1d3d7dd9084e825c",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C044",
+      "origin": "live-description",
+      "text": "-   debug/release 및 `SA_MODE`/`SERVER_MODE` 확인",
+      "sha256": "8c1113caca02ded8a50aad213fd65a0b1c04d1d78da95096caebe94ec365ef3c",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C045",
+      "origin": "live-description",
+      "text": "관련 이슈: CBRD-26425, CBRD-27193",
+      "sha256": "5c82c59e0f822dea096d9daa73f0bd8229e179fe36eab09d80abfffa058d9751",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C046",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "**이슈 수행 목적**: 중첩된 page fix와 unfix의 회계가 끝까지 일치하도록 READ-to-WRITE 경로를 수정한다.",
+      "sha256": "0166d2552f670cbcc7d582aa623fa4db003a3e5204e3e97a1bfb32bf9f5f01d3",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C047",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C048",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "| 구분 | 동작 |\n|------|------|\n| **AS-IS (현재 동작 / 배경)** | 같은 스레드의 중첩 READ 뒤에 일반 `pgbuf_fix(..., PGBUF_LATCH_WRITE, ...)`가 성공하면 BCB와 스레드의 fix count가 서로 달라진다. |\n| **TO-BE (목표 상태 / 기대 동작)** | 일반 READ-to-WRITE fix를 허용하면 모든 성공 호출을 계상하고, 허용하지 않으면 기존 READ 상태를 바꾸지 않은 채 WRITE 요청을 실패시킨다. |\n| **영향** | 설계 의도 훼손 - 래치가 남은 fix보다 먼저 풀리거나 정상적인 unfix가 내부 오류로 처리될 수 있다. |",
+      "sha256": "f957957c025fa70b96baa5e06d2d60efbd1d760cda888ef73c8c5e546236a1d8",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27370-C049",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "**이슈 수행 방안**: 성공한 `pgbuf_fix` 수와 BCB/스레드별 fix count를 항상 일치시킨다. 일반 READ-to-WRITE 요청을 허용할지, 전용 `pgbuf_promote_read_latch`만 허용할지는 `TBD - 합의 미확인`이다.",
+      "sha256": "7f036a97b9381e4d96a6d1141a6f019a06855f020d9509b757644bf08dff59ca",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C050",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c`의 `pgbuf_latch_bcb_upon_fix`와 관련 회귀 테스트가 대상이다. 문제 분기는 `SERVER_MODE`(서버 프로세스 빌드)와 `SA_MODE`(서버 기능을 프로세스 안에서 실행하는 standalone 빌드)가 공유하며 디스크 형식이나 공개 SQL 호환성 변경은 예상하지 않는다.",
+      "sha256": "4a8671f150c5b6aaabcdcf56862b2b00c6e044be1f40fde59898d425ce0100bd",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27370-C051",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "`pgbuf_fix`는 페이지 버퍼의 페이지를 고정하고 래치(latch - 페이지의 물리적 일관성을 보호하는 잠금)를 얻는다. 성공한 호출마다 BCB(Buffer Control Block - 버퍼 페이지의 상태 구조체)의 전역 `fcnt`와 해당 스레드의 `PGBUF_HOLDER::fix_count`가 함께 증가해야 한다. 각 호출자는 같은 횟수만큼 `pgbuf_unfix`를 실행하며, 마지막 unfix에서만 래치가 풀린다.",
+      "sha256": "2435270114e3a37f2bdc840b72a50a7d633a85c74512d875cc5b11e3bdc77591",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27370-C052",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "문제는 이미 READ 래치를 가진 스레드가 일반 `pgbuf_fix`로 WRITE를 요청할 때 발생한다.",
+      "sha256": "07274e2ccd869a65da64ec538bd54fb8ec236571aa0b3d44c1563854b06b13bb",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C053",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "```\npgbuf_fix(READ) 반복            global fcnt == holder fix_count\n  └ pgbuf_fix(WRITE)\n      ├ 단독 holder 확인        old fcnt == holder fix_count\n      ├ WRITE로 변경\n      ├ global fcnt = 1          ★ 이전 READ 회계를 덮어씀\n      └ 공통 성공 처리           holder fix_count++\n```",
+      "sha256": "f1408c4c40b2b02abaf217ee2fd64a6dd89b1b2af7ac10d822320d408c8b7f95",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C054",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "`pgbuf_latch_bcb_upon_fix`는 `old_impl.impl.fcnt == holder->fix_count`이면 즉시 승격 가능한 단독 holder로 판단한다. 이때 `new_impl.impl.fcnt = 1`을 저장한 뒤, 공통 성공 처리에서 `holder->fix_count`를 1 증가시킨다. 서로 같아야 할 두 회계가 한 번의 성공 경로 안에서 어긋난다.",
+      "sha256": "758e50c86a9c2a4b59e50ad2107fc8549b3e1c52746d53ccdd51b169b92f5921",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27370-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "회귀는 CBRD-26425 atomic latch 개편 커밋 `58cef8e01fcf121acbe3a35b7249deda54217532`에서 들어왔다. 개편 전 release 빌드는 이 경로에서 `bufptr->fcnt`와 `holder->fix_count`를 각각 1 증가시켰다. 반면 debug 빌드는 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae`가 추가한 검사로 일반 중첩 WRITE 요청을 `ER_FAILED`로 거부했다. 개편 후에는 두 빌드 모두 요청을 성공시키면서 전역 값만 초기화한다. 2026-09-02 기준 develop HEAD `5f3a30d0998beafcc3932ed8cf65e66020a53c4c`에도 이 대입이 남아 있다.",
+      "sha256": "411cb129e0b8027bc603076d441991c8f53784d91a266ec17cbf16b5920f7f07",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27370-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "| 확인 항목 | 환경 |\n|-----------|------|\n| 최신 소스 확인 | Linux, develop `5f3a30d0998beafcc3932ed8cf65e66020a53c4c` |\n| SA runtime probe | Linux, CUBRID `11.5.0.2431-198b42a`, 64-bit debug build |\n| 최초 교차 확인 | Linux, `f799e05d77d5300c6ea5753b4a6cc7caee6d8912`, debug/release SA build |",
+      "sha256": "8d6dd022e90208015ab96e00a5d5e62264843a76ba2c3c4643b23200ba080794",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27370-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "`/tmp/vs18_probe.cpp`:",
+      "sha256": "2ede068d14d53971e131dc9916eb64e635920ee050cdf855415bb5b2c0d91184",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "```cpp\n#include \"config.h\"\n#include \"dbi.h\"\n#include \"page_buffer.h\"\n#include \"storage_common.h\"\n#include \"thread_manager.hpp\"",
+      "sha256": "89f2649009791b1a20b07b6d34006652dc41a529d8e415f83d0de400829a2058",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "#include <cstdio>\n#include <cstdlib>",
+      "sha256": "2a7214b54c8cf151d4222b8ce26b886dbfe1dc5e17fde75555f3e8e44d51e7cb",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "__attribute__ ((noinline)) static void\nprobe_point (const char *label, THREAD_ENTRY *thread_p, PAGE_PTR page)\n{\n  std::printf (\"%s: global_fcnt=%d latch=%d\\n\", label, pgbuf_get_fix_count (page),\n               static_cast<int> (pgbuf_get_latch_mode (page)));\n}",
+      "sha256": "07be17db36cf4f68f9e1b98c4c0f3bd7c5cfd97eca44b853c520a91961fcbff1",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "int\nmain (int argc, char **argv)\n{\n  if (argc != 2)\n    {\n      return 2;\n    }",
+      "sha256": "f06b2851f1d925e2093150a305719f164dcb7f867e9e6ee0a2a4b025138b9ff4",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "std::setvbuf (stdout, nullptr, _IONBF, 0);\n  db_login (\"dba\", nullptr);\n  if (db_restart (argv[0], 0, argv[1]) != NO_ERROR)\n    {\n      return 3;\n    }",
+      "sha256": "85a3090cf2a08df8b07fb32adf67166962670749197341739892b17c42e67adf",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "THREAD_ENTRY *thread_p = thread_get_thread_entry_info ();\n  VPID vpid = { 0, 0 };",
+      "sha256": "f60f22920c532605210eedcc5cdf75e8f1ba94aefb46e3905f12ba9615f8aeb9",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "PAGE_PTR p1 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                           PGBUF_LATCH_READ, PGBUF_UNCONDITIONAL_LATCH);\n  probe_point (\"after READ 1\", thread_p, p1);",
+      "sha256": "3f28ed73a05ce7013714d878ea88afc9fd8977ed346ff024e90e90a648933db3",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "PAGE_PTR p2 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                           PGBUF_LATCH_READ, PGBUF_UNCONDITIONAL_LATCH);\n  probe_point (\"after READ 2\", thread_p, p2);",
+      "sha256": "f885b6f9e9bb4600472e0c0bfd6229abd6cb1e13917d3a717fb4a0b46c614709",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "PAGE_PTR p3 = pgbuf_fix (thread_p, &vpid, OLD_PAGE,\n                           PGBUF_LATCH_WRITE, PGBUF_UNCONDITIONAL_LATCH);\n  probe_point (\"after WRITE\", thread_p, p3);",
+      "sha256": "87de08d6bf156c4d53a798e94d35479991a0e6d23033616c2f88a97762282a73",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "std::_Exit (p1 == p2 && p2 == p3 ? 0 : 4);\n}\n```",
+      "sha256": "8b8fbbef8a8ca0b97c96675df034192c7082efe29eaacf96a6c75a6c3ad59e10",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27370-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "`/tmp/vs18_probe.gdb`:",
+      "sha256": "1678ac8333ec680427192be8da2b771fe130e3789f0b5dee02327413e32270dc",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27370-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "```gdb\nset pagination off\nset breakpoint pending on\nbreak probe_point\ncommands\n  silent\n  set $iop = (pgbuf_iopage_buffer *) ((char *) page - (long) &((pgbuf_iopage_buffer *) 0)->iopage.page)\n  set $holder = pgbuf_find_thrd_holder (thread_p, $iop->bcb)\n  printf \"GDB %s: holder_fix_count=%d\\n\", label, $holder->fix_count\n  continue\nend\nrun cbrd27370_probe\n```",
+      "sha256": "6b6779c1302c6be85796fddc427ae8ef2bfde935e6f6f989cf27ef4c9d2c0253",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "```bash\nSOURCE_ROOT=$(pwd)\nSA_LIB=$(find \"$SOURCE_ROOT\" -path '*/sa/libcubridsa.so' -print -quit)\nBUILD_ROOT=$(dirname \"$(dirname \"$SA_LIB\")\")\nPROBE_INSTALL=$(mktemp -d /tmp/cbrd27370-install.XXXXXX)\nPROBE_DATA=$(mktemp -d /tmp/cbrd27370-data.XXXXXX)",
+      "sha256": "e22574e002cc6d6c53d2541ea85a0520fe22d45da7672d55144646740c416fb0",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "cmake --build \"$BUILD_ROOT\"\ncmake --install \"$BUILD_ROOT\" --prefix \"$PROBE_INSTALL\"",
+      "sha256": "0d6e0e9bf6870fbfc1a6e847233ca51de992d017ecba605c15dcd1c67db2181e",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "g++ -std=gnu++17 -g -O0 -DSA_MODE -DLINUX -DGCC -DI386 -DX86 -DSYSV \\\n  -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -D_REENTRANT \\\n  -I\"$BUILD_ROOT\" -I\"$SOURCE_ROOT/include\" -I\"$SOURCE_ROOT/src/api\" \\\n  -I\"$SOURCE_ROOT/src/base\" -I\"$SOURCE_ROOT/src/compat\" -I\"$SOURCE_ROOT/src/storage\" \\\n  -I\"$SOURCE_ROOT/src/thread\" -I\"$SOURCE_ROOT/src/transaction\" \\\n  -I\"$SOURCE_ROOT/src/communication\" -I\"$SOURCE_ROOT/src/connection\" \\\n  -I\"$SOURCE_ROOT/src/monitor\" -I\"$SOURCE_ROOT/src/object\" -I\"$SOURCE_ROOT/src/query\" \\\n  -I\"$SOURCE_ROOT/src/xasl\" -I\"$SOURCE_ROOT/cubrid-cci/src/cci\" \\\n  -I\"$BUILD_ROOT/3rdparty/include\" -I\"$BUILD_ROOT/3rdparty/Source/lz4/lib\" \\\n  -I\"$BUILD_ROOT/3rdparty/Source/rapidjson/include\" \\\n  /tmp/vs18_probe.cpp -L\"$(dirname \"$SA_LIB\")\" -L\"$BUILD_ROOT\" \\\n  -L\"$BUILD_ROOT/3rdparty/lib\" -Wl,-rpath,\"$(dirname \"$SA_LIB\")\" \\\n  -lcubridsa -lpthread -ldl -o /tmp/vs18_probe",
+      "sha256": "265054acfc3009062f2aae51f7b41eb2b0f3b34d5c737544f24f0237253b3011",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "mkdir \"$PROBE_DATA/db\"\nCUBRID=\"$PROBE_INSTALL\" CUBRID_DATABASES=\"$PROBE_INSTALL/databases\" \\\nLD_LIBRARY_PATH=\"$PROBE_INSTALL/lib:$PROBE_INSTALL/cci/lib\" \\\n  \"$PROBE_INSTALL/bin/cubrid\" createdb -F \"$PROBE_DATA/db\" -L \"$PROBE_DATA/db\" \\\n  cbrd27370_probe en_US.utf8",
+      "sha256": "ab9887dc8bac1eba7781e2c0de35b3499f4168af1aa4109a0bba23eca7aa163c",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "cd \"$PROBE_DATA/db\"\nCUBRID=\"$PROBE_INSTALL\" CUBRID_DATABASES=\"$PROBE_INSTALL/databases\" \\\nLD_LIBRARY_PATH=\"$PROBE_INSTALL/lib:$PROBE_INSTALL/cci/lib\" \\\n  gdb -q -batch -x /tmp/vs18_probe.gdb /tmp/vs18_probe\n```",
+      "sha256": "840613db873a65dba4cfb869f5af62cbbef53d266028c8a19bedaa85b9ec0f00",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27370-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "일반 READ-to-WRITE fix를 지원하는 계약이라면 출력은 `fcnt=1 -> 2 -> 3`이고 세 포인터가 같으며 최종 래치는 WRITE여야 한다. 세 번의 unfix는 `fcnt=2 -> 1 -> 0`으로 진행하고 마지막 호출에서만 래치를 해제해야 한다.",
+      "sha256": "eaaa22383a39c6e9b87df3ccb36cf5208b7cbbf4d9225482641d12fb2b525dc8",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27370-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "일반 READ-to-WRITE fix를 금지하는 계약이라면 세 번째 호출은 실패하고 기존 상태 `fcnt=2`, `holder->fix_count=2`, READ를 그대로 유지해야 한다. 이후 두 번의 unfix로 정상 해제해야 한다.",
+      "sha256": "c8cf71e5ef192c9e1add365b41760ea4954a76895972f6a1efff4b66e240e285",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27370-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "```text\nGDB after READ 1: holder_fix_count=1\nafter READ 1: global_fcnt=1 latch=1\nGDB after READ 2: holder_fix_count=2\nafter READ 2: global_fcnt=2 latch=1\nGDB after WRITE: holder_fix_count=3\nafter WRITE: global_fcnt=1 latch=2\n```",
+      "sha256": "dade305bcddb8ac62af9f2885f2e2fa6d8dc183fd140d956e1d03c7ef2076348",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27370-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "세 번째 호출은 성공하고 공통 성공 경로가 `holder->fix_count`를 `3`으로 올리지만 전역 `fcnt`는 `1`로 되돌아간다. release 빌드에서는 첫 unfix 직후 `fcnt=0`, `PGBUF_NO_LATCH`가 되었고, 나머지 두 호출에서 내부 값이 음수가 된 뒤 `0`으로 보정되었다. debug 빌드는 음수 방어 assertion에서 중단되었다.",
+      "sha256": "2329600894b268aa945d6628bc299527efe93ca32cd5e65bfa8e8c877c6fd503",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27370-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "출력의 latch 값 `1`은 READ, `2`는 WRITE다.",
+      "sha256": "5a6073eb0882aa9c4f7b173e1cdefcf397a85efceed1fc2f1fdd2a725db1c30c",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27370-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "| 위치 | 의미 |\n|------|------|\n| `src/storage/page_buffer.c:6310-6319` | 단독 READ holder의 일반 WRITE 요청 분기 |\n| `src/storage/page_buffer.c:6392-6408` | 즉시 획득 후 공통 성공 처리 |\n| `src/storage/page_buffer.c:6573-6601` | 일반 unfix의 전역 count 처리 |\n| `src/storage/page_buffer.c:2740-2924` | 기존 fix 회계를 보존하는 전용 `pgbuf_promote_read_latch` 경로 |",
+      "sha256": "ad8529738ce660ca6e0985f3f4dedbe2b4f22e96733df070fa06fa4b8d947fdc",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27370-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "| 후보 | 동작 | 고려사항 |\n|------|------|----------|\n| 일반 승격 유지 | `new_impl.impl.fcnt`를 기존 값에서 1 증가시켜 공통 holder 증가와 맞춘다. | 개편 전 동작과 일치한다. 동일 스레드 READ 1회/다회 및 대기자 유무를 모두 검증해야 한다. |\n| 일반 승격 금지 | 상태를 변경하지 않고 WRITE fix를 실패시키며 `pgbuf_promote_read_latch` 사용을 강제한다. | 2014년 커밋 `076bf011458615c7262c56f5e4fe999e8d1459ae`의 \"do not permit nested write mode fix operation\" 의도와 맞지만 호출부 호환성 조사가 필요하다. |",
+      "sha256": "384c46667da64284019b75b63cf36bbef265979bb3d36dcd21d267ea7a53eb20",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27370-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "정책 선택과 무관하게 다음 회귀 검증이 필요하다.",
+      "sha256": "7740cec9a9eb89e70b78c1318347ddbd5e758dc72fefc1fc76b1f69f316a6659",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "- READ 1회 후 일반 WRITE fix\n- READ 2회 후 일반 WRITE fix\n- 성공한 fix 수만큼 unfix했을 때 전역/스레드 count와 래치 상태\n- WRITE 대기자가 있는 상태에서 조기 깨우기나 인계가 없는지 확인\n- `pgbuf_promote_read_latch` 대조군에서 기존 fix 회계 보존 확인\n- debug/release 및 `SA_MODE`/`SERVER_MODE` 확인",
+      "sha256": "41d9682ee15913ecfb795589ec7971495f8afc534c055a7be4637ad809f585f6",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27370-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+      "text": "관련 이슈: CBRD-26425, CBRD-27193",
+      "sha256": "5c82c59e0f822dea096d9daa73f0bd8229e179fe36eab09d80abfffa058d9751",
+      "disposition_group": 14
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        4,
+        7,
+        8,
+        9,
+        46,
+        49,
+        52,
+        53,
+        54
+      ],
+      "disposition": "retained",
+      "reason": "Purpose, ordinary nested READ-to-WRITE trigger, CAS reset, common holder increment and unselected permit/reject policy are retained. Live/local duplicate concepts are combined in one current-source account. Trigger is explicitly scoped to the sole holder.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6410",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6452-L6495"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        48
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate AS-IS/TO-BE/impact tables are expressed as four opening fields plus the triage argument. Supported early-unlatch/internal-error consequences are retained with historical runtime attribution and no SQL/data-corruption assertion.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6661",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_debug.log#L12-L32",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_release.log#L1-L7"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        50
+      ],
+      "disposition": "corrected",
+      "reason": "Shared SA/SERVER ordinary accounting source and page_buffer.c focus are retained. Unverified prediction of unchanged public SQL/disk compatibility is removed; caller compatibility is an ANALYSIS question, especially for rejecting ordinary promotion.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6495"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        51
+      ],
+      "disposition": "corrected",
+      "reason": "Fix/unfix and BCB/holder meanings are retained. BCB-wide count is distinguished from per-thread count; equality is scoped to the sole holder rather than all successful callers generally. Latch is distinguished from transaction lock.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6370-L6378",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6103-L6135",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6661"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        55
+      ],
+      "disposition": "corrected",
+      "reason": "Pre/post-atomic accounting regression is retained with directly verified immutable parent and child code. Debug was not simply a graceful ER_FAILED rejection: assertions precede return. 2014 check is verified as existing there; release increment code alone does not establish a supported API contract. Old 5f current-source label is replaced by pinned f6 while 5f remains historical.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/051851d1e1a04b43c649159fb71a5cf3177e662a/src/storage/page_buffer.c#L5968-L6041",
+        "https://github.com/CUBRID/cubrid/blob/58cef8e01fcf121acbe3a35b7249deda54217532/src/storage/page_buffer.c#L6173-L6182",
+        "https://github.com/CUBRID/cubrid/blob/58cef8e01fcf121acbe3a35b7249deda54217532/src/storage/page_buffer.c#L6255-L6265",
+        "https://github.com/CUBRID/cubrid/blob/076bf011458615c7262c56f5e4fe999e8d1459ae/src/storage/page_buffer.c#L4831-L4849"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        56
+      ],
+      "disposition": "corrected",
+      "reason": "All originally reported build identities are preserved but separated from independently inspected preserved logs. Original 198b42a/f799 claims are attributed to the immutable original notes; preserved follow-up debug is attributed to 5f and release to recorded short 0888ccb. No same-commit comparison, new f6 runtime execution, SQL reproduction, or release-tag exposure is claimed.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md#L48-L54",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L56-L92"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate original probe source units (headers, printing, argc/login/restart, thread/VPID, READ/READ/WRITE, _Exit) are preserved through an immutable committed extended probe reference and explanation. Original vs18 stopped before unfix; replacement source includes three unfixes and error observations. Diagnostic pointer reads after unfix and _Exit limitation are explicit.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md#L58-L109",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/cbrd27370_probe.cpp"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate GDB/setup/build/compile/createdb/run units are replaced with a complete portable proposed CMake plus compiler/GDB procedure using pinned source assets, explicit matching source/build/install identity, -DNDEBUG for release, temporary data/registry paths and holder-aware script. No personal command or first-found SA library is required. Procedure is clearly unexecuted.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/cbrd27370_probe.gdb",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/CBRD-27370-claim-verification-report_5f3a30d_claude.md#L94-L108",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L281-L335"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        32,
+        75,
+        76
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate conditional expected results for allowing versus rejecting ordinary promotion are retained, including 3-to-0 accounting or preservation of two READ fixes on rejection. Neither policy is selected.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6370-L6378",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6452-L6495"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        35,
+        77,
+        79
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate observed READ/READ/WRITE BCB/holder values and latch-number meanings are retained as historical debug evidence, with release raw log observation limits made explicit.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_debug.log#L12-L32",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_release.log#L1-L7",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.h#L189-L197"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        78
+      ],
+      "disposition": "corrected",
+      "reason": "Successful third call, early first-unfix unlatch, debug assertion and release later errors are retained with separate historical build attribution. Wording implying a negative BCB was stored then repaired is corrected: current negative branch changes local impl_new then breaks before CAS; preserved logs show observed zero and error -19.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_debug.log#L12-L32",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/run_release.log#L1-L7",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6661"
+      ]
+    },
+    {
+      "ids": [
+        36,
+        80
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate old line-only code tables are replaced by verified immutable current f6 line links. Dedicated promotion is described as preserving existing debt on inspected branches, not a blanket guarantee that its entire implementation is unaffected.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6361-L6410",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6452-L6495",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6661",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2825-L2918",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2924-L2981"
+      ]
+    },
+    {
+      "ids": [
+        37,
+        81
+      ],
+      "disposition": "corrected",
+      "reason": "Duplicate allow/fix-count versus reject/use-dedicated options are retained as candidates, expanded to compare limits, caller compatibility, unknown costs and decision evidence. A one-line fcnt increment is not presented as an agreed complete solution.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6370-L6395",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6497-L6506",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2825-L2918",
+        "https://github.com/CUBRID/cubrid/blob/051851d1e1a04b43c649159fb71a5cf3177e662a/src/storage/page_buffer.c#L5968-L6041"
+      ]
+    },
+    {
+      "ids": [
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        82,
+        83
+      ],
+      "disposition": "retained",
+      "reason": "Duplicate regression-test obligations are retained as observable acceptance/verification outcomes: one/two READs before WRITE, matching unfix counts, latch lifetime, other readers and WRITE waiters, dedicated-promotion control, debug/release and SA/SERVER. Final test design remains ANALYSIS.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/cbrd-27370/repro/cbrd27370_probe.cpp",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6370-L6395",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6661"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        12,
+        23,
+        30,
+        45,
+        47,
+        57,
+        68,
+        84
+      ],
+      "disposition": "non-substantive",
+      "reason": "Field labels, temporary filename captions, a fence-only unit, and duplicate reference-only related-issue units are formatting/navigation rather than separate claims. Exact /tmp captions are superseded by portable pinned assets. CBRD-26425 and parent CBRD-27193 relationships are preserved in narrative with links.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27370-pgbuf-read-write-fix-count_5f3a30d_codex.md",
+        "https://jira.cubrid.org/browse/CBRD-26425",
+        "https://jira.cubrid.org/browse/CBRD-27193"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

@@ -5,6 +5,12 @@ Personal CUBRID Jira issue notes in Markdown format.
 Issue files live in the `issues/` directory, one file per Jira issue, named
 `CBRD-<number>[-slug].md`. See [`CLAUDE.md`](CLAUDE.md) for the full workflow.
 
+## Reviewed issue batches
+
+- [CBRD-27193 and all 19 subtasks, 2026-10-21](reviews/CBRD-27193-rewrite/README.md):
+  current-skill rewrites against CUBRID `f6cac312`, with per-issue review,
+  original-claim accounting, shared scope and description-publication status.
+
 ## Upload to Jira
 
 Use the `upload` just recipe to interactively upload a Markdown file to Jira:

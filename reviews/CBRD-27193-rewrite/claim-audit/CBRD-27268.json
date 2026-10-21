@@ -1,0 +1,1037 @@
+{
+  "issue": "CBRD-27268",
+  "reviewer": "/root",
+  "report_sha256": "f2f83000e1f8c06f49b64602ca53495d7e7daa3591df34c4c9dece7e60ccc18f",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27268-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: `double_write_buffer_size` 가 다른 크기 파라미터와 같은 문법(`0`, byte 정수, `512K`, `2M`)을 받아들이게 한다.",
+      "sha256": "62e04e5e69e1194342474bc1023fd46270be3fc19f9c70b58b674588dc243843",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |\n|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | `double_write_buffer_size` 는 바이트 값을 받는 크기 파라미터인데 `PRM_INTEGER` 이면서 `PRM_SIZE_UNIT` 플래그가 없다(`system_parameter.c:4340-4351`). 그래서 `2M` 같은 단위 표기가 파싱 단계에서 거부되고, CUBRID 의 conf 로더는 값 오류를 경고로 넘기지 않고 로드 전체를 실패시키므로 서버가 기동을 중단한다. 반면 byte 값을 받는 다른 크기 파라미터는 예외 없이 `PRM_BIGINT` + `PRM_SIZE_UNIT` 조합이라 같은 표기를 정상 처리한다 --- `db_volume_size`, `log_volume_size`, `max_subquery_cache_size` 등. |\n| **TO-BE (목표 상태 / 기대 동작)** | 아래 대비대로, 다른 크기 파라미터와 같은 입력 문법을 받는다. 값의 의미(0 = DWB 비활성, 상한 32 MiB, 2의 거듭제곱 반올림)는 그대로 둔다.                                                                                                                                                                                                                                                                                                                                                                   |\n| **영향**                          | 고객 장애 --- 문법 오류가 경고가 아니라 서버 기동 실패로 나타난다. `cubrid server start` 는 실패 원인을 보여주지 않고 start timeout 으로만 끝나므로, 원인이 conf 한 줄의 단위 표기라는 사실을 찾는 데 시간이 든다. `data_buffer_size=16M` 이 동작하는 것을 본 사용자가 같은 문법을 DWB 에 쓰는 것은 자연스러운 오사용이다.                                                                                                                                                                                |",
+      "sha256": "4421254d1fbff4c925ec2441be109c452499dc77c25fad271fbdb231e14ed4ec",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27268-C004",
+      "origin": "live-description",
+      "text": "AS-IS / TO-BE 입력 대비:",
+      "sha256": "4b047f60b761aca7830a63ede9d4acec657fdc23946ed519cf0de8717f70b3a7",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C005",
+      "origin": "live-description",
+      "text": "| conf 입력                          | 현재 동작            | 목표 동작             |\n|------------------------------------|----------------------|-----------------------|\n| `double_write_buffer_size=2097152` | 2 MiB 로 해석 (정상) | 동일                  |\n| `double_write_buffer_size=2M`      | 서버 기동 실패       | 2097152 바이트로 해석 |\n| `double_write_buffer_size=512K`    | 서버 기동 실패       | 524288 바이트로 해석  |\n| `double_write_buffer_size=0`       | DWB 비활성 (정상)    | 동일                  |",
+      "sha256": "04a3aecb063799651c5936f3cd066f6b8c4e8d750f09541cde410fef5ba8abea",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27268-C006",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C007",
+      "origin": "live-description",
+      "text": "-   파라미터 정의를 `PRM_BIGINT` + `PRM_SIZE_UNIT` 로 바꿔 다른 byte 단위 파라미터와 같은 패턴에 맞춘다. 상·하한(0 \\~ 32 MiB)은 현행 유지한다.",
+      "sha256": "7219fc0de6b75ce3902a538d2579c03ae957542348b0b32dd66851bb094f2314",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C008",
+      "origin": "live-description",
+      "text": "-   `PRM_INTEGER` 에 `PRM_SIZE_UNIT` 만 붙이는 방식은 쓸 수 없다 --- `PRM_DIFFER_UNIT` 이 함께 없으면 `sysprm_generate_new_value` 가 `:8920-8923` 에서 무조건 `PRM_ERR_BAD_VALUE` 를 반환한다.",
+      "sha256": "f4ff1b44b9bc3ddac9eea153af040deb0f8c2de9c9e211702586b57689cf6681",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27268-C009",
+      "origin": "live-description",
+      "text": "-   값 표시 형식이 바뀌는 부수 효과가 있으므로 Specification Changes 에 명시한다.",
+      "sha256": "986c94f1c9c08965b276bedd18739858d7380e7400430818c39e0da4bb3bdb07",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C010",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/base/system_parameter.c` 의 `PRM_ID_DWB_SIZE` 항목 하나와, 그 값을 읽는 유일한 소비자인 `src/storage/double_write_buffer.cpp:775`. 디스크 형식과 DWB 동작 자체는 바뀌지 않는다. 값 표시 경로(`SHOW PARAMETERS`, `cubrid paramdump`)의 출력 문자열이 `2097152` 에서 `2.0M` 형태로 바뀌므로 이 파라미터를 파싱하는 테스트와 운영 스크립트가 영향을 받는다.",
+      "sha256": "83f33648874e7ca700781b37e96f02bf1ede0b68d86448ae6a52fb4da662252a",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27268-C011",
+      "origin": "live-description",
+      "text": "-   부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D5(크기 단위 문법 거부와 그로 인한 기동 실패)다.",
+      "sha256": "11eb673339ee0b13ac358943ce5d35ec40a87d3f4fc312d68a5cbdfb9eb6b5b5",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27268-C012",
+      "origin": "live-description",
+      "text": "DWB(Double Write Buffer --- 데이터 page 를 원래 위치에 쓰기 전에 별도 파일에 사본을 먼저 기록해 torn write 로부터 보호하는 장치)의 크기는 `double_write_buffer_size` 로 바이트 단위로 지정한다. 기본값은 2 MiB 이고 상한은 32 MiB, 0 은 DWB 비활성을 뜻한다.",
+      "sha256": "6f7dce8512e4d6a8dc3eda2c90a8b17bae9dd89eebcf569d055be102bc747345",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27268-C013",
+      "origin": "live-description",
+      "text": "문제는 이 파라미터가 크기 파라미터인데도 크기 단위 문법을 지원하지 않는 것이고, 더 나쁜 것은 그 거부가 조용하지 않다는 점이다. CUBRID 의 conf 로더는 잘못된 값을 만나면 그 파라미터만 건너뛰지 않고 로드 전체를 실패시킨다.",
+      "sha256": "65eb0168bfab5e830c70c028acfcdbbb8665e652878d8d021ec5f8c6d47b6f87",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27268-C014",
+      "origin": "live-description",
+      "text": "``` bash\n# 1. conf 에 크기 단위 표기로 값을 지정\ncat >> $CUBRID/conf/cubrid.conf <<'EOF'\ndouble_write_buffer_size=2M\nEOF",
+      "sha256": "084c8eeaea0e774087fb8275cb1522bd2183dd8c54bdbb1fd32a31af16b28d51",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27268-C015",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C016",
+      "origin": "live-description",
+      "text": "`cubrid server start` 는 실패 원인을 그대로 보여주지 않고 기동 대기 후 timeout 으로 끝난다. 실제 원인은 서버 프로세스의 stderr 와 에러 로그에 남는다.",
+      "sha256": "842ff0c4373897b8562f43984d634a45520dbfb6b3b073cfb00c59cac830bdf6",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27268-C017",
+      "origin": "live-description",
+      "text": "The 'double_write_buffer_size' parameter at line <N> in file '<CUBRID>/conf/cubrid.conf' : Value type does not match parameter type.\n    ERROR CODE = -839  ... \"double_write_buffer_size\": Unknown system parameter or bad value.\n    ERROR CODE = -1076 ... Could not load system parameter.",
+      "sha256": "d2fb8fb4ebe735e7123d7f8ecb8c92e213a18cc453683aeeaccb2bc97a52b278",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27268-C018",
+      "origin": "live-description",
+      "text": "같은 파일에서 `data_buffer_size=16M` 은 정상 처리된다. 두 파라미터의 문법이 다르다는 사실은 어디에도 표시되지 않는다.",
+      "sha256": "99ddefc0a01e48920d8a680a6457b637c73a66cf31a77e6b0bc574cc743bf402",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27268-C019",
+      "origin": "live-description",
+      "text": "기대 동작은 `2M` 이 2097152 바이트로 해석되어 서버가 정상 기동하는 것이다.",
+      "sha256": "8f56e1718eaccf582d7724965d45abc79bcd511d9c09ebc7ff64f4c547cceecc",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C020",
+      "origin": "live-description",
+      "text": "prm_load_by_section ()                                    system_parameter.c:6536\n      └ prm_set (prm, \"2M\", true)                                          :6740\n           └ sysprm_generate_new_value ()                                  :8750\n                case PRM_INTEGER:                                          :8888\n                  ├ if (PRM_HAS_SIZE_UNIT (prm))     → 플래그 없음 → 미진입 :8899\n                  ├ else if (PRM_HAS_TIME_UNIT (prm))→ 플래그 없음 → 미진입 :8925\n                  └ else                                                   :8953\n                       parse_int (&val, \"2M\", 10)                          :8957\n                       ★ 실패 → return PRM_ERR_BAD_VALUE                   :8959-8962\n      ← error != NO_ERROR                                                  :6741\n           prm_report_bad_entry () → stderr + ER_PRM_BAD_VALUE(-839)       :6743\n           return error                                                    :6744\n    prm_read_and_parse_ini_file () → 그대로 반환                            :6776, :6810\n    sysprm_load_and_init_internal () → 그대로 반환                          :6298-6301\n    boot_restart_server ()                                        boot_sr.c:2029\n      ★ ER_BO_CANT_LOAD_SYSPRM(-1076) → goto error, 기동 중단              :2031-2033",
+      "sha256": "2f1cd12b234952a591f8ee1c898bfb30a8b8c58acfedd20ab2f52a1506eb0506",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27268-C021",
+      "origin": "live-description",
+      "text": "`PRM_INTEGER` 에 `PRM_SIZE_UNIT` 만 추가하는 것은 해결책이 되지 못한다. 그 조합은 `:8899` 로 들어간 뒤 `PRM_DIFFERENT_UNIT` 이 거짓이라 `:8920-8923` 의 `else` 로 빠져 무조건 `PRM_ERR_BAD_VALUE` 를 반환한다. `PRM_DIFFER_UNIT` 을 함께 붙이면 `PRM_ADJUST_FOR_SET_BIGINT_TO_INTEGER`(`:836-844`)가 `prm->set_dup` 함수 포인터를 호출하므로 변환 함수 한 쌍을 새로 만들어야 한다. 그런데 `double_write_buffer_size` 는 저장 단위가 이미 바이트라 변환할 것이 없다. `PRM_DIFFER_UNIT` 은 `data_buffer_size` 처럼 \\\"입력은 바이트, 저장은 page 수\\\" 인 파라미터를 위한 장치다(`:1211-1221`, `prm_size_to_io_pages` / `prm_io_pages_to_size`).",
+      "sha256": "4815dac55f112130a00d0546ff32a3cb46a75f7bc5af394250004428040194b2",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27268-C022",
+      "origin": "live-description",
+      "text": "`PRM_SIZE_UNIT` 을 가진 파라미터를 전수 대조한 결과, 조합은 정확히 두 종류로 갈린다.",
+      "sha256": "2fc5d6bcb6e338a4cea11edc32c2af59dcc6ac74842854c8689a84a06e02f278",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C023",
+      "origin": "live-description",
+      "text": "| 조합                                                               | 저장 단위                      | 예                                                                                                                                                                                                                                                                                             | `2M` 입력 |\n|--------------------------------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|\n| `PRM_BIGINT` + `PRM_SIZE_UNIT`                                     | 바이트                         | `db_volume_size`(`:3288`), `log_volume_size`(`:3300`), `thread_stacksize`(`:1612`), `max_subquery_cache_size`(`:5029`), `max_agg_hash_size`(`:3506`), `max_hash_list_scan_size`(`:3553`), `group_concat_max_len`(`:2040`), `ib_task_memsize`(`:4497`), `backup_volume_max_size_bytes`(`:1658`) | 정상      |\n| `PRM_INTEGER` + `PRM_SIZE_UNIT` + `PRM_DIFFER_UNIT` + 변환 함수 쌍 | 바이트가 아닌 단위(page 수 등) | `data_buffer_size`(`:1211`), `log_buffer_size`(`:1380`), `max_flush_size_per_second`(`:1887`) 등                                                                                                                                                                                               | 정상      |\n| `PRM_INTEGER`, 플래그 없음                                         | 바이트                         | `double_write_buffer_size`(`:4340`)                                                                                                                                                                                                                                                            | **거부**  |",
+      "sha256": "22e9744ac0178553bce42148ed17f564b2486cd93b4ea4af2dbf5ce8e2da163c",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C024",
+      "origin": "live-description",
+      "text": "즉 `double_write_buffer_size` 만 크기 파라미터인데 어느 패턴에도 속하지 않는다. 저장 단위가 바이트이므로 첫 번째 패턴이 정확한 짝이다.",
+      "sha256": "f2eaaf549f9a06ac7b38462f35a4ab9fb5769aa6b78c3351d5797610f90746e1",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C025",
+      "origin": "live-description",
+      "text": "> **요지**: 다른 바이트 단위 파라미터는 예외 없이 `PRM_BIGINT` + `PRM_SIZE_UNIT` 이다. 이 파라미터를 그 패턴으로 옮기면 새 파싱 코드나 변환 함수 없이 문법이 통일된다.",
+      "sha256": "d697bb66c213fb0f1ca3e749282c361917712b12670f91437776f38a34dd3a7e",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C026",
+      "origin": "live-description",
+      "text": "허용 단위는 `util_size_string_to_byte`(`util_common.c:1123`)와 `util_size_to_byte`(`:1005`)가 정하며, 대소문자를 구분하지 않는다.",
+      "sha256": "a087874001b0736ef68e2311220811d584b28d459eec398ed358e76f5dc48a78",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27268-C027",
+      "origin": "live-description",
+      "text": "| 입력 형태            | 해석                                                        |\n|----------------------|-------------------------------------------------------------|\n| 접미사 없는 수       | 바이트                                                      |\n| `B`                  | 바이트                                                      |\n| `K`, `KB`            | KiB (x 1024)                                                |\n| `M`, `MB`            | MiB (x 1024\\^2)                                             |\n| `G`, `GB` 및 그 이상 | 문법으로는 허용되나 상한 32 MiB 를 넘어 `PRM_ERR_BAD_RANGE` |",
+      "sha256": "eeab848def4b06affecb1d23a47b3b0ca3834406f404826d69bb3bfc5ba86b51",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27268-C028",
+      "origin": "live-description",
+      "text": "파싱을 통과한 값은 `dwb_load_buffer_size`(`double_write_buffer.cpp:769-785`)가 아래처럼 보정한다. 지금도 같은 규칙이지만 매뉴얼에 드러나 있지 않아 함께 문서화한다.",
+      "sha256": "9403aa580fd943205906ddb35680043c5f79d115d1f4a80f29c198c6950ba0d4",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27268-C029",
+      "origin": "live-description",
+      "text": "| 입력 값                                            | 최종 값                                                               | 근거                                                    |\n|----------------------------------------------------|-----------------------------------------------------------------------|---------------------------------------------------------|\n| 0                                                  | DWB 비활성                                                            | `:776-780`                                              |\n| 0 초과 512 KiB 미만                                | 512 KiB (`DWB_MIN_SIZE`)                                              | `dwb_power2_ceil` `:737-740`                            |\n| 512 KiB 이상 32 MiB 이하이면서 2의 거듭제곱이 아님 | 다음 2의 거듭제곱으로 올림                                            | `:745-755`                                              |\n| 32 MiB 초과                                        | 파라미터 상한 검사에서 `PRM_ERR_BAD_RANGE` (`DWB_MAX_SIZE` 도 32 MiB) | `system_parameter.c:4347`, `double_write_buffer.cpp:53` |",
+      "sha256": "b8cd5989f3e6498218598396ad01a2ec36eab6958d825ce0313a777b158589ac",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27268-C030",
+      "origin": "live-description",
+      "text": "즉 `600K` 를 지정하면 실제로는 1 MiB 가 되고, 이 반올림은 경고 없이 일어난다. 매뉴얼에 반올림 규칙을 적는다.",
+      "sha256": "b1323dcc3f64e5e84110092dce1e3f7f80ce91dde87df07482d293951e7ad285",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27268-C031",
+      "origin": "live-description",
+      "text": "`PRM_SIZE_UNIT` 이 붙으면 값 출력이 `util_byte_to_size_string` 을 거친다(`system_parameter.c:7848-7852`). `SHOW PARAMETERS` 와 `cubrid paramdump` 의 표시가 `double_write_buffer_size=2097152` 에서 `double_write_buffer_size=2.0M` 형태로 바뀐다. 다른 크기 파라미터와 같은 표시 형식이 되므로 일관성은 개선되지만, 이 값을 정수로 파싱하는 기존 테스트와 스크립트는 갱신이 필요하다.",
+      "sha256": "b768af718e6d728b2127bc5bf7f8c4be2744cf81f663ed3eb0f915bb18ed2170",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C032",
+      "origin": "live-description",
+      "text": "| 파일 / 라인                    | 변경                                                                                                                                                                                                 |\n|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `system_parameter.c:4342`      | `static_flag` 에 `PRM_SIZE_UNIT` 를 추가한다. 최종 플래그 조합은 아래 코드 블록 참조                                                                                                                 |\n| `system_parameter.c:4343`      | `PRM_INTEGER` → `PRM_BIGINT`                                                                                                                                                                         |\n| `system_parameter.c:4345-4348` | 기본값·상한·하한의 공용체 멤버를 `.i` 에서 `.bi` 로 변경. 값 자체는 유지 (2 MiB / 2 MiB / 32 MiB / 0)                                                                                                |\n| `double_write_buffer.cpp:775`  | `prm_get_integer_value (PRM_ID_DWB_SIZE)` → `prm_get_bigint_value (PRM_ID_DWB_SIZE)`. 대상 변수가 `unsigned int *` 이므로 명시적 캐스팅을 붙인다. 상한이 32 MiB 라 `unsigned int` 범위를 넘지 않는다 |",
+      "sha256": "9fb75a55a6cd1de90309df4fad4ccd45d74159310b0fcd691bb2f6c57ff201d5",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C033",
+      "origin": "live-description",
+      "text": "`system_parameter.c:4342-4343` 의 변경 후 모습이다.",
+      "sha256": "309913787ad07ee989b44f54c8927989601be668df0f22b4f4f0f931ed2748d1",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C034",
+      "origin": "live-description",
+      "text": "``` c\n  {PRM_ID_DWB_SIZE,\n   PRM_NAME_DWB_SIZE,\n   (PRM_FOR_SERVER | PRM_USER_CHANGE | PRM_SIZE_UNIT),\n   PRM_BIGINT,",
+      "sha256": "7aceeea33a2b478c93d650939f551d1cfa75b0c3f2605cc9749dcecb23fe91b6",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C035",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C036",
+      "origin": "live-description",
+      "text": "`prm_get_bigint_value` 는 `system_parameter.h:831`, `:949` 에 이미 선언되어 있으므로 새 접근자를 만들 필요는 없다. `PRM_ID_DWB_SIZE` 를 참조하는 다른 지점은 없다 --- 전체 소스에서 이 파라미터를 읽는 곳은 `double_write_buffer.cpp:775` 한 곳이다.",
+      "sha256": "fea7faa12661ef42b6874a792ce58239336bd3322181be90eb1d661bb7f3a849",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C037",
+      "origin": "live-description",
+      "text": "| 순위 | 후보                                                                    | 권장 이유 / 고려사항                                                                                                                                                   |\n|------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 1    | `PRM_BIGINT` + `PRM_SIZE_UNIT` 로 전환                                  | 다른 바이트 단위 파라미터 전부와 동일한 패턴이라 파싱·표시·범위 검사가 모두 기존 코드로 처리된다. 변경량이 5줄 수준이다. 값 표시 형식이 바뀌는 것이 유일한 부수 효과다 |\n| 2    | 문법은 그대로 두고 에러 메시지만 개선                                   | 기동 실패 자체는 남는다. 사용자가 원인을 빨리 찾을 수 있게 되는 것뿐이라 근본 해결이 아니다. 다른 크기 파라미터와의 비일관성도 남는다                                  |\n| 3    | `PRM_INTEGER` + `PRM_SIZE_UNIT` + `PRM_DIFFER_UNIT` + 항등 변환 함수 쌍 | 저장 단위가 이미 바이트라 변환 함수가 아무 일도 하지 않는 껍데기가 된다. `PRM_DIFFER_UNIT` 의 설계 의도와 맞지 않는다                                                  |",
+      "sha256": "0b5f20fca64173cfc5633af2ce81d743f9602466dd76bba6c5ecf45bd1b7c752",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27268-C038",
+      "origin": "live-description",
+      "text": "``` bash\n# 단위 문법 수용\necho 'double_write_buffer_size=2M' >> $CUBRID/conf/cubrid.conf\ncubrid server start demodb\ncsql -u dba -S demodb -c \"SHOW PARAMETERS\" | grep double_write_buffer_size",
+      "sha256": "1a8b0f81a13e7a55dd5360c99145abd949109e2960ff9705b815f2e40ddb7966",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27268-C039",
+      "origin": "live-description",
+      "text": "```",
+      "sha256": "f1b901847390b0ed7e374e7c1e464ec17b46a427c487a5ad6cbd2906405083d5",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C040",
+      "origin": "live-description",
+      "text": "-   [ ] `double_write_buffer_size=2M`, `=512K`, `=2097152`, `=0` 네 표기가 모두 서버 기동을 막지 않는다.",
+      "sha256": "dbc5b593417692f8f1f075250b1c4d0e0c1e043790eb53994dd328e228d11e5b",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C041",
+      "origin": "live-description",
+      "text": "-   [ ] `2M` 과 `2097152` 가 동일한 DWB 크기로 동작한다.",
+      "sha256": "47bae644d113418c5a3d4178a19a08463eb5bc92798394e4a7e0d003da92cbb8",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C042",
+      "origin": "live-description",
+      "text": "-   [ ] 32 MiB 초과 값은 `PRM_ERR_BAD_RANGE` 로 거부되고, 상한이 `DWB_MAX_SIZE` 와 일치한다.",
+      "sha256": "2de8f9fcad1c49c3913ddb3244ec2d66a2ef494763bcb1a01eb0de523efa89d9",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27268-C043",
+      "origin": "live-description",
+      "text": "-   [ ] `0` 은 DWB 비활성으로 계속 동작한다.",
+      "sha256": "7679259794df03bd6bee4c164fc4ded8604eaef29efb209dd2b5c74f34d5435e",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C044",
+      "origin": "live-description",
+      "text": "-   [ ] `SHOW PARAMETERS` 와 `cubrid paramdump` 의 표시 형식 변경이 문서와 관련 테스트에 반영된다.",
+      "sha256": "a012e6cb942f1ef905272521a05a4b85a8e37969f8ce6e43a01b3163fc79da58",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C045",
+      "origin": "live-description",
+      "text": "-   [ ] 512 KiB 미달 값과 2의 거듭제곱이 아닌 값의 반올림 규칙이 매뉴얼에 기술된다.",
+      "sha256": "1d0b335dea65ae0a927d4d60e99109edac44c55009ecc9c9082d1fa4fdc4202d",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27268-C046",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria 충족",
+      "sha256": "0ea4a17918fef8cc37098a111487d52496e3d2ec6ab4b5cbe13fd0d6508e5d5d",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C047",
+      "origin": "live-description",
+      "text": "-   [ ] QA 통과 (파라미터 표기를 검증하는 기존 shell 테스트 기대값 갱신 포함)",
+      "sha256": "707651efdf7a6a7f0849ad71cdb7afd5b65406931b466c03dc89061d09ad5b7a",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27268-C048",
+      "origin": "live-description",
+      "text": "-   [ ] 매뉴얼의 `double_write_buffer_size` 설명에 허용 단위와 반올림 규칙 반영",
+      "sha256": "9a1c0bb4723e6aea9c9a55fb34d96cf9aa7556d70980321594cd99d86b8682fb",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27268-C049",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:4340-4351` --- `PRM_ID_DWB_SIZE` 파라미터 정의",
+      "sha256": "052f91a1e78bdabdf23fcdbf07705cc662567d32151745c86ca96b5d92449c84",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C050",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:8750`, `:8888-9028` --- `sysprm_generate_new_value` 의 `PRM_INTEGER` / `PRM_BIGINT` 파싱 분기",
+      "sha256": "9c1eba414cd4bc139297a7edd71c88b13a401db68bd1d0b8b09888d8672eaa61",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C051",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:6536-6749` --- `prm_load_by_section`, 값 오류 시 로드 전체 실패",
+      "sha256": "e933538b149300fbe1f1ea89cc7e80498ed3d7fad2b718e7946b6094e7895007",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C052",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:7848-7852` --- `PRM_SIZE_UNIT` 값의 표시 경로",
+      "sha256": "f6671406d2f4994d48ea71fe58fe53b55641ae067724a29e220b268bbf83eb05",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C053",
+      "origin": "live-description",
+      "text": "-   `src/base/system_parameter.c:1211-1221` --- `data_buffer_size` 의 `PRM_DIFFER_UNIT` 패턴 (대조용)",
+      "sha256": "fb734949412ccf3a16fa636832602e7759c0d798d9f1286bbe5c4ec046d70e85",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C054",
+      "origin": "live-description",
+      "text": "-   `src/executables/util_common.c:1005-1163` --- `util_size_to_byte`, `util_size_string_to_byte` 허용 단위",
+      "sha256": "61ccce0ebf34d35fe25281a5337b23c22d5ced174ed1d6785503813b99713fd0",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C055",
+      "origin": "live-description",
+      "text": "-   `src/storage/double_write_buffer.cpp:732-785` --- `dwb_power2_ceil`, `dwb_load_buffer_size`",
+      "sha256": "564b2cd766066c2684b4b6bedbb3debe26bb13c0d897a816b7c3ae2d0ae7d08d",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C056",
+      "origin": "live-description",
+      "text": "-   `src/storage/double_write_buffer.cpp:52-53` --- `DWB_MIN_SIZE`(512 KiB), `DWB_MAX_SIZE`(32 MiB)",
+      "sha256": "db3e8595292fa919279c6799cadca0a8039c5ee08fb157a31054f6a3e4768777",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C057",
+      "origin": "live-description",
+      "text": "-   `src/transaction/boot_sr.c:2029-2034` --- 파라미터 로드 실패 시 기동 중단",
+      "sha256": "9a438eaad1b9f04feec56ea1d1b0b38768b5fa8fb186a41347915dc264734579",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C058",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193",
+      "sha256": "64b84f8f519b14bdeeef560bbd260603d4204093f3570c22acbe0652abdf073a",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27268-C059",
+      "origin": "live-description",
+      "text": "-   `double_write_buffer_blocks`(`system_parameter.c:4352-4363`)는 개수 파라미터라 크기 단위 문법 대상이 아니다. 다만 이쪽도 `dwb_power2_ceil` 로 2의 거듭제곱 반올림이 조용히 일어나므로(`double_write_buffer.cpp:808`) 반올림 규칙 문서화는 두 파라미터에 함께 적용하는 편이 낫다.",
+      "sha256": "017f37063368a74768fa0452a8ab241011425b6c51f4b6937613e86a72b020c0",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27268-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: `double_write_buffer_size` 가 다른 크기 파라미터와 같은 문법(`0`, byte 정수, `512K`, `2M`)을 받아들이게 한다.",
+      "sha256": "62e04e5e69e1194342474bc1023fd46270be3fc19f9c70b58b674588dc243843",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | `double_write_buffer_size` 는 바이트 값을 받는 크기 파라미터인데 `PRM_INTEGER` 이면서 `PRM_SIZE_UNIT` 플래그가 없다(`system_parameter.c:4340-4351`). 그래서 `2M` 같은 단위 표기가 파싱 단계에서 거부되고, CUBRID 의 conf 로더는 값 오류를 경고로 넘기지 않고 로드 전체를 실패시키므로 서버가 기동을 중단한다. 반면 byte 값을 받는 다른 크기 파라미터는 예외 없이 `PRM_BIGINT` + `PRM_SIZE_UNIT` 조합이라 같은 표기를 정상 처리한다 — `db_volume_size`, `log_volume_size`, `max_subquery_cache_size` 등. |\n| **TO-BE (목표 상태 / 기대 동작)** | 아래 대비대로, 다른 크기 파라미터와 같은 입력 문법을 받는다. 값의 의미(0 = DWB 비활성, 상한 32 MiB, 2의 거듭제곱 반올림)는 그대로 둔다. |\n| **영향** | 고객 장애 — 문법 오류가 경고가 아니라 서버 기동 실패로 나타난다. `cubrid server start` 는 실패 원인을 보여주지 않고 start timeout 으로만 끝나므로, 원인이 conf 한 줄의 단위 표기라는 사실을 찾는 데 시간이 든다. `data_buffer_size=16M` 이 동작하는 것을 본 사용자가 같은 문법을 DWB 에 쓰는 것은 자연스러운 오사용이다. |",
+      "sha256": "52ecb004827352fe73cc174dec01d073d205c4b86e9f20eae3bd1b2ca573888c",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27268-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "AS-IS / TO-BE 입력 대비:",
+      "sha256": "4b047f60b761aca7830a63ede9d4acec657fdc23946ed519cf0de8717f70b3a7",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| conf 입력 | 현재 동작 | 목표 동작 |\n|---|---|---|\n| `double_write_buffer_size=2097152` | 2 MiB 로 해석 (정상) | 동일 |\n| `double_write_buffer_size=2M` | 서버 기동 실패 | 2097152 바이트로 해석 |\n| `double_write_buffer_size=512K` | 서버 기동 실패 | 524288 바이트로 해석 |\n| `double_write_buffer_size=0` | DWB 비활성 (정상) | 동일 |",
+      "sha256": "2fd32f3f11f6843e848634420ae1567b571b719ae085f7a421ede743eaf615b2",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27268-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- 파라미터 정의를 `PRM_BIGINT` + `PRM_SIZE_UNIT` 로 바꿔 다른 byte 단위 파라미터와 같은 패턴에 맞춘다. 상·하한(0 ~ 32 MiB)은 현행 유지한다.\n- `PRM_INTEGER` 에 `PRM_SIZE_UNIT` 만 붙이는 방식은 쓸 수 없다 — `PRM_DIFFER_UNIT` 이 함께 없으면 `sysprm_generate_new_value` 가 `:8920-8923` 에서 무조건 `PRM_ERR_BAD_VALUE` 를 반환한다.\n- 값 표시 형식이 바뀌는 부수 효과가 있으므로 Specification Changes 에 명시한다.",
+      "sha256": "663a614f0b815cf494ff2ddf5978073d1f617362dfbc0297c2c84db27d1504d0",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/base/system_parameter.c` 의 `PRM_ID_DWB_SIZE` 항목 하나와, 그 값을 읽는 유일한 소비자인 `src/storage/double_write_buffer.cpp:775`. 디스크 형식과 DWB 동작 자체는 바뀌지 않는다. 값 표시 경로(`SHOW PARAMETERS`, `cubrid paramdump`)의 출력 문자열이 `2097152` 에서 `2.0M` 형태로 바뀌므로 이 파라미터를 파싱하는 테스트와 운영 스크립트가 영향을 받는다.\n- 부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D5(크기 단위 문법 거부와 그로 인한 기동 실패)다.",
+      "sha256": "42cbda08aaf134353ec086799ffe92888d36ac7e3f8b8e43edcc7a1d293c238a",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27268-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "DWB(Double Write Buffer — 데이터 page 를 원래 위치에 쓰기 전에 별도 파일에 사본을 먼저 기록해 torn write 로부터 보호하는 장치)의 크기는 `double_write_buffer_size` 로 바이트 단위로 지정한다. 기본값은 2 MiB 이고 상한은 32 MiB, 0 은 DWB 비활성을 뜻한다.",
+      "sha256": "0b21782bf3338935ba8667ff50b85cf629d1dc377daa1d6ded42dc41349f06e2",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27268-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "문제는 이 파라미터가 크기 파라미터인데도 크기 단위 문법을 지원하지 않는 것이고, 더 나쁜 것은 그 거부가 조용하지 않다는 점이다. CUBRID 의 conf 로더는 잘못된 값을 만나면 그 파라미터만 건너뛰지 않고 로드 전체를 실패시킨다.",
+      "sha256": "65eb0168bfab5e830c70c028acfcdbbb8665e652878d8d021ec5f8c6d47b6f87",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27268-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "```bash\n# 1. conf 에 크기 단위 표기로 값을 지정\ncat >> $CUBRID/conf/cubrid.conf <<'EOF'\ndouble_write_buffer_size=2M\nEOF",
+      "sha256": "da934bb6a525b02d679ecac66f03240619478c8d5a71751514e284da7c0a2e7e",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27268-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`cubrid server start` 는 실패 원인을 그대로 보여주지 않고 기동 대기 후 timeout 으로 끝난다. 실제 원인은 서버 프로세스의 stderr 와 에러 로그에 남는다.",
+      "sha256": "842ff0c4373897b8562f43984d634a45520dbfb6b3b073cfb00c59cac830bdf6",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27268-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "```\nThe 'double_write_buffer_size' parameter at line <N> in file '<CUBRID>/conf/cubrid.conf' : Value type does not match parameter type.\nERROR CODE = -839  ... \"double_write_buffer_size\": Unknown system parameter or bad value.\nERROR CODE = -1076 ... Could not load system parameter.\n```",
+      "sha256": "ea0049e43ecfb7a167c8295930e9bee60ea6ad33628ecb790113ca6ce371e40e",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27268-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "같은 파일에서 `data_buffer_size=16M` 은 정상 처리된다. 두 파라미터의 문법이 다르다는 사실은 어디에도 표시되지 않는다.",
+      "sha256": "99ddefc0a01e48920d8a680a6457b637c73a66cf31a77e6b0bc574cc743bf402",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27268-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "기대 동작은 `2M` 이 2097152 바이트로 해석되어 서버가 정상 기동하는 것이다.",
+      "sha256": "8f56e1718eaccf582d7724965d45abc79bcd511d9c09ebc7ff64f4c547cceecc",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27268-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "```\nprm_load_by_section ()                                    system_parameter.c:6536\n  └ prm_set (prm, \"2M\", true)                                          :6740\n       └ sysprm_generate_new_value ()                                  :8750\n            case PRM_INTEGER:                                          :8888\n              ├ if (PRM_HAS_SIZE_UNIT (prm))     → 플래그 없음 → 미진입 :8899\n              ├ else if (PRM_HAS_TIME_UNIT (prm))→ 플래그 없음 → 미진입 :8925\n              └ else                                                   :8953\n                   parse_int (&val, \"2M\", 10)                          :8957\n                   ★ 실패 → return PRM_ERR_BAD_VALUE                   :8959-8962\n  ← error != NO_ERROR                                                  :6741\n       prm_report_bad_entry () → stderr + ER_PRM_BAD_VALUE(-839)       :6743\n       return error                                                    :6744\nprm_read_and_parse_ini_file () → 그대로 반환                            :6776, :6810\nsysprm_load_and_init_internal () → 그대로 반환                          :6298-6301\nboot_restart_server ()                                        boot_sr.c:2029\n  ★ ER_BO_CANT_LOAD_SYSPRM(-1076) → goto error, 기동 중단              :2031-2033\n```",
+      "sha256": "7e10d3c0cf97e7347a839e8a8c1f11f9ca136950e5f2a90b44bb8261541efa27",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27268-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`PRM_INTEGER` 에 `PRM_SIZE_UNIT` 만 추가하는 것은 해결책이 되지 못한다. 그 조합은 `:8899` 로 들어간 뒤 `PRM_DIFFERENT_UNIT` 이 거짓이라 `:8920-8923` 의 `else` 로 빠져 무조건 `PRM_ERR_BAD_VALUE` 를 반환한다. `PRM_DIFFER_UNIT` 을 함께 붙이면 `PRM_ADJUST_FOR_SET_BIGINT_TO_INTEGER`(`:836-844`)가 `prm->set_dup` 함수 포인터를 호출하므로 변환 함수 한 쌍을 새로 만들어야 한다. 그런데 `double_write_buffer_size` 는 저장 단위가 이미 바이트라 변환할 것이 없다. `PRM_DIFFER_UNIT` 은 `data_buffer_size` 처럼 \"입력은 바이트, 저장은 page 수\" 인 파라미터를 위한 장치다(`:1211-1221`, `prm_size_to_io_pages` / `prm_io_pages_to_size`).",
+      "sha256": "73d609468fe9900ba5e8bda07be9091a5844294b9d262022ccf457b64128fc88",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27268-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`PRM_SIZE_UNIT` 을 가진 파라미터를 전수 대조한 결과, 조합은 정확히 두 종류로 갈린다.",
+      "sha256": "2fc5d6bcb6e338a4cea11edc32c2af59dcc6ac74842854c8689a84a06e02f278",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 조합 | 저장 단위 | 예 | `2M` 입력 |\n|---|---|---|---|\n| `PRM_BIGINT` + `PRM_SIZE_UNIT` | 바이트 | `db_volume_size`(`:3288`), `log_volume_size`(`:3300`), `thread_stacksize`(`:1612`), `max_subquery_cache_size`(`:5029`), `max_agg_hash_size`(`:3506`), `max_hash_list_scan_size`(`:3553`), `group_concat_max_len`(`:2040`), `ib_task_memsize`(`:4497`), `backup_volume_max_size_bytes`(`:1658`) | 정상 |\n| `PRM_INTEGER` + `PRM_SIZE_UNIT` + `PRM_DIFFER_UNIT` + 변환 함수 쌍 | 바이트가 아닌 단위(page 수 등) | `data_buffer_size`(`:1211`), `log_buffer_size`(`:1380`), `max_flush_size_per_second`(`:1887`) 등 | 정상 |\n| `PRM_INTEGER`, 플래그 없음 | 바이트 | `double_write_buffer_size`(`:4340`) | **거부** |",
+      "sha256": "99d952eadcdfe040c573c65f7b9098c350ca0c62785ff48e1ea0fceb16a97b33",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "즉 `double_write_buffer_size` 만 크기 파라미터인데 어느 패턴에도 속하지 않는다. 저장 단위가 바이트이므로 첫 번째 패턴이 정확한 짝이다.",
+      "sha256": "f2eaaf549f9a06ac7b38462f35a4ab9fb5769aa6b78c3351d5797610f90746e1",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "> **요지**: 다른 바이트 단위 파라미터는 예외 없이 `PRM_BIGINT` + `PRM_SIZE_UNIT` 이다. 이 파라미터를 그 패턴으로 옮기면 새 파싱 코드나 변환 함수 없이 문법이 통일된다.",
+      "sha256": "d697bb66c213fb0f1ca3e749282c361917712b12670f91437776f38a34dd3a7e",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27268-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "허용 단위는 `util_size_string_to_byte`(`util_common.c:1123`)와 `util_size_to_byte`(`:1005`)가 정하며, 대소문자를 구분하지 않는다.",
+      "sha256": "a087874001b0736ef68e2311220811d584b28d459eec398ed358e76f5dc48a78",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27268-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 입력 형태 | 해석 |\n|---|---|\n| 접미사 없는 수 | 바이트 |\n| `B` | 바이트 |\n| `K`, `KB` | KiB (x 1024) |\n| `M`, `MB` | MiB (x 1024^2) |\n| `G`, `GB` 및 그 이상 | 문법으로는 허용되나 상한 32 MiB 를 넘어 `PRM_ERR_BAD_RANGE` |",
+      "sha256": "69052c9c29a868748890d88b6bd2a2327acbc4ec5050c95ab61e18d4c49a60bf",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27268-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "파싱을 통과한 값은 `dwb_load_buffer_size`(`double_write_buffer.cpp:769-785`)가 아래처럼 보정한다. 지금도 같은 규칙이지만 매뉴얼에 드러나 있지 않아 함께 문서화한다.",
+      "sha256": "9403aa580fd943205906ddb35680043c5f79d115d1f4a80f29c198c6950ba0d4",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27268-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 입력 값 | 최종 값 | 근거 |\n|---|---|---|\n| 0 | DWB 비활성 | `:776-780` |\n| 0 초과 512 KiB 미만 | 512 KiB (`DWB_MIN_SIZE`) | `dwb_power2_ceil` `:737-740` |\n| 512 KiB 이상 32 MiB 이하이면서 2의 거듭제곱이 아님 | 다음 2의 거듭제곱으로 올림 | `:745-755` |\n| 32 MiB 초과 | 파라미터 상한 검사에서 `PRM_ERR_BAD_RANGE` (`DWB_MAX_SIZE` 도 32 MiB) | `system_parameter.c:4347`, `double_write_buffer.cpp:53` |",
+      "sha256": "2059a1ec785bd5f9acde658299b613bb2084df0a162f9893b2a7e26d712ee577",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27268-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "즉 `600K` 를 지정하면 실제로는 1 MiB 가 되고, 이 반올림은 경고 없이 일어난다. 매뉴얼에 반올림 규칙을 적는다.",
+      "sha256": "b1323dcc3f64e5e84110092dce1e3f7f80ce91dde87df07482d293951e7ad285",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27268-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`PRM_SIZE_UNIT` 이 붙으면 값 출력이 `util_byte_to_size_string` 을 거친다(`system_parameter.c:7848-7852`). `SHOW PARAMETERS` 와 `cubrid paramdump` 의 표시가 `double_write_buffer_size=2097152` 에서 `double_write_buffer_size=2.0M` 형태로 바뀐다. 다른 크기 파라미터와 같은 표시 형식이 되므로 일관성은 개선되지만, 이 값을 정수로 파싱하는 기존 테스트와 스크립트는 갱신이 필요하다.",
+      "sha256": "b768af718e6d728b2127bc5bf7f8c4be2744cf81f663ed3eb0f915bb18ed2170",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27268-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 파일 / 라인 | 변경 |\n|---|---|\n| `system_parameter.c:4342` | `static_flag` 에 `PRM_SIZE_UNIT` 를 추가한다. 최종 플래그 조합은 아래 코드 블록 참조 |\n| `system_parameter.c:4343` | `PRM_INTEGER` → `PRM_BIGINT` |\n| `system_parameter.c:4345-4348` | 기본값·상한·하한의 공용체 멤버를 `.i` 에서 `.bi` 로 변경. 값 자체는 유지 (2 MiB / 2 MiB / 32 MiB / 0) |\n| `double_write_buffer.cpp:775` | `prm_get_integer_value (PRM_ID_DWB_SIZE)` → `prm_get_bigint_value (PRM_ID_DWB_SIZE)`. 대상 변수가 `unsigned int *` 이므로 명시적 캐스팅을 붙인다. 상한이 32 MiB 라 `unsigned int` 범위를 넘지 않는다 |",
+      "sha256": "ba640354b961c99a9d9871ff208a973382cfbffed5a28aebe019aa67b930573b",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`system_parameter.c:4342-4343` 의 변경 후 모습이다.",
+      "sha256": "309913787ad07ee989b44f54c8927989601be668df0f22b4f4f0f931ed2748d1",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "```c\n  {PRM_ID_DWB_SIZE,\n   PRM_NAME_DWB_SIZE,\n   (PRM_FOR_SERVER | PRM_USER_CHANGE | PRM_SIZE_UNIT),\n   PRM_BIGINT,\n```",
+      "sha256": "a528c6082aee6d740fc1cc2d3715fb80b8387e64306b6e39d26a9f3faee5a6d9",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "`prm_get_bigint_value` 는 `system_parameter.h:831`, `:949` 에 이미 선언되어 있으므로 새 접근자를 만들 필요는 없다. `PRM_ID_DWB_SIZE` 를 참조하는 다른 지점은 없다 — 전체 소스에서 이 파라미터를 읽는 곳은 `double_write_buffer.cpp:775` 한 곳이다.",
+      "sha256": "00fde41b4917aeb36c0e774dfcdec1295641202230c8314eafcfead1ff83fd37",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27268-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "| 순위 | 후보 | 권장 이유 / 고려사항 |\n|---|---|---|\n| 1 | `PRM_BIGINT` + `PRM_SIZE_UNIT` 로 전환 | 다른 바이트 단위 파라미터 전부와 동일한 패턴이라 파싱·표시·범위 검사가 모두 기존 코드로 처리된다. 변경량이 5줄 수준이다. 값 표시 형식이 바뀌는 것이 유일한 부수 효과다 |\n| 2 | 문법은 그대로 두고 에러 메시지만 개선 | 기동 실패 자체는 남는다. 사용자가 원인을 빨리 찾을 수 있게 되는 것뿐이라 근본 해결이 아니다. 다른 크기 파라미터와의 비일관성도 남는다 |\n| 3 | `PRM_INTEGER` + `PRM_SIZE_UNIT` + `PRM_DIFFER_UNIT` + 항등 변환 함수 쌍 | 저장 단위가 이미 바이트라 변환 함수가 아무 일도 하지 않는 껍데기가 된다. `PRM_DIFFER_UNIT` 의 설계 의도와 맞지 않는다 |",
+      "sha256": "38e5c741f6fd6eca7beaa1266428dd34635577ff0d9874845abee30a6a18fab1",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27268-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "```bash\n# 단위 문법 수용\necho 'double_write_buffer_size=2M' >> $CUBRID/conf/cubrid.conf\ncubrid server start demodb\ncsql -u dba -S demodb -c \"SHOW PARAMETERS\" | grep double_write_buffer_size",
+      "sha256": "ef2c54f888bb4bb6abf132558b460a33717a7d4c941a292c378c041a70317de8",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27268-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- [ ] `double_write_buffer_size=2M`, `=512K`, `=2097152`, `=0` 네 표기가 모두 서버 기동을 막지 않는다.\n- [ ] `2M` 과 `2097152` 가 동일한 DWB 크기로 동작한다.\n- [ ] 32 MiB 초과 값은 `PRM_ERR_BAD_RANGE` 로 거부되고, 상한이 `DWB_MAX_SIZE` 와 일치한다.\n- [ ] `0` 은 DWB 비활성으로 계속 동작한다.\n- [ ] `SHOW PARAMETERS` 와 `cubrid paramdump` 의 표시 형식 변경이 문서와 관련 테스트에 반영된다.\n- [ ] 512 KiB 미달 값과 2의 거듭제곱이 아닌 값의 반올림 규칙이 매뉴얼에 기술된다.",
+      "sha256": "d3bb82b78aa9d6122d2ea5441abc2dbce97ac0b3ff0c8c54d2ae9201f00fbb3b",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27268-C094",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria 충족\n- [ ] QA 통과 (파라미터 표기를 검증하는 기존 shell 테스트 기대값 갱신 포함)\n- [ ] 매뉴얼의 `double_write_buffer_size` 설명에 허용 단위와 반올림 규칙 반영",
+      "sha256": "1ae27b2704f9d0e280889b335ab61b30d41edc119409c84cbae1e4f57f0261e1",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27268-C095",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- `src/base/system_parameter.c:4340-4351` — `PRM_ID_DWB_SIZE` 파라미터 정의\n- `src/base/system_parameter.c:8750`, `:8888-9028` — `sysprm_generate_new_value` 의 `PRM_INTEGER` / `PRM_BIGINT` 파싱 분기\n- `src/base/system_parameter.c:6536-6749` — `prm_load_by_section`, 값 오류 시 로드 전체 실패\n- `src/base/system_parameter.c:7848-7852` — `PRM_SIZE_UNIT` 값의 표시 경로\n- `src/base/system_parameter.c:1211-1221` — `data_buffer_size` 의 `PRM_DIFFER_UNIT` 패턴 (대조용)\n- `src/executables/util_common.c:1005-1163` — `util_size_to_byte`, `util_size_string_to_byte` 허용 단위\n- `src/storage/double_write_buffer.cpp:732-785` — `dwb_power2_ceil`, `dwb_load_buffer_size`\n- `src/storage/double_write_buffer.cpp:52-53` — `DWB_MIN_SIZE`(512 KiB), `DWB_MAX_SIZE`(32 MiB)\n- `src/transaction/boot_sr.c:2029-2034` — 파라미터 로드 실패 시 기동 중단",
+      "sha256": "776dbbd0dd4adefb811929c41fffd9cae4ed8a569af428d5a80d1d938723f181",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27268-C096",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+      "text": "- 부모 EPIC: CBRD-27193\n- `double_write_buffer_blocks`(`system_parameter.c:4352-4363`)는 개수 파라미터라 크기 단위 문법 대상이 아니다. 다만 이쪽도 `dwb_power2_ceil` 로 2의 거듭제곱 반올림이 조용히 일어나므로(`double_write_buffer.cpp:808`) 반올림 규칙 문서화는 두 파라미터에 함께 적용하는 편이 낫다.",
+      "sha256": "90caab809805f57a094185e43bccd644ef87a9b62589fb5bd98c855be533387a",
+      "disposition_group": 22
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        19,
+        40,
+        41,
+        43,
+        60,
+        74
+      ],
+      "disposition": "retained",
+      "reason": "명시적으로 요청된 0·바이트 정수·512K·2M 지원과 동등 크기, 0 비활성 결과를 보존한다. 중복 local/live 단위를 함께 계상한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L769-L785"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        4,
+        6,
+        15,
+        35,
+        39,
+        46,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        61,
+        63,
+        65,
+        95
+      ],
+      "disposition": "non-substantive",
+      "reason": "제목성 도입, 코드 fence, 반복 완료 템플릿, 참고 위치만 있는 단위이다. 참고 라인은 현재 고정 커밋의 검증한 불변 링크로 대체한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        5,
+        62,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "핵심 입력 차이는 유지하되 현재 소스에서 도출한 기동 중단 경로와 실제 실행 결과를 구별한다. 고객 장애·timeout 단정 및 다른 바이트 파라미터 전부에 대한 무예외 주장을 제거한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9119-L9148",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/porting.c#L2266-L2292",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2029-L2035"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        9,
+        31,
+        44,
+        66,
+        86
+      ],
+      "disposition": "corrected",
+      "reason": "PRM_BIGINT/PRM_SIZE_UNIT 전환과 2.0M 출력은 선택된 구현이 아닌 ANALYSIS 후보·조건부 영향으로 기록한다. SHOW PARAMETERS의 근거가 없어 사용하지 않고 검증한 paramdump 경로와 실제 출력 소비자 조사로 바꾼다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L7994-L8025",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9150-L9195",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_cs.c#L2437-L2451",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L11255-L11295"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        21,
+        76
+      ],
+      "disposition": "retained",
+      "reason": "현재 PRM_INTEGER+PRM_SIZE_UNIT 분기에는 PRM_DIFFER_UNIT과 변환 콜백이 필요하다는 소스 제약을 유지한다. stale 라인과 구체적 구현 지시는 현재 근거와 후보 검토로 정리한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9055-L9091",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L847-L856",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L1223-L1233"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        11,
+        67
+      ],
+      "disposition": "corrected",
+      "reason": "부모 관계와 직접 크기 소비자는 유지하되 D5 내부 표식, 두 파일만 변경·디스크/DWB 무영향·출력만 부수효과라는 확정 표현을 제거한다. 공통 저장·전달·출력 경로를 ANALYSIS 검토 범위로 둔다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L769-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L11255-L11295",
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        68
+      ],
+      "disposition": "retained",
+      "reason": "DWB 사본 기록 역할, 바이트 단위, 2 MiB 기본값, 32 MiB 상한과 0 비활성을 현재 고정 소스로 확인해 유지한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L2328-L2356",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L769-L785"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        69
+      ],
+      "disposition": "retained",
+      "reason": "설정 값 오류가 그 항목을 무시하는 경고로 끝나지 않고 로드 실패로 반환되는 동작을 유지한다. 일반 무조건 고객 장애로 확대하지 않는다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6907-L6912",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6462-L6468",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2029-L2035"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        38,
+        70,
+        92
+      ],
+      "disposition": "corrected",
+      "reason": "공유 conf에 append하고 demodb를 시작하며 검증되지 않은 SHOW PARAMETERS를 호출하는 절차를 제거한다. 미실행 구현 후 확인 항목을 명시한 입력·경계값·기동 테스트 및 적용 크기 관찰 기준으로 대체한다. 현재 2M/300K/600K는 동작 예제가 아니다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9119-L9148",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L769-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6247-L6265",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_cs.c#L2437-L2451"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        17,
+        71,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "기동 timeout·진단 출력은 기존 보고의 주장으로만 남기고 원본 실행 빌드/로그를 확보할 질문으로 바꾼다. 오류 메시지가 전혀 없다는 단정과 실행 결과처럼 적힌 로그 예문은 제거하고 실제 stderr/오류 설정 소스 경로를 인용한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L10065-L10111",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2029-L2035"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        73
+      ],
+      "disposition": "corrected",
+      "reason": "data_buffer_size가 크기 단위 변환을 쓴다는 대조 근거는 유지한다. 16M 런타임 관측 및 문법 차이가 어디에도 표시되지 않는다는 검증되지 않은 단정은 제거한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L1223-L1233",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9055-L9091"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        75
+      ],
+      "disposition": "corrected",
+      "reason": "stale 라인·실측처럼 읽히는 호출 트리를 현재 고정 소스의 parse_int→값 오류→설정 로드 실패→기동 중단 근거로 재구성한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9119-L9148",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/porting.c#L2266-L2292",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6907-L6912",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6462-L6468",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/transaction/boot_sr.c#L2029-L2035"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        23,
+        24,
+        25,
+        77,
+        78,
+        79,
+        80
+      ],
+      "disposition": "corrected",
+      "reason": "두 기존 크기 처리 패턴을 검증한 예와 파서 분기로 설명한다. 전수/정확히 두 종류/모든 바이트 파라미터는 예외 없음 및 이 타입 전환이 정답이라는 범위 초과 결론은 제거한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L1223-L1233",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L3300-L3325",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9055-L9091",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9150-L9195"
+      ]
+    },
+    {
+      "ids": [
+        26,
+        81
+      ],
+      "disposition": "retained",
+      "reason": "공통 크기 파서와 대소문자를 구별하지 않는 단위 비교를 유지한다. 현재 DWB 지원 문법과 공통 helper 동작은 구별한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_common.c#L1053-L1089",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_common.c#L1171-L1210"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        82
+      ],
+      "disposition": "corrected",
+      "reason": "공통 파서의 B, K/KB, M/MB, G/GB, T/TB, P/PB 및 1024 배율을 명시한다. 소수 입력이 가능하므로 G 이상이 항상 32 MiB를 넘는다는 주장은 환산 바이트 기준으로 정정한다. 정수·소수/UINT64 변환 및 공백/KiB 제한을 명확히 한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_common.c#L1053-L1089",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/executables/util_common.c#L1171-L1210",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/porting.h#L64-L68"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        30,
+        83,
+        85
+      ],
+      "disposition": "corrected",
+      "reason": "DWB 보정 규칙은 유지하되 현재 600K가 수용된다는 오해를 막기 위해 614400바이트의 실제 소스 의미로 설명한다. paramdump가 보정 후 크기를 보인다는 절차를 고치고 매뉴얼 부재는 검증되지 않아 단정하지 않는다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L732-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L1164-L1213",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6247-L6265"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        42,
+        84
+      ],
+      "disposition": "corrected",
+      "reason": "0·최소 512 KiB·다음 2의 거듭제곱·32 MiB 상한은 보존한다. 모든 상한 초과 문자열이 BAD_RANGE라는 확대를 피하고 33554433 등 파싱 가능한 경계값으로 검증한다. 큰 정수 타입 오류는 구별한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L51-L55",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L732-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L8780-L8823",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9119-L9148"
+      ]
+    },
+    {
+      "ids": [
+        32,
+        33,
+        34,
+        36,
+        87,
+        88,
+        89,
+        90
+      ],
+      "disposition": "corrected",
+      "reason": "세부 타입/union/접근자/캐스팅 패치와 변경 후 코드는 합의된 결정이 없어 제거하고 ANALYSIS 후보와 확인 범위로 재구성한다. 직접 DWB 크기 소비자 근거는 유지하지만 공통 파라미터 전달/직렬화도 검토하도록 한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L769-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L11255-L11295"
+      ]
+    },
+    {
+      "ids": [
+        37,
+        91
+      ],
+      "disposition": "corrected",
+      "reason": "후보 순위·5줄 수준·출력만 유일 부수효과라는 비용/위험 단정을 제거한다. 공통 파서 재사용 후보의 근거와 타입·출력·직렬화 불확실성을 남긴다. 메시지 개선만으로 명시적 크기 문법 요구를 충족하지 못한다는 범위는 유지한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9055-L9091",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L9150-L9195",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L7994-L8025",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L11255-L11295"
+      ]
+    },
+    {
+      "ids": [
+        45,
+        48
+      ],
+      "disposition": "retained",
+      "reason": "단위 문법·0·범위·올림을 사용자 문서에 설명한다는 완료 결과를 유지한다. 현행 매뉴얼에 설명이 전무하다는 주장으로 사용하지 않는다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L732-L785"
+      ]
+    },
+    {
+      "ids": [
+        47,
+        93,
+        94
+      ],
+      "disposition": "corrected",
+      "reason": "핵심 수용/동등 크기/비활성/경계/문서 기준은 유지한다. 구현되지 않은 출력 변화나 특정 shell 테스트 존재를 가정하지 않고 집중 파싱·설정 로드/기동·적용 크기·출력 호환 검증의 결과로 완료 조건을 구체화한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4352-L4364",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L732-L785",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L6247-L6265",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L11255-L11295"
+      ]
+    },
+    {
+      "ids": [
+        58
+      ],
+      "disposition": "retained",
+      "reason": "CBRD-27193 부모 관계를 live snapshot과 원본 문서에 따라 유지한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27268-dwb-size-unit-syntax_e6ed61e_claude.md",
+        "https://jira.cubrid.org/browse/CBRD-27268"
+      ]
+    },
+    {
+      "ids": [
+        59,
+        96
+      ],
+      "disposition": "corrected",
+      "reason": "double_write_buffer_blocks는 개수이고 별도의 0 비활성/2의 거듭제곱 보정 조건이라는 사실을 유지한다. 블록 문법 확장을 끌어오지 않고 크기 검증의 관련 조건으로 고정·기록한다. 두 매뉴얼을 함께 바꾼다는 구현 지시는 확정하지 않는다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4365-L4377",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L795-L810",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L1178-L1185"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

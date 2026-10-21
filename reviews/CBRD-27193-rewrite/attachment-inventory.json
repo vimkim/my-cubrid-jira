@@ -1,0 +1,94 @@
+{
+  "scope_count": 20,
+  "issues": [
+    {
+      "key": "CBRD-27193",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27194",
+      "attachments": [
+        {
+          "id": "1020015",
+          "filename": "image-2026-08-06-17-41-28-760.png",
+          "size": 174097,
+          "created": "2026-08-06T17:41:29.000+0900",
+          "content": "http://jira.cubrid.org/secure/attachment/1020015/image-2026-08-06-17-41-28-760.png"
+        }
+      ]
+    },
+    {
+      "key": "CBRD-27196",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27211",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27252",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27262",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27263",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27264",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27265",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27266",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27267",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27268",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27269",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27270",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27316",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27356",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27370",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27398",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27423",
+      "attachments": []
+    },
+    {
+      "key": "CBRD-27630",
+      "attachments": []
+    }
+  ],
+  "review": "The single27194 screenshot was read by the orchestrator and assigned writer. It repeats historical source-analysis claims, not a runtime trace; see27194 supplemental audit. No other scoped issue has attachments."
+}

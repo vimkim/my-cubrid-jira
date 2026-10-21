@@ -1,0 +1,1161 @@
+{
+  "issue": "CBRD-27267",
+  "reviewer": "/root",
+  "report_sha256": "8651aa8cf66109e21aa62e9ecb20cb167c93e5b866f8ff82972a7323c4b0bd2a",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27267-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: quota 를 크게 초과한 private LRU 부터 회수하려는 2단계 victim 탐색이 실제로 동작하는 상태로 만들거나, 동작하지 않는 경로를 제거해 victim 탐색 코드를 단순화한다.",
+      "sha256": "31611965b9adf0064f3643b131149d36a92f3601006d3119de07ca9a0bd62cfa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27267-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27267-C003",
+      "origin": "live-description",
+      "text": "| 구분                              | 내용                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |\n|-----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **AS-IS (현재 동작 / 배경)**      | `big_private_lrus_with_victims`(`page_buffer.c:824`)에 리스트를 넣는 지점은 `pgbuf_lfcq_get_victim_from_private_lru` 가 이미 큐에서 하나를 꺼낸 **뒤**(`:16423`)뿐이고, 리스트를 큐에 처음 넣는 진입점은 이 큐를 아예 쓰지 않는다. 그런데 이 큐를 유일한 공급원으로 삼는 쪽은 자기 private LRU 가 quota 를 넘겨 남의 private 리스트를 뒤질 자격을 잃은 `restricted` 스레드이고, 이 스레드는 큐가 비면 승격 코드에 닿기 전에 반환한다. 즉 big 큐는 quota 이하 스레드의 통과 트래픽으로만 채워지므로, victim 을 찾는 스레드가 모두 over-quota 인 부하에서는 계속 비어 있다. 경로 전체와 실측 라인은 아래 Description 에 정리했다. |\n| **TO-BE (목표 상태 / 기대 동작)** | `TBD - 합의 미확인`. 아래 두 안 중 하나를 부하 시험으로 선택한다. (a) over-quota 스레드도 big 리스트를 찾을 수 있게 생산 경로를 복구한다. (b) big 큐와 2단계 우선 소비를 제거하고 `restricted` 스레드는 private 단계를 건너뛰게 명시한다.                                                                                                                                                                                                                                                                                                                                                                                       |\n| **영향**                          | 설계 의도 훼손 --- 자기 private LRU 가 quota 를 초과한 스레드는 \\\"quota 2배를 넘긴 큰 private 리스트부터 회수\\\" 대신 곧바로 shared LRU 탐색 단계(`:9151`)로 내려간다. private LRU 가 막으려던 스캔 오염이 shared LRU 에서 발생하고, 정작 폭식하는 private 리스트는 회수 압력을 받지 않는다.                                                                                                                                                                                                                                                                                                                                     |",
+      "sha256": "4e722ac9dfb2ca72bf561b53590850a004faccead83a48817c28a1541e8c1355",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27267-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27267-C005",
+      "origin": "live-description",
+      "text": "-   현황 확정은 이 이슈에서 끝났다 --- 생산 경로가 아예 없는 것이 아니라 소비 경로 내부에만 있고, 그 소비 경로에 over-quota 스레드가 도달하지 못한다.",
+      "sha256": "eff46203eee9dd4d919e487a04f82a503423a1572be77481c5fa4b696e508c57",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27267-C006",
+      "origin": "live-description",
+      "text": "-   (a)안과 (b)안 중 어느 쪽으로 갈지는 `TBD - 합의 미확인` 이다. over-quota 스레드 여럿이 동시에 victim 을 경쟁하는 부하에서 victim 탐색 비용과 shared LRU 침범량을 비교해 정한다.",
+      "sha256": "ac2fdfdcd8b4d638f7063c72be2fa2042738389edb73e00827ed4e77416d72ce",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27267-C007",
+      "origin": "live-description",
+      "text": "-   어느 안이든 `Num_lfcq_big_private_lists` 게이지와 `Num_lfcq_prv_get_big` 카운터로 전후 값을 남기는 것을 완료 조건에 포함한다.",
+      "sha256": "0152354c7f209dcf3936e8184fc703a5afb98475a4eb03e42c4bdb4c1cfe6eea",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27267-C008",
+      "origin": "live-description",
+      "text": "-   **변경 범위 / 영향**: `src/storage/page_buffer.c` 의 LFCQ(lock-free circular queue --- 락 없이 index 를 넣고 빼는 원형 큐) 관련 함수 3개(`pgbuf_lfcq_add_lru_with_victims`, `pgbuf_lfcq_get_victim_from_private_lru`, `pgbuf_get_victim`)와 큐 생성/해제(`:1829`, `:2045-2048`)에 한정된다. 디스크 형식, 외부 interface, 시스템 파라미터는 바뀌지 않는다. (b)안을 택하면 `PSTAT_PB_LFCQ_LRU_PRV_GET_BIG` 와 `PSTAT_PB_LFCQ_BIG_PRV_NUM` 두 perfmon 항목이 의미를 잃으므로 statdump 출력이 바뀐다.",
+      "sha256": "885769efff9db195fa65b36872816a392cc6b441366ba9c5ba6251cbb8a3c58c",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27267-C009",
+      "origin": "live-description",
+      "text": "-   부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D4(big private victim queue 의 생산 경로)다.",
+      "sha256": "65297dd507619bff2d0432d416cfe2828169e524fd1246e5f30b9eb498e4411e",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27267-C010",
+      "origin": "live-description",
+      "text": "pgbuf(page buffer manager --- 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 victim(재사용할 수 있도록 회수 대상이 된 BCB --- Buffer Control Block, frame 에 올라온 page 의 fix 수와 상태를 보관하는 제어 블록)을 찾을 때 LRU(Least Recently Used --- 최근 사용 시점 기준의 page 교체 목록) 전체를 순회하지 않는다. 대신 \\\"victim 후보를 가진 LRU 리스트\\\" 의 index 만 LFCQ 에 담아 두고, 큐에서 index 를 하나 꺼내 그 리스트만 뒤진다.",
+      "sha256": "e41a71aee8466ef720198cc1d021fa4f1b2be1bfd5ecbc923ee4836b71be91ca",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27267-C011",
+      "origin": "live-description",
+      "text": "private LRU 는 세션마다 하나씩 배정되어 대량 스캔이 공용 캐시를 오염시키지 않게 막는 장치다. 세션마다 quota 가 있고, quota 를 넘긴 리스트가 먼저 회수 대상이 된다. 그래서 큐가 세 개로 나뉘어 있다.",
+      "sha256": "2bcd00ad77f89ca74bd70a889c05bd808dbad4925061e89bdf565f981ebc0749",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27267-C012",
+      "origin": "live-description",
+      "text": "| 큐                                       | 등록 조건                                               | 소비 주체                                            |\n|------------------------------------------|---------------------------------------------------------|------------------------------------------------------|\n| `big_private_lrus_with_victims` (`:824`) | 리스트 크기 100 초과 && quota 2배 초과 && 후보 2개 초과 | 모든 스레드. `restricted` 스레드에게는 유일한 공급원 |\n| `private_lrus_with_victims` (`:823`)     | private 이면서 over-quota                               | `restricted == false` 스레드만                       |\n| `shared_lrus_with_victims` (`:825`)      | quota 무관, 후보 1개 이상                               | 모든 스레드                                          |",
+      "sha256": "b912aca600b06aff4d9bc893b38b700f76a84a26ac6fbeb8025073dae9df9bc2",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27267-C013",
+      "origin": "live-description",
+      "text": "`restricted` 는 `pgbuf_get_victim` 이 결정한다. 자기 private LRU 를 먼저 뒤져 실패했고(`:9087`), vacuum worker 가 아니고, 자기 리스트가 `PGBUF_LRU_LIST_IS_OVER_QUOTA_WITH_BUFFER`(`:1070-1071`, quota + max(10, quota 의 1%) 초과)면 `restrict_other = true` 가 된다(`:9100`). 즉 \\\"남의 private 리스트를 뒤질 자격이 없는 폭식 스레드\\\" 다. 이 스레드에게도 예외를 하나 준 것이 big 큐다 --- 자기보다 훨씬 심하게 폭식하는 리스트는 뒤져도 된다는 정책이다.",
+      "sha256": "d3ccc4349f9fdfa45e33930ef5c0d3832cc552a9711cc48a1af7e03cbd015d31",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27267-C014",
+      "origin": "live-description",
+      "text": "세 큐의 `produce` / `consume` 호출 지점을 전수 대조한 결과다.",
+      "sha256": "11999759872dd4a3659123aba57f4a4a41d2d66b3ac047bd3205fd5de57f1985",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27267-C015",
+      "origin": "live-description",
+      "text": "| 큐                              | produce 지점                                                                                               | consume 지점                                                     | 관찰                         |\n|---------------------------------|------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|------------------------------|\n| `big_private_lrus_with_victims` | `:16423` 단 1곳 --- `pgbuf_lfcq_get_victim_from_private_lru` 가 두 큐 중 하나에서 consume 에 성공한 **뒤** | `:16396` 단 1곳 --- 같은 함수의 진입부, 다른 두 큐보다 먼저 시도 | 생산이 소비 경로 안에만 있다 |\n| `private_lrus_with_victims`     | `:16351` (`pgbuf_lfcq_add_lru_with_victims` 경유, 신규 등록 진입점), `:16441` (소비 후 재삽입)             | `:16409`                                                         | 신규 등록 경로가 있다        |\n| `shared_lrus_with_victims`      | `:16359` (신규 등록 진입점), `:16506` (재삽입)                                                             | `:16483`                                                         | 신규 등록 경로가 있다        |",
+      "sha256": "3baed79d5c4da57bf3bf53e45a14d1cf294aced818ef22a325bdd28e9d6bc7f9",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27267-C016",
+      "origin": "live-description",
+      "text": "`pgbuf_lfcq_add_lru_with_victims` 를 호출하는 곳은 네 군데다 --- `pgbuf_adjust_quotas` 의 private 루프 2곳(`:14360`, `:14406`)과 shared 루프 1곳(`:14436`), 그리고 victim 후보가 새로 생길 때마다 불리는 `pgbuf_lru_add_victim_candidate`(`:15651`). 이 함수는 `PGBUF_IS_PRIVATE_LRU_INDEX` 로 private/shared 만 구분하므로(`:16348-16363`), big 조건을 만족하는 리스트도 private 큐로 들어간다.",
+      "sha256": "74d8817596c87a5e9fc40bfed15ec82f2b4d264c873f9973a72676ffc9a10611",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27267-C017",
+      "origin": "live-description",
+      "text": "pgbuf_get_victim ()                                          page_buffer.c:9022\n      1단계: 자기 private LRU 탐색                                        :9062-9102\n         └ 실패 && !vacuum && 자기 리스트가 buffer 초과 over-quota\n              → restrict_other = true                                     :9100\n      2단계: if (quota 활성 && flush 데몬 존재)                            :9111\n         └ pgbuf_lfcq_get_victim_from_private_lru (thread, restrict_other) :9117\n              ├ big 큐 consume 시도                                        :16396\n              │    성공 → promotion 재평가 → victim 반환\n              └ 실패\n                   ★ restricted == true 면 즉시 return NULL                :16404-16406\n                     (promotion 블록 :16419-16427 에 도달하지 못함)\n                   restricted == false 면 private 큐 consume               :16409\n                     → 리스트가 big 조건 충족 시 big 큐로 promote           :16419-16427\n      3단계: shared LRU 탐색                                               :9151",
+      "sha256": "f15304a1ffd8d0375ec6ba12c7c4e44905a67f30326ff81b9c0ffa9738b3fd88",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27267-C018",
+      "origin": "live-description",
+      "text": "`:16419-16420` 의 big 판정은 `PGBUF_LRU_LIST_COUNT (lru_list) > PBGUF_BIG_PRIVATE_MIN_SIZE`(100, `:1073`) && `PGBUF_LRU_LIST_COUNT (lru_list) > 2 * lru_list->quota` && `lru_list->count_vict_cand > 1` 이다. 이 판정은 promotion 블록 안에만 있어서, big 조건을 만족하는지 여부는 **누군가 그 리스트를 private 큐에서 꺼낸 순간에만** 평가된다.",
+      "sha256": "750e42591f9207a1b3c4ec407f390a5b33b0958e1c6cf3a3e010bd522c210ec3",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27267-C019",
+      "origin": "live-description",
+      "text": "`PGBUF_LRU_VICTIM_LFCQ_FLAG`(`:1076`, `0x80000000`)가 리스트의 큐 중복 등록을 막는 역할을 하므로, 한 리스트는 세 큐 중 최대 한 곳에만 들어 있다. 따라서 big 큐는 별도 레인이 아니라 private 큐를 통과해야만 닿는 승격 레인이다.",
+      "sha256": "0b5da8931518c1088b9d635db20035cfd3dd1b43b7b42330cf10747fd2957e2a",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27267-C020",
+      "origin": "live-description",
+      "text": "> **요지**: big 큐는 \\\"영원히 비어 있는\\\" 것이 아니라 \\\"quota 이하 스레드가 private 큐를 소비해 줄 때만 채워지는\\\" 상태다. 이 승격을 유발할 수 있는 유일한 주체가 정작 big 큐를 필요로 하지 않는 스레드라는 점이 문제의 핵심이다.",
+      "sha256": "c5d3e81ad20178d59b7c3e79f3dcb9104c0d1ac86753429b02e834ded13353a6",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27267-C021",
+      "origin": "live-description",
+      "text": "구 분석 보고서(commit `5cd4f860e` 기준의 D4)는 \\\"big 큐는 영원히 비어 있다\\\" 고 판정했다. `e6ed61e87` 재검증 결과 이 판정은 과하게 단정한 것이다. 정확한 서술은 아래와 같다.",
+      "sha256": "90daff7868797849f519e7471e81e9ef9092d7da0252a4c23b081895276e45b2",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27267-C022",
+      "origin": "live-description",
+      "text": "| 항목                                              | 구 분석 D4     | e6ed61e87 재검증                                                                                                                    |\n|---------------------------------------------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------|\n| 신규 등록 진입점이 big 큐에 넣는가                | 넣지 않는다    | 넣지 않는다 (일치)                                                                                                                  |\n| 유일한 produce 가 consume 이후인가                | 그렇다         | 그렇다 (일치)                                                                                                                       |\n| big 큐가 항상 비어 있는가                         | 항상 비어 있다 | 아니다. `restricted == false` 스레드가 private 큐를 소비하면서 승격시킬 수 있다                                                     |\n| over-quota 스레드가 2단계에서 항상 NULL 을 받는가 | 항상 그렇다    | 부하에 따라 다르다. quota 이하 victim 소비자가 함께 돌면 big 큐가 채워져 성공할 수 있고, 경쟁자가 모두 over-quota 면 항상 NULL 이다 |",
+      "sha256": "90e9f9fe3804c225b66fb0e254c671cebab9aff4d1d89288ce966b41c6ef024e",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27267-C023",
+      "origin": "live-description",
+      "text": "즉 결함은 \\\"죽은 코드\\\" 가 아니라 \\\"특정 부하에서만 무력해지는 자기 참조 구조\\\" 다. 무력해지는 부하는 흔한 편이다 --- 대량 스캔 세션 여럿이 동시에 도는 상황에서는 모든 victim 소비자가 over-quota 가 된다.",
+      "sha256": "af4318d86bae94110a15d2bf4912efb5e4f36b72eb3c002be2f10b9225d6347b",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27267-C024",
+      "origin": "live-description",
+      "text": "동작 스펙 변경은 선택안에 달려 있다. 두 안 모두 사용자 설정과 SQL 동작은 바꾸지 않는다.",
+      "sha256": "2b49de756cfb054a58c7c0f4ccd4f090ebfd4978aa6f538e8a3ba7d253381b08",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27267-C025",
+      "origin": "live-description",
+      "text": "| 선택안               | 스펙 변경                                                                                                                         | 관측 지표 영향                                                                         |\n|----------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|\n| \\(a\\) 생산 경로 복구 | over-quota 스레드가 자신보다 크게 폭식한 private 리스트에서 victim 을 회수할 수 있게 된다. shared LRU 로 내려가는 빈도가 줄어든다 | `Num_lfcq_big_private_lists` 가 0 이 아닌 값을 갖고 `Num_lfcq_prv_get_big` 이 증가한다 |\n| \\(b\\) 큐 제거        | over-quota 스레드는 2단계를 건너뛰고 shared LRU 로 직행하는 현행 실효 동작이 코드에 명시된다                                      | `Num_lfcq_big_private_lists`, `Num_lfcq_prv_get_big` 두 항목이 statdump 에서 제거된다  |",
+      "sha256": "14a388546707916e55b9a2ed74f0fed0065c70535b6a84e1b2edaae422270016",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27267-C026",
+      "origin": "live-description",
+      "text": "| 순위 | 후보                                                                  | 권장 이유 / 고려사항                                                                                                                                                                                                                                                                                                                                                         |\n|------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| 1    | \\(a\\) `pgbuf_lfcq_add_lru_with_victims` 에서 big 조건을 판정해 라우팅 | 설계 의도를 그대로 살린다. 이 함수는 이미 `lru_list` 를 받으므로 `PGBUF_LRU_LIST_COUNT`, `quota`, `count_vict_cand` 를 그 자리에서 볼 수 있어 추가 자료구조가 필요 없다. 다만 이 함수는 victim 후보가 생길 때마다 불리는 hot 경로(`:15651`)라 판정 3개가 추가되는 비용을 측정해야 한다. big 조건이 흔히 성립하면 큐가 편중돼 quota 이하 리스트가 굶을 가능성도 확인 대상이다 |\n| 2    | (a') `pgbuf_adjust_quotas` 에서만 big 큐로 라우팅                     | 100ms 주기 데몬 경로라 hot 경로 비용이 없다. 그 대신 quota 재계산 시점까지 최대 100ms 지연되고, 이미 큐에 들어 있는 리스트는 플래그 때문에 재라우팅되지 않아 승격이 다음 사이클로 밀린다                                                                                                                                                                                     |\n| 3    | \\(b\\) big 큐와 2단계 우선 소비 제거                                   | 가장 단순하고 죽은 분기가 사라진다. `restricted` 스레드는 2단계를 아예 건너뛰도록 `pgbuf_get_victim`(`:9111-9117`)에서 분기한다. over-quota 스레드가 shared LRU 를 침범하는 현행 동작을 공식화하는 셈이라, 부하 시험에서 (a)가 이득을 보이지 않을 때만 택한다                                                                                                                |",
+      "sha256": "df88e7d70786799e42de211b0fcca20bf46f6d12f7f0c046ff7a758f2eea5bb4",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27267-C027",
+      "origin": "live-description",
+      "text": "| 파일 / 라인                 | 변경                                                                                                                                                                                                  |\n|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| `page_buffer.c:16334-16369` | `pgbuf_lfcq_add_lru_with_victims` 의 private 분기에서 big 조건을 판정해 `big_private_lrus_with_victims` 또는 `private_lrus_with_victims` 로 라우팅. produce 실패 시 플래그 롤백(`:16365`)은 현행 유지 |\n| `page_buffer.c:16419-16427` | 소비 후 promotion 블록은 유지. 등록 시점 판정과 소비 시점 판정이 이중이 되지만, 큐에 머무는 동안 리스트 크기가 변하므로 재평가는 필요하다                                                             |\n| `page_buffer.c:16404-16406` | `restricted` 조기 반환은 유지. big 큐가 채워지면 이 반환은 정상 동작이 된다                                                                                                                           |",
+      "sha256": "ba3572c0f6fe40e5f1017d4ca6da1fcd0e7233942398b14b634befafa2d30bd7",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27267-C028",
+      "origin": "live-description",
+      "text": "big 조건 판정을 매크로로 뽑아 두 지점이 같은 정의를 쓰게 만드는 것이 유지보수상 안전하다. 현재는 `:16419-16420` 에만 인라인으로 있다.",
+      "sha256": "cbcfa19c42c00ec74c47872b57d60d123b304f879cf4689ac6031c50a2e47cd5",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27267-C029",
+      "origin": "live-description",
+      "text": "부하는 over-quota 스레드끼리 경쟁하는 형태여야 한다. private LRU 가 quota 를 넘도록 세션마다 큰 테이블 full scan 을 돌리고, 세션 수를 늘려 모든 victim 소비자가 over-quota 가 되게 만든다. 그 상태에서 아래 지표를 비교한다.",
+      "sha256": "4a5354337999fa554fbf41ee24d2e73a739d1ed5dbda4346fa23037fd88f2004",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27267-C030",
+      "origin": "live-description",
+      "text": "| 지표                                          | 이름                           | 의미                           |\n|-----------------------------------------------|--------------------------------|--------------------------------|\n| `PSTAT_PB_LFCQ_BIG_PRV_NUM`                   | `Num_lfcq_big_private_lists`   | big 큐에 든 리스트 수 (게이지) |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_BIG`               | `Num_lfcq_prv_get_big`         | big 큐에서 consume 성공한 횟수 |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_CALLS`             | `Num_lfcq_prv_get_total_calls` | 2단계 진입 횟수                |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_EMPTY`             | `Num_lfcq_prv_get_empty`       | private 큐가 비어 실패한 횟수  |\n| `PSTAT_PB_VICTIM_SEARCH_SHARED_LISTS`         | shared 탐색 시간               | shared LRU 침범량의 대리 지표  |\n| `PSTAT_PB_ALLOC_BCB_COND_WAIT_HIGH_PRIO` 계열 | victim 대기 시간               | 최종 사용자 체감 지표          |",
+      "sha256": "8f7dd88d2a491c360d9f7cbb7fc5973264f6d5c722335cf3c0dcb876d1c1403e",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27267-C031",
+      "origin": "live-description",
+      "text": "이 카운터들은 전부 `perfmon_is_perf_tracking_and_active (PERFMON_ACTIVATION_FLAG_PB_VICTIMIZATION)` 게이트 안에 있고(`:16387`), `extended_statistics_activation` 기본값(`system_parameter.c:4148-4149`)에는 `PB_VICTIMIZATION`(0x10, `perf_monitor.h:64`)이 빠져 있다. 측정 시 `extended_statistics_activation` 에 0x10 을 포함시켜야 한다.",
+      "sha256": "dd02fcca20d6f7c834408119b8cec636d39b683e83ee8966f552a430c3e98b71",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27267-C032",
+      "origin": "live-description",
+      "text": "`pgbuf_peek_stats`(`:14686-14782`)는 `big_private_lrus_with_victims` 와 `private_lrus_with_victims` 가 NULL 일 때(quota 비활성 설정) `lfcq_big_prv_num` / `lfcq_prv_num` 출력 인자를 대입하지 않는다(`:14771-14779`). 함수 진입부의 0 초기화 목록(`:14697-14705`)에도 두 인자가 없어서, 호출자(`perf_monitor.c:1989-1990`)가 넘긴 버퍼의 이전 값이 그대로 노출될 수 있다. 위 검증 지표가 이 경로를 지나므로 부하 시험의 신뢰성이 여기에 걸려 있고, 대상 자료구조도 이 이슈와 같다. 따라서 이 초기화 누락은 이 이슈 범위로 두고 부하 시험 전에 먼저 수정한다 --- 동작이 있는 결함이라 죽은 코드 정리(B4) 범위가 아니고, 통계 의미 정리 이슈(CBRD-27266)와도 분리한다.",
+      "sha256": "58ec65ccb49da1286766fd7f34a6a104ae0c1f281b5281e43348734184dfcf6c",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27267-C033",
+      "origin": "live-description",
+      "text": "수정은 두 출력 인자를 진입부 0 초기화 목록에 추가하는 것으로 충분하다. 큐가 NULL 인 설정에서 \\\"큐에 든 리스트 0개\\\" 는 정확한 값이다.",
+      "sha256": "107cf52a80eb50f6768224bf3551c202d2086e741dfdd548dee603a437b50e0d",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27267-C034",
+      "origin": "live-description",
+      "text": "-   [ ] over-quota 스레드끼리 경쟁하는 부하에서 `Num_lfcq_big_private_lists` 와 `Num_lfcq_prv_get_big` 의 수정 전 값을 기록한다 (현행 동작 baseline).",
+      "sha256": "7614fece54b15d6df8af18ea7ee21099b15e760d8cdb7745ce11a4525b27fd52",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C035",
+      "origin": "live-description",
+      "text": "-   [ ] (a)안과 (b)안 중 선택한 근거가 위 지표 비교 결과와 함께 본문에 기록된다.",
+      "sha256": "4beb0c3339b0a500c706780a55b694789b50e33c0c0144bcf07a97cbc8ccd459",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C036",
+      "origin": "live-description",
+      "text": "-   [ ] (a)안을 택한 경우, 같은 부하에서 `Num_lfcq_prv_get_big` 이 0 보다 크고 shared LRU 탐색 시간이 baseline 이하다.",
+      "sha256": "5374bd9dbe87d1596123dc0f636aba86b1df949ed05b8919604d258f79647575",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C037",
+      "origin": "live-description",
+      "text": "-   [ ] (b)안을 택한 경우, big 큐 관련 자료구조와 두 perfmon 항목이 남지 않고 `restricted` 스레드의 2단계 우회가 코드에 명시된다.",
+      "sha256": "abc47a283ec606118f8f74c8e54bebeaa33db67bbe6feffabaab3d8e6a1b3532",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C038",
+      "origin": "live-description",
+      "text": "-   [ ] 선택한 안이 quota 비활성 설정(`private_lrus_with_victims == NULL`)에서 기존과 동일하게 동작한다.",
+      "sha256": "49a3ae400988157355acbea9c23e190a2abcb216807743145a3fb558e828bb1b",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C039",
+      "origin": "live-description",
+      "text": "-   [ ] `pgbuf_peek_stats` 의 lock-free 큐 출력 인자 초기화 누락이 처리된다.",
+      "sha256": "0858f6d5e16fbbf14d4c9a200743792c753b2350f75b1b22587e205cfc14a669",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C040",
+      "origin": "live-description",
+      "text": "-   [ ] 위 Acceptance Criteria 충족",
+      "sha256": "0ea4a17918fef8cc37098a111487d52496e3d2ec6ab4b5cbe13fd0d6508e5d5d",
+      "disposition_group": 32
+    },
+    {
+      "id": "CBRD-27267-C041",
+      "origin": "live-description",
+      "text": "-   [ ] QA 통과 (버퍼 포화 스트레스 시나리오 포함)",
+      "sha256": "1ea42272124258d1cf9ab56a9643272e023d9be6ee4cf780b82f186fadbf7488",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27267-C042",
+      "origin": "live-description",
+      "text": "-   [ ] 회귀 성능 측정: victim 대기 시간 분포와 hit rate 를 수정 전후로 비교해 악화가 없음을 확인",
+      "sha256": "ca647f55c7d4ba7a543771066c41f1aaf92aa36ff666b44f1ca698b05a2f93c4",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27267-C043",
+      "origin": "live-description",
+      "text": "-   [ ] (b)안을 택한 경우 statdump 항목 제거를 운영 문서에 반영",
+      "sha256": "f7f2da8ab602cccff4a4abfde6d8362ae4deae6c0f0ab9dd79ff7fc4c3cc92e3",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27267-C044",
+      "origin": "live-description",
+      "text": "생산 경로를 복구할지 큐와 2단계 탐색을 제거할지는 `TBD - 합의 미확인` 이다. over-quota 경쟁 부하에서 victim 탐색 비용과 shared LRU 침범량을 비교해 정한다.",
+      "sha256": "545e9a98731be998907fc33b6379e28aa44cb0bfc92a2ce1272e754fe305e4d0",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27267-C045",
+      "origin": "live-description",
+      "text": "(a)안을 택할 경우 판정을 hot 경로(`pgbuf_lru_add_victim_candidate` 경유)에 둘지 100ms 주기 데몬(`pgbuf_adjust_quotas`)에만 둘지는 `TBD - 합의 미확인` 이다. 전자는 반응이 빠르고 후자는 hot 경로 비용이 없다.",
+      "sha256": "2eb61dd579b7b48199a70a2ecdaeea934853fea23004bb73236be37bd1306528",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27267-C046",
+      "origin": "live-description",
+      "text": "big 조건이 흔히 성립하는 부하에서 모든 소비자가 big 큐만 소비하게 되면, quota 를 조금 넘긴 리스트는 회수 압력을 받지 못한다. 이 편중이 실제로 문제가 되는지는 부하 시험에서 함께 확인해야 한다.",
+      "sha256": "8026821f60760349f30c6937c751ba4a1e9e981cf5188da6c50986f4e7f7ae94",
+      "disposition_group": 35
+    },
+    {
+      "id": "CBRD-27267-C047",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:823-825` --- 세 LFCQ 필드 선언",
+      "sha256": "5d710a415b5303f94ed5f557b57972d082366443441672b01c717d01d4269024",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C048",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:1820-1835`, `:2045-2048` --- 큐 생성과 해제",
+      "sha256": "24e3b3bfe583b690cda0bf2877f7f188e433c139e36237bb67c17c696a6d3403",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C049",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:9022-9196` --- `pgbuf_get_victim`, 3단계 탐색과 `restrict_other` 결정",
+      "sha256": "d961ece0d05d6d8b038cc5d8e8e5ae870d66d94dbef81dfbf174df3d689f9f70",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C050",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:16326-16369` --- `pgbuf_lfcq_add_lru_with_victims`, 신규 등록 진입점",
+      "sha256": "da177c9cb3d58e715850df1f589423091c4ec03814466ca4d004861d6c26f712",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C051",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:16380-16461` --- `pgbuf_lfcq_get_victim_from_private_lru`, big 큐 consume 과 promotion",
+      "sha256": "a36a5ed1b7f88b8d8b8229c8430c9ce3bc66bfba0aaeac46ff5b62a7a4ff6db9",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C052",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:14345-14442` --- `pgbuf_adjust_quotas` 의 큐 재등록 지점",
+      "sha256": "8b38f5c4a3f0ea0ff2e0929f2a75f7f19b570a4b93007ed7b1e69f89a4500325",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C053",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:15612-15657` --- `pgbuf_lru_add_victim_candidate`, 후보 발생 시 큐 등록",
+      "sha256": "0c238e9f021f900e99b204f6a45786f42bc3d33a8563be82556c20cd00c697f3",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C054",
+      "origin": "live-description",
+      "text": "-   `src/storage/page_buffer.c:1060-1073` --- quota 판정 매크로와 `PBGUF_BIG_PRIVATE_MIN_SIZE`",
+      "sha256": "7bb9c9a6e161a8d8c1648c56ffef8ea2c5878b227da1e262aeb49bfeae77c3d0",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C055",
+      "origin": "live-description",
+      "text": "-   부모 EPIC: CBRD-27193",
+      "sha256": "64b84f8f519b14bdeeef560bbd260603d4204093f3570c22acbe0652abdf073a",
+      "disposition_group": 37
+    },
+    {
+      "id": "CBRD-27267-C056",
+      "origin": "live-description",
+      "text": "-   같은 victim 공급 계열의 정확성 결함(A3, direct victim 긴급 배정 경로 미실행)은 별도 이슈다. 이 이슈는 탐색 정책 쪽이라 수정 단위를 분리해 둔다.",
+      "sha256": "ebbc73cddda5320d34b5000a60afdf150ee309b4ca0fdd57be4bd402d6a45e50",
+      "disposition_group": 38
+    },
+    {
+      "id": "CBRD-27267-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "**이슈 수행 목적**: quota 를 크게 초과한 private LRU 부터 회수하려는 2단계 victim 탐색이 실제로 동작하는 상태로 만들거나, 동작하지 않는 경로를 제거해 victim 탐색 코드를 단순화한다.",
+      "sha256": "31611965b9adf0064f3643b131149d36a92f3601006d3119de07ca9a0bd62cfa",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27267-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "**이슈 수행 이유**:",
+      "sha256": "812bd4e1fe37d3ecbb1cc26b90b85873dda34fd2e43d317ecbad7ed5bb179f3a",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27267-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 구분 | 내용 |\n|---|---|\n| **AS-IS (현재 동작 / 배경)** | `big_private_lrus_with_victims`(`page_buffer.c:824`)에 리스트를 넣는 지점은 `pgbuf_lfcq_get_victim_from_private_lru` 가 이미 큐에서 하나를 꺼낸 **뒤**(`:16423`)뿐이고, 리스트를 큐에 처음 넣는 진입점은 이 큐를 아예 쓰지 않는다. 그런데 이 큐를 유일한 공급원으로 삼는 쪽은 자기 private LRU 가 quota 를 넘겨 남의 private 리스트를 뒤질 자격을 잃은 `restricted` 스레드이고, 이 스레드는 큐가 비면 승격 코드에 닿기 전에 반환한다. 즉 big 큐는 quota 이하 스레드의 통과 트래픽으로만 채워지므로, victim 을 찾는 스레드가 모두 over-quota 인 부하에서는 계속 비어 있다. 경로 전체와 실측 라인은 아래 Description 에 정리했다. |\n| **TO-BE (목표 상태 / 기대 동작)** | `TBD - 합의 미확인`. 아래 두 안 중 하나를 부하 시험으로 선택한다. (a) over-quota 스레드도 big 리스트를 찾을 수 있게 생산 경로를 복구한다. (b) big 큐와 2단계 우선 소비를 제거하고 `restricted` 스레드는 private 단계를 건너뛰게 명시한다. |\n| **영향** | 설계 의도 훼손 — 자기 private LRU 가 quota 를 초과한 스레드는 \"quota 2배를 넘긴 큰 private 리스트부터 회수\" 대신 곧바로 shared LRU 탐색 단계(`:9151`)로 내려간다. private LRU 가 막으려던 스캔 오염이 shared LRU 에서 발생하고, 정작 폭식하는 private 리스트는 회수 압력을 받지 않는다. |",
+      "sha256": "f0d8c8768787514bff677207cbb6d6abcd405138a31bd9eceb7251026c34c247",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27267-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "**이슈 수행 방안**:",
+      "sha256": "c8b6b5b2e0f439c925425afcdb3c58f5006a3bed4180c322be6ba50c8bbfab29",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27267-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- 현황 확정은 이 이슈에서 끝났다 — 생산 경로가 아예 없는 것이 아니라 소비 경로 내부에만 있고, 그 소비 경로에 over-quota 스레드가 도달하지 못한다.\n- (a)안과 (b)안 중 어느 쪽으로 갈지는 `TBD - 합의 미확인` 이다. over-quota 스레드 여럿이 동시에 victim 을 경쟁하는 부하에서 victim 탐색 비용과 shared LRU 침범량을 비교해 정한다.\n- 어느 안이든 `Num_lfcq_big_private_lists` 게이지와 `Num_lfcq_prv_get_big` 카운터로 전후 값을 남기는 것을 완료 조건에 포함한다.",
+      "sha256": "a62ccb682c0efc3be848ce1a9adb868d3affd6f8fa908b507b6b025ec091faed",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27267-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- **변경 범위 / 영향**: `src/storage/page_buffer.c` 의 LFCQ(lock-free circular queue — 락 없이 index 를 넣고 빼는 원형 큐) 관련 함수 3개(`pgbuf_lfcq_add_lru_with_victims`, `pgbuf_lfcq_get_victim_from_private_lru`, `pgbuf_get_victim`)와 큐 생성/해제(`:1829`, `:2045-2048`)에 한정된다. 디스크 형식, 외부 interface, 시스템 파라미터는 바뀌지 않는다. (b)안을 택하면 `PSTAT_PB_LFCQ_LRU_PRV_GET_BIG` 와 `PSTAT_PB_LFCQ_BIG_PRV_NUM` 두 perfmon 항목이 의미를 잃으므로 statdump 출력이 바뀐다.\n- 부모 EPIC 은 CBRD-27193 이고, 이 이슈가 소유하는 결함은 D4(big private victim queue 의 생산 경로)다.",
+      "sha256": "a5decdc337033e241cff013e58fe193bbb1ae0fe370e8933e91f3988a85cc2da",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27267-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "pgbuf(page buffer manager — 디스크 page 를 메모리 frame 에 캐시하고 fix, latch, 교체, flush 를 관리하는 모듈)는 victim(재사용할 수 있도록 회수 대상이 된 BCB — Buffer Control Block, frame 에 올라온 page 의 fix 수와 상태를 보관하는 제어 블록)을 찾을 때 LRU(Least Recently Used — 최근 사용 시점 기준의 page 교체 목록) 전체를 순회하지 않는다. 대신 \"victim 후보를 가진 LRU 리스트\" 의 index 만 LFCQ 에 담아 두고, 큐에서 index 를 하나 꺼내 그 리스트만 뒤진다.",
+      "sha256": "0110964c5220431bc39e67d29109581df436286440f1ea67804bf5dfaf06c202",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27267-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "private LRU 는 세션마다 하나씩 배정되어 대량 스캔이 공용 캐시를 오염시키지 않게 막는 장치다. 세션마다 quota 가 있고, quota 를 넘긴 리스트가 먼저 회수 대상이 된다. 그래서 큐가 세 개로 나뉘어 있다.",
+      "sha256": "2bcd00ad77f89ca74bd70a889c05bd808dbad4925061e89bdf565f981ebc0749",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27267-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 큐 | 등록 조건 | 소비 주체 |\n|---|---|---|\n| `big_private_lrus_with_victims` (`:824`) | 리스트 크기 100 초과 && quota 2배 초과 && 후보 2개 초과 | 모든 스레드. `restricted` 스레드에게는 유일한 공급원 |\n| `private_lrus_with_victims` (`:823`) | private 이면서 over-quota | `restricted == false` 스레드만 |\n| `shared_lrus_with_victims` (`:825`) | quota 무관, 후보 1개 이상 | 모든 스레드 |",
+      "sha256": "1aebcf351fc3d4f2933b67a229a605ffb659b8a223d5c3019421b74fcc973c39",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27267-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "`restricted` 는 `pgbuf_get_victim` 이 결정한다. 자기 private LRU 를 먼저 뒤져 실패했고(`:9087`), vacuum worker 가 아니고, 자기 리스트가 `PGBUF_LRU_LIST_IS_OVER_QUOTA_WITH_BUFFER`(`:1070-1071`, quota + max(10, quota 의 1%) 초과)면 `restrict_other = true` 가 된다(`:9100`). 즉 \"남의 private 리스트를 뒤질 자격이 없는 폭식 스레드\" 다. 이 스레드에게도 예외를 하나 준 것이 big 큐다 — 자기보다 훨씬 심하게 폭식하는 리스트는 뒤져도 된다는 정책이다.",
+      "sha256": "12ad9bee60a1e754c7e359a26e50abf7cc7455ea78c13e665fade3c41a719120",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27267-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "세 큐의 `produce` / `consume` 호출 지점을 전수 대조한 결과다.",
+      "sha256": "11999759872dd4a3659123aba57f4a4a41d2d66b3ac047bd3205fd5de57f1985",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27267-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 큐 | produce 지점 | consume 지점 | 관찰 |\n|---|---|---|---|\n| `big_private_lrus_with_victims` | `:16423` 단 1곳 — `pgbuf_lfcq_get_victim_from_private_lru` 가 두 큐 중 하나에서 consume 에 성공한 **뒤** | `:16396` 단 1곳 — 같은 함수의 진입부, 다른 두 큐보다 먼저 시도 | 생산이 소비 경로 안에만 있다 |\n| `private_lrus_with_victims` | `:16351` (`pgbuf_lfcq_add_lru_with_victims` 경유, 신규 등록 진입점), `:16441` (소비 후 재삽입) | `:16409` | 신규 등록 경로가 있다 |\n| `shared_lrus_with_victims` | `:16359` (신규 등록 진입점), `:16506` (재삽입) | `:16483` | 신규 등록 경로가 있다 |",
+      "sha256": "3db275ed7a2af8fe839b06e31bb314159d5b947e197fbf6103b41f4e8d1e7dec",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27267-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "`pgbuf_lfcq_add_lru_with_victims` 를 호출하는 곳은 네 군데다 — `pgbuf_adjust_quotas` 의 private 루프 2곳(`:14360`, `:14406`)과 shared 루프 1곳(`:14436`), 그리고 victim 후보가 새로 생길 때마다 불리는 `pgbuf_lru_add_victim_candidate`(`:15651`). 이 함수는 `PGBUF_IS_PRIVATE_LRU_INDEX` 로 private/shared 만 구분하므로(`:16348-16363`), big 조건을 만족하는 리스트도 private 큐로 들어간다.",
+      "sha256": "ce9f7719d53a52f581b3ade9c3f92233840261808480b36a92f34fe812693c26",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27267-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "```\npgbuf_get_victim ()                                          page_buffer.c:9022\n  1단계: 자기 private LRU 탐색                                        :9062-9102\n     └ 실패 && !vacuum && 자기 리스트가 buffer 초과 over-quota\n          → restrict_other = true                                     :9100\n  2단계: if (quota 활성 && flush 데몬 존재)                            :9111\n     └ pgbuf_lfcq_get_victim_from_private_lru (thread, restrict_other) :9117\n          ├ big 큐 consume 시도                                        :16396\n          │    성공 → promotion 재평가 → victim 반환\n          └ 실패\n               ★ restricted == true 면 즉시 return NULL                :16404-16406\n                 (promotion 블록 :16419-16427 에 도달하지 못함)\n               restricted == false 면 private 큐 consume               :16409\n                 → 리스트가 big 조건 충족 시 big 큐로 promote           :16419-16427\n  3단계: shared LRU 탐색                                               :9151\n```",
+      "sha256": "6d7eb3f5b93a0cf455fde25a7a0e2c8f53d7dcdc832310b2b0b827682bcd739d",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27267-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "`:16419-16420` 의 big 판정은 `PGBUF_LRU_LIST_COUNT (lru_list) > PBGUF_BIG_PRIVATE_MIN_SIZE`(100, `:1073`) && `PGBUF_LRU_LIST_COUNT (lru_list) > 2 * lru_list->quota` && `lru_list->count_vict_cand > 1` 이다. 이 판정은 promotion 블록 안에만 있어서, big 조건을 만족하는지 여부는 **누군가 그 리스트를 private 큐에서 꺼낸 순간에만** 평가된다.",
+      "sha256": "750e42591f9207a1b3c4ec407f390a5b33b0958e1c6cf3a3e010bd522c210ec3",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27267-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "`PGBUF_LRU_VICTIM_LFCQ_FLAG`(`:1076`, `0x80000000`)가 리스트의 큐 중복 등록을 막는 역할을 하므로, 한 리스트는 세 큐 중 최대 한 곳에만 들어 있다. 따라서 big 큐는 별도 레인이 아니라 private 큐를 통과해야만 닿는 승격 레인이다.",
+      "sha256": "0b5da8931518c1088b9d635db20035cfd3dd1b43b7b42330cf10747fd2957e2a",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27267-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "> **요지**: big 큐는 \"영원히 비어 있는\" 것이 아니라 \"quota 이하 스레드가 private 큐를 소비해 줄 때만 채워지는\" 상태다. 이 승격을 유발할 수 있는 유일한 주체가 정작 big 큐를 필요로 하지 않는 스레드라는 점이 문제의 핵심이다.",
+      "sha256": "ef01fb237960f44f904aa0982788cbfac48c6726c5b98d2ba6f5522d04b0e845",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27267-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "구 분석 보고서(commit `5cd4f860e` 기준의 D4)는 \"big 큐는 영원히 비어 있다\" 고 판정했다. `e6ed61e87` 재검증 결과 이 판정은 과하게 단정한 것이다. 정확한 서술은 아래와 같다.",
+      "sha256": "0a81790f1b88c4eab225455df091c2b2ec92a803572438adb1a87bb7cbba8b4b",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27267-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 항목 | 구 분석 D4 | e6ed61e87 재검증 |\n|---|---|---|\n| 신규 등록 진입점이 big 큐에 넣는가 | 넣지 않는다 | 넣지 않는다 (일치) |\n| 유일한 produce 가 consume 이후인가 | 그렇다 | 그렇다 (일치) |\n| big 큐가 항상 비어 있는가 | 항상 비어 있다 | 아니다. `restricted == false` 스레드가 private 큐를 소비하면서 승격시킬 수 있다 |\n| over-quota 스레드가 2단계에서 항상 NULL 을 받는가 | 항상 그렇다 | 부하에 따라 다르다. quota 이하 victim 소비자가 함께 돌면 big 큐가 채워져 성공할 수 있고, 경쟁자가 모두 over-quota 면 항상 NULL 이다 |",
+      "sha256": "1d2af9dae5bb8545c1cd25cda1c6c105907b92b7a1aa923c9f2e2a262695b052",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27267-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "즉 결함은 \"죽은 코드\" 가 아니라 \"특정 부하에서만 무력해지는 자기 참조 구조\" 다. 무력해지는 부하는 흔한 편이다 — 대량 스캔 세션 여럿이 동시에 도는 상황에서는 모든 victim 소비자가 over-quota 가 된다.",
+      "sha256": "79bfdbf64d75bbd19b90058689f65d3561824b57eae4977abbffac1efd1852ed",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27267-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "동작 스펙 변경은 선택안에 달려 있다. 두 안 모두 사용자 설정과 SQL 동작은 바꾸지 않는다.",
+      "sha256": "2b49de756cfb054a58c7c0f4ccd4f090ebfd4978aa6f538e8a3ba7d253381b08",
+      "disposition_group": 21
+    },
+    {
+      "id": "CBRD-27267-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 선택안 | 스펙 변경 | 관측 지표 영향 |\n|---|---|---|\n| (a) 생산 경로 복구 | over-quota 스레드가 자신보다 크게 폭식한 private 리스트에서 victim 을 회수할 수 있게 된다. shared LRU 로 내려가는 빈도가 줄어든다 | `Num_lfcq_big_private_lists` 가 0 이 아닌 값을 갖고 `Num_lfcq_prv_get_big` 이 증가한다 |\n| (b) 큐 제거 | over-quota 스레드는 2단계를 건너뛰고 shared LRU 로 직행하는 현행 실효 동작이 코드에 명시된다 | `Num_lfcq_big_private_lists`, `Num_lfcq_prv_get_big` 두 항목이 statdump 에서 제거된다 |",
+      "sha256": "64075545764d056499677d3814c353639509bfd49dba3be01da327007b37923e",
+      "disposition_group": 22
+    },
+    {
+      "id": "CBRD-27267-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 순위 | 후보 | 권장 이유 / 고려사항 |\n|---|---|---|\n| 1 | (a) `pgbuf_lfcq_add_lru_with_victims` 에서 big 조건을 판정해 라우팅 | 설계 의도를 그대로 살린다. 이 함수는 이미 `lru_list` 를 받으므로 `PGBUF_LRU_LIST_COUNT`, `quota`, `count_vict_cand` 를 그 자리에서 볼 수 있어 추가 자료구조가 필요 없다. 다만 이 함수는 victim 후보가 생길 때마다 불리는 hot 경로(`:15651`)라 판정 3개가 추가되는 비용을 측정해야 한다. big 조건이 흔히 성립하면 큐가 편중돼 quota 이하 리스트가 굶을 가능성도 확인 대상이다 |\n| 2 | (a') `pgbuf_adjust_quotas` 에서만 big 큐로 라우팅 | 100ms 주기 데몬 경로라 hot 경로 비용이 없다. 그 대신 quota 재계산 시점까지 최대 100ms 지연되고, 이미 큐에 들어 있는 리스트는 플래그 때문에 재라우팅되지 않아 승격이 다음 사이클로 밀린다 |\n| 3 | (b) big 큐와 2단계 우선 소비 제거 | 가장 단순하고 죽은 분기가 사라진다. `restricted` 스레드는 2단계를 아예 건너뛰도록 `pgbuf_get_victim`(`:9111-9117`)에서 분기한다. over-quota 스레드가 shared LRU 를 침범하는 현행 동작을 공식화하는 셈이라, 부하 시험에서 (a)가 이득을 보이지 않을 때만 택한다 |",
+      "sha256": "60cfca9711f3ce448c69f03c7629819ea116c77fcbdd5590bb9fee166e48aee7",
+      "disposition_group": 23
+    },
+    {
+      "id": "CBRD-27267-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 파일 / 라인 | 변경 |\n|---|---|\n| `page_buffer.c:16334-16369` | `pgbuf_lfcq_add_lru_with_victims` 의 private 분기에서 big 조건을 판정해 `big_private_lrus_with_victims` 또는 `private_lrus_with_victims` 로 라우팅. produce 실패 시 플래그 롤백(`:16365`)은 현행 유지 |\n| `page_buffer.c:16419-16427` | 소비 후 promotion 블록은 유지. 등록 시점 판정과 소비 시점 판정이 이중이 되지만, 큐에 머무는 동안 리스트 크기가 변하므로 재평가는 필요하다 |\n| `page_buffer.c:16404-16406` | `restricted` 조기 반환은 유지. big 큐가 채워지면 이 반환은 정상 동작이 된다 |",
+      "sha256": "a19087533940087aaa7a6349962c98dc9a5f45b0c5c8b09b0f091aa7538c36b9",
+      "disposition_group": 24
+    },
+    {
+      "id": "CBRD-27267-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "big 조건 판정을 매크로로 뽑아 두 지점이 같은 정의를 쓰게 만드는 것이 유지보수상 안전하다. 현재는 `:16419-16420` 에만 인라인으로 있다.",
+      "sha256": "cbcfa19c42c00ec74c47872b57d60d123b304f879cf4689ac6031c50a2e47cd5",
+      "disposition_group": 25
+    },
+    {
+      "id": "CBRD-27267-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "부하는 over-quota 스레드끼리 경쟁하는 형태여야 한다. private LRU 가 quota 를 넘도록 세션마다 큰 테이블 full scan 을 돌리고, 세션 수를 늘려 모든 victim 소비자가 over-quota 가 되게 만든다. 그 상태에서 아래 지표를 비교한다.",
+      "sha256": "4a5354337999fa554fbf41ee24d2e73a739d1ed5dbda4346fa23037fd88f2004",
+      "disposition_group": 26
+    },
+    {
+      "id": "CBRD-27267-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "| 지표 | 이름 | 의미 |\n|---|---|---|\n| `PSTAT_PB_LFCQ_BIG_PRV_NUM` | `Num_lfcq_big_private_lists` | big 큐에 든 리스트 수 (게이지) |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_BIG` | `Num_lfcq_prv_get_big` | big 큐에서 consume 성공한 횟수 |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_CALLS` | `Num_lfcq_prv_get_total_calls` | 2단계 진입 횟수 |\n| `PSTAT_PB_LFCQ_LRU_PRV_GET_EMPTY` | `Num_lfcq_prv_get_empty` | private 큐가 비어 실패한 횟수 |\n| `PSTAT_PB_VICTIM_SEARCH_SHARED_LISTS` | shared 탐색 시간 | shared LRU 침범량의 대리 지표 |\n| `PSTAT_PB_ALLOC_BCB_COND_WAIT_HIGH_PRIO` 계열 | victim 대기 시간 | 최종 사용자 체감 지표 |",
+      "sha256": "80483012fcb3951bd3c4d2075071f553cea55c82cd2df573690dbcbff961c37b",
+      "disposition_group": 27
+    },
+    {
+      "id": "CBRD-27267-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "이 카운터들은 전부 `perfmon_is_perf_tracking_and_active (PERFMON_ACTIVATION_FLAG_PB_VICTIMIZATION)` 게이트 안에 있고(`:16387`), `extended_statistics_activation` 기본값(`system_parameter.c:4148-4149`)에는 `PB_VICTIMIZATION`(0x10, `perf_monitor.h:64`)이 빠져 있다. 측정 시 `extended_statistics_activation` 에 0x10 을 포함시켜야 한다.",
+      "sha256": "dd02fcca20d6f7c834408119b8cec636d39b683e83ee8966f552a430c3e98b71",
+      "disposition_group": 28
+    },
+    {
+      "id": "CBRD-27267-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "`pgbuf_peek_stats`(`:14686-14782`)는 `big_private_lrus_with_victims` 와 `private_lrus_with_victims` 가 NULL 일 때(quota 비활성 설정) `lfcq_big_prv_num` / `lfcq_prv_num` 출력 인자를 대입하지 않는다(`:14771-14779`). 함수 진입부의 0 초기화 목록(`:14697-14705`)에도 두 인자가 없어서, 호출자(`perf_monitor.c:1989-1990`)가 넘긴 버퍼의 이전 값이 그대로 노출될 수 있다. 위 검증 지표가 이 경로를 지나므로 부하 시험의 신뢰성이 여기에 걸려 있고, 대상 자료구조도 이 이슈와 같다. 따라서 이 초기화 누락은 이 이슈 범위로 두고 부하 시험 전에 먼저 수정한다 — 동작이 있는 결함이라 죽은 코드 정리(B4) 범위가 아니고, 통계 의미 정리 이슈(CBRD-27266)와도 분리한다.",
+      "sha256": "49fba901bbaba72f49c1d327c085ac6dd9e82e813d06c39b7361af77521b0837",
+      "disposition_group": 29
+    },
+    {
+      "id": "CBRD-27267-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "수정은 두 출력 인자를 진입부 0 초기화 목록에 추가하는 것으로 충분하다. 큐가 NULL 인 설정에서 \"큐에 든 리스트 0개\" 는 정확한 값이다.",
+      "sha256": "8d3b8fad3144dda72d39bf141f0d894325fe4ab755c149ae9285556e7791cc45",
+      "disposition_group": 30
+    },
+    {
+      "id": "CBRD-27267-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- [ ] over-quota 스레드끼리 경쟁하는 부하에서 `Num_lfcq_big_private_lists` 와 `Num_lfcq_prv_get_big` 의 수정 전 값을 기록한다 (현행 동작 baseline).\n- [ ] (a)안과 (b)안 중 선택한 근거가 위 지표 비교 결과와 함께 본문에 기록된다.\n- [ ] (a)안을 택한 경우, 같은 부하에서 `Num_lfcq_prv_get_big` 이 0 보다 크고 shared LRU 탐색 시간이 baseline 이하다.\n- [ ] (b)안을 택한 경우, big 큐 관련 자료구조와 두 perfmon 항목이 남지 않고 `restricted` 스레드의 2단계 우회가 코드에 명시된다.\n- [ ] 선택한 안이 quota 비활성 설정(`private_lrus_with_victims == NULL`)에서 기존과 동일하게 동작한다.\n- [ ] `pgbuf_peek_stats` 의 lock-free 큐 출력 인자 초기화 누락이 처리된다.",
+      "sha256": "e56e1ca59a04b419c406a1fc15473f015ddecc61f5b4325e0b2ef34fb2538413",
+      "disposition_group": 31
+    },
+    {
+      "id": "CBRD-27267-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- [ ] 위 Acceptance Criteria 충족\n- [ ] QA 통과 (버퍼 포화 스트레스 시나리오 포함)\n- [ ] 회귀 성능 측정: victim 대기 시간 분포와 hit rate 를 수정 전후로 비교해 악화가 없음을 확인\n- [ ] (b)안을 택한 경우 statdump 항목 제거를 운영 문서에 반영",
+      "sha256": "8fa871a5660500415018e202b040e7a7003d350429c1b86490988de43a98312f",
+      "disposition_group": 33
+    },
+    {
+      "id": "CBRD-27267-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "생산 경로를 복구할지 큐와 2단계 탐색을 제거할지는 `TBD - 합의 미확인` 이다. over-quota 경쟁 부하에서 victim 탐색 비용과 shared LRU 침범량을 비교해 정한다.",
+      "sha256": "545e9a98731be998907fc33b6379e28aa44cb0bfc92a2ce1272e754fe305e4d0",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27267-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "(a)안을 택할 경우 판정을 hot 경로(`pgbuf_lru_add_victim_candidate` 경유)에 둘지 100ms 주기 데몬(`pgbuf_adjust_quotas`)에만 둘지는 `TBD - 합의 미확인` 이다. 전자는 반응이 빠르고 후자는 hot 경로 비용이 없다.",
+      "sha256": "2eb61dd579b7b48199a70a2ecdaeea934853fea23004bb73236be37bd1306528",
+      "disposition_group": 34
+    },
+    {
+      "id": "CBRD-27267-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "big 조건이 흔히 성립하는 부하에서 모든 소비자가 big 큐만 소비하게 되면, quota 를 조금 넘긴 리스트는 회수 압력을 받지 못한다. 이 편중이 실제로 문제가 되는지는 부하 시험에서 함께 확인해야 한다.",
+      "sha256": "8026821f60760349f30c6937c751ba4a1e9e981cf5188da6c50986f4e7f7ae94",
+      "disposition_group": 35
+    },
+    {
+      "id": "CBRD-27267-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- `src/storage/page_buffer.c:823-825` — 세 LFCQ 필드 선언\n- `src/storage/page_buffer.c:1820-1835`, `:2045-2048` — 큐 생성과 해제\n- `src/storage/page_buffer.c:9022-9196` — `pgbuf_get_victim`, 3단계 탐색과 `restrict_other` 결정\n- `src/storage/page_buffer.c:16326-16369` — `pgbuf_lfcq_add_lru_with_victims`, 신규 등록 진입점\n- `src/storage/page_buffer.c:16380-16461` — `pgbuf_lfcq_get_victim_from_private_lru`, big 큐 consume 과 promotion\n- `src/storage/page_buffer.c:14345-14442` — `pgbuf_adjust_quotas` 의 큐 재등록 지점\n- `src/storage/page_buffer.c:15612-15657` — `pgbuf_lru_add_victim_candidate`, 후보 발생 시 큐 등록\n- `src/storage/page_buffer.c:1060-1073` — quota 판정 매크로와 `PBGUF_BIG_PRIVATE_MIN_SIZE`",
+      "sha256": "06e3eec8b2b7dd5285581a3792a0391e335624e61a2531d32e7c69576e18d232",
+      "disposition_group": 36
+    },
+    {
+      "id": "CBRD-27267-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27267-pgbuf-big-private-victim-queue_e6ed61e_claude.md",
+      "text": "- 부모 EPIC: CBRD-27193\n- 같은 victim 공급 계열의 정확성 결함(A3, direct victim 긴급 배정 경로 미실행)은 별도 이슈다. 이 이슈는 탐색 정책 쪽이라 수정 단위를 분리해 둔다.",
+      "sha256": "06ae0a2d4c392a4d8a01836fff4e2a3e63aeb8de5a7c5ed7c1f02f0895dbdce7",
+      "disposition_group": 38
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        3,
+        57,
+        59
+      ],
+      "disposition": "corrected",
+      "reason": "생산자 부재/항상 빈 큐를 전제로 한 목적과 영향은 현재 생산 경로로 반박한다. 초기 등록/재등록 정책의 부하 효과를 판별하는 조사로 재구성한다. 57/59는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        4,
+        58,
+        60
+      ],
+      "disposition": "non-substantive",
+      "reason": "Opening label-only 단위다. 현행 네 opening field로 대체한다. 58/60은 로컬 중복이다.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-original-claims.json",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        61
+      ],
+      "disposition": "corrected",
+      "reason": "over-quota 요청자가 생산 지점에 도달할 수 없다는 일반화를 정정한다. 제한 호출도 기존 big를 소비하면 생산 지점에서 재등록한다. 61은5/6/7의 로컬 합본이며 미선정 정책과 계측 필요는 유지하되 현행 유지도 허용한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16448",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        44,
+        89
+      ],
+      "disposition": "corrected",
+      "reason": "복구/제거 합의 미확인 및 성능 비교 취지를 유지한다. 기존 생산자 부재가 반박되어 현행 유지도 결론에 포함하며 등록 정책 변경 필요성을 ANALYSIS에 둔다. 89는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/report-2026-10-02.md#L174-L178"
+      ]
+    },
+    {
+      "ids": [
+        7
+      ],
+      "disposition": "corrected",
+      "reason": "big 게이지/소비 카운터 관측은 유지하되 이 둘만으로 검증을 완료하지 않는다. 제한 호출 누락과 큐 소비/실제 victim 성공 차이를 밝힌다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16394-L16443",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L505-L546"
+      ]
+    },
+    {
+      "ids": [
+        8,
+        62
+      ],
+      "disposition": "corrected",
+      "reason": "미선정 변경을 함수3개 범위나 외부 영향 없음으로 보장하지 않는다. 큐 제거 시 현재 도달 가능한 동작 및 통계 계약의 호환성 결정을 다룬다. 62는 Summary의 로컬 합본이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1790-L1809",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L561-L567"
+      ]
+    },
+    {
+      "ids": [
+        9
+      ],
+      "disposition": "corrected",
+      "reason": "부모 관계는 유지한다. D4를 확정 생산 경로 결함으로 취급하지 않고 정정된 정책 조사 범위를 기록한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/pgbuf-defects-report_5cd4f860e_claude.md#L105-L116",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443"
+      ]
+    },
+    {
+      "ids": [
+        10,
+        63
+      ],
+      "disposition": "corrected",
+      "reason": "페이지 버퍼/BCB/victim/LRU/인덱스 큐의 배경을 유지한다. 모든 탐색이 리스트 순회 없이 이루어진다는 절대 표현을 피하고 큐 후보 선택과 실제 victim 탐색을 구분한다. 63은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9047-L9092",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16337-L16346",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16441-L16443"
+      ]
+    },
+    {
+      "ids": [
+        11,
+        64
+      ],
+      "disposition": "corrected",
+      "reason": "세션마다 전용 private 리스트가 하나라는 전제를 정정한다. 빈 세션 리스트가 없으면 활동이 적은 리스트를 공유할 수 있다. 스캔 오염 차단을 보장하지 않는다. 64는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14489-L14546"
+      ]
+    },
+    {
+      "ids": [
+        12,
+        65
+      ],
+      "disposition": "corrected",
+      "reason": "big 후보 수는 2개 초과가 아니라 >1, 즉2개 이상이다. restricted의 유일 공급원은 다른 private 단계에만 한정한다. 65는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9159"
+      ]
+    },
+    {
+      "ids": [
+        13,
+        66
+      ],
+      "disposition": "corrected",
+      "reason": "호출별 제한 조건/여유분은 유지한다. quota 이하/초과의 고정 신분 설명과 대상이 요청자보다 더 크다는 해석은 제거한다. 대상 자신의 quota와 비교한다. 66은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1035-L1048",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9125",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16430-L16432"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        67
+      ],
+      "disposition": "non-substantive",
+      "reason": "produce/consume 대조라는 방법 소개 문구다. 별도 동작 주장이 아니며 검증한 경로/출처로 대체한다. 67은 로컬 중복이다.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-original-claims.json",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        15,
+        68
+      ],
+      "disposition": "retained",
+      "reason": "big 생산이 private 소비 함수에 있고 일반/shared 신규 등록 및 재등록 경로가 있다는 토폴로지는 유지한다. 과거 라인을 현재 immutable 링크로 교체한다. 68은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16337-L16469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16493-L16518"
+      ]
+    },
+    {
+      "ids": [
+        16,
+        69
+      ],
+      "disposition": "retained",
+      "reason": "신규 등록 함수는 quota 조정의 private2곳/shared1곳과 후보 증가1곳에서 호출되며 private는 일반 큐에 들어간다. 69는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14350-L14453",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15658-L15668",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16359-L16374"
+      ]
+    },
+    {
+      "ids": [
+        17,
+        70
+      ],
+      "disposition": "corrected",
+      "reason": "흐름을 현재 라인으로 갱신하고 big 소비 후 restricted도 재등록함을 설명한다. consume 실패와 물리적 빈 큐를 동치로 두지 않는다. 70은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9177",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16448",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/lockfree_circular_queue.hpp#L335-L350"
+      ]
+    },
+    {
+      "ids": [
+        18,
+        71
+      ],
+      "disposition": "corrected",
+      "reason": "크기>100/대상 quota2배 초과/후보>1은 유지한다. 일반 큐에서 꺼낼 때만 big 판정을 한다는 설명은 big 소비 후에도 평가하므로 정정한다. 71은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16442"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        72
+      ],
+      "disposition": "corrected",
+      "reason": "flag/CAS의 신규 중복 등록 방지 역할은 유지한다. 동시 소비와 선행 재등록까지 포함한 전역 최대1곳 invariant를 별도 증명 없이 선언하지 않는다. 72는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16348-L16377",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16469"
+      ]
+    },
+    {
+      "ids": [
+        20,
+        73
+      ],
+      "disposition": "corrected",
+      "reason": "최초 big 등록에는 비제한 일반 큐 소비가 필요하다는 결론만 유지한다. quota 이하만 생산하며 그 생산자는 big가 필요 없다는 설명은 제거한다. 제한 호출도 seeded big를 재등록한다. 73은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16448"
+      ]
+    },
+    {
+      "ids": [
+        21,
+        74
+      ],
+      "disposition": "retained",
+      "reason": "과거 D4의 생산자 없음/항상 비어 있음 주장에 대한 정정 맥락을 유지한다. 과거 문서와 현재 소스 및 미실행 런타임을 구별한다. 74는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/pgbuf-defects-report_5cd4f860e_claude.md#L105-L116",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/report-2026-10-02.md#L174-L178",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443"
+      ]
+    },
+    {
+      "ids": [
+        22,
+        75
+      ],
+      "disposition": "corrected",
+      "reason": "원문 정정 표도 모두 over-quota이면 항상 NULL이라고 과장한다. 기존 big 큐 이력, 호출별 restricted 및 비제한 호출 유무가 필요하다. 75는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9125",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16448"
+      ]
+    },
+    {
+      "ids": [
+        23,
+        76
+      ],
+      "disposition": "corrected",
+      "reason": "특정 부하의 확인된 기능 결함/흔한 발생/동시 scan이면 모든 소비자 over-quota라는 표현은 미측정 가설로 바꾼다. SQL 부하와 빈도/지연/오염 결과는 없다. 76은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9138",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/report-2026-10-02.md#L174-L178"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        77
+      ],
+      "disposition": "corrected",
+      "reason": "스펙이 ANALYSIS 결정에 달린다는 점은 유지한다. 미선정 변경의 SQL/설정 무영향 보장은 제거하고 도달 가능 동작과 지표 계약을 정하도록 한다. 77은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L561-L567"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        78
+      ],
+      "disposition": "corrected",
+      "reason": "복구하면 shared 탐색 감소/제거하면 실효 동작 동일이라는 예측을 확정하지 않는다. 현행 restricted big 소비가 가능하여 제거는 정책 변경이다. 지표 폐기 방식도 미선정이다. 78은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16448",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9134-L9177",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L561-L567"
+      ]
+    },
+    {
+      "ids": [
+        26,
+        79
+      ],
+      "disposition": "corrected",
+      "reason": "후보 비용/편중 조사 질문은 유지하되 우선순위, 의도 충족 보장,100ms 최대 지연, 제거는 죽은 분기 삭제라는 판정을 제거한다. 현행을 기준으로 변경 필요성을 먼저 검증한다. 79는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15658-L15668",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16348-L16469",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        80
+      ],
+      "disposition": "removed",
+      "reason": "미선정(a)안의 구체 patch 위치와 분기 보존을 구현 지시로 남기지 않는다. 확인 사실은 현행 경로 설명으로 보존하고 설계는 ANALYSIS로 둔다. 80은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16348-L16469",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        28,
+        81
+      ],
+      "disposition": "removed",
+      "reason": "big 판정 macro 추출을 선정된 안전 구현으로 제시하지 않는다. 신규 판정 위치와 이중 판정은 미정이다. 81은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16430-L16438",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        29,
+        82
+      ],
+      "disposition": "corrected",
+      "reason": "동시 full scan은 부하 후보로 유지하되 세션 수로 모든 victim 호출의 restricted를 보장하지 않는다. 호출 상태와 큐 이력을 관측하도록 한다. 82는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9069-L9125",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14489-L14546"
+      ]
+    },
+    {
+      "ids": [
+        30,
+        83
+      ],
+      "disposition": "corrected",
+      "reason": "지표를 현재 동작에 맞춘다. total_calls는 모든 진입이 아니고 empty는 restricted 반환을 누락한다. shared timer는 침범량이 아니며 victim 대기는 사용자 전체 지연과 다르다. 83은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16394-L16443",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9150-L9177",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L505-L546",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L561-L567"
+      ]
+    },
+    {
+      "ids": [
+        31,
+        84
+      ],
+      "disposition": "corrected",
+      "reason": "기본 mask에 PB_VICTIMIZATION0x10 누락 및 private 상세 카운터 gate는 유지한다. 게이지/모든 시간 지표가 동일 gate라는 일반화는 제거한다. 84는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16394-L16400",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.h#L56-L65",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/system_parameter.c#L4155-L4165"
+      ]
+    },
+    {
+      "ids": [
+        32,
+        85
+      ],
+      "disposition": "corrected",
+      "reason": "NULL이면 두 출력 인자를 대입하지 않는 사실만 확인한다. SERVER_MODE caller/buffer 계약 없이 운영 stale 통계로 확정하거나 선행 필수 수정 및 소유권을 고정하지 않는다. 85는 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14697-L14717",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1968"
+      ]
+    },
+    {
+      "ids": [
+        33,
+        86
+      ],
+      "disposition": "removed",
+      "reason": "0 초기화로 충분하며 NULL은0이 정확하다는 미선정 구현을 제거한다. 비활성/미제공/0의 계약과 호출자 사용 확인을 ANALYSIS로 둔다. 86은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14783-L14793",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1968",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        87
+      ],
+      "disposition": "corrected",
+      "reason": "기존 acceptance와87 로컬 합본을 관측 가능한 조사 결과로 재구성한다. 미합의 big소비>0/shared시간 baseline이하, a/b만 허용, perfmon2개 필수삭제, 선행0초기화를 제거한다. quota on/off와 실제 victim 결과 및 출력 계약은 유지한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16469",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L1790-L1809",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L1949-L1968",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        40
+      ],
+      "disposition": "non-substantive",
+      "reason": "위 acceptance 충족이라는 중복 참조-only checklist다. DoD는 경로 증거/부하 조사/결정 결과로 작성한다.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-original-claims.json",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        41,
+        42,
+        43,
+        88
+      ],
+      "disposition": "corrected",
+      "reason": "미정의 QA 통과/절대 성능 악화 없음 대신 변경 필요 시 관련 검증 및 수용 기준을 정한다. 통계 호환성/문서 처리 필요는 유지하되 항목 삭제를 강제하지 않는다. 88은 로컬 합본이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/base/perf_monitor.c#L505-L567",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        45,
+        90
+      ],
+      "disposition": "corrected",
+      "reason": "등록 위치/비용의 ANALYSIS 비교 취지는 유지한다. 100ms 최대 지연과 데몬 변경 시 hot경로 비용 없음이라는 보장은 확정하지 않는다. 90은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L14350-L14423",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L15658-L15668",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16348-L16377",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        46,
+        91
+      ],
+      "disposition": "retained",
+      "reason": "big 우선 소비의 리스트 간 회수 편중 가능성은 미측정 조사 질문으로 유지한다. 실제 starvation이나 성능 저하는 확정하지 않는다. 91은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16408-L16443",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        92
+      ],
+      "disposition": "non-substantive",
+      "reason": "과거 e6ed61e 라인 목록과92 로컬 중복인 참고문헌-only 단위다. 사실을 설명하는 본문에 현재 커밋의 확인한 immutable links를 배치한다.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267-original-claims.json",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    },
+    {
+      "ids": [
+        55
+      ],
+      "disposition": "retained",
+      "reason": "실제 부모 CBRD-27193 관계를 유지한다.",
+      "evidence": [
+        "https://jira.cubrid.org/browse/CBRD-27267",
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27267.json"
+      ]
+    },
+    {
+      "ids": [
+        56,
+        93
+      ],
+      "disposition": "corrected",
+      "reason": "direct victim 긴급 배정과 본 큐 정책의 독립 범위를 유지한다. 다른 이슈의 결함 분류와 복구/제거 선택은 본 조사의 근거가 아니다. 93은 로컬 중복이다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16384-L16469",
+        "https://jira.cubrid.org/browse/CBRD-27264",
+        "/home/vimkim/gh/my-cubrid-jira-CBRD-27193-rewrite/issues/CBRD-27267-big-private-victim-queue_f6cac31_codex.md"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

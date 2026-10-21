@@ -1,0 +1,68 @@
+{
+  "issue": "CBRD-27316",
+  "reviewer": "/root",
+  "report_sha256": "f13959d1233161b04d5358f437fa8a81bd3edeb5d51132f5f1e97188234e5725",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27316-C001",
+      "origin": "live-description",
+      "text": "<http://jira.cubrid.org/browse/CBRD-27316>",
+      "sha256": "b2e4c15fe35365585275f33aae56ec63dcc48391877e514bfe247aeaf51b33e2",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27316-C002",
+      "origin": "live-description",
+      "text": "| Field | Value |\n|---|---|\n| Status | Open |\n| Priority | Minor |\n| Type | Sub-task |\n| Assignee | Unassigned |\n| Reporter | Daehyun Kim |\n| Resolution | Unresolved |\n| Created | 2026-08-26 |\n| Updated | 2026-09-17 |",
+      "sha256": "7903887db2e14c2408a5fed7be746bc2ab6a4cd7717e5af138476d185c66161c",
+      "disposition_group": 1
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1
+      ],
+      "disposition": "non-substantive",
+      "reason": "Original inventory unit is only the live JIRA reference URL. The report retains the issue link and parent relationship. Live fields.description is null and comments.total is 0, so this unit does not provide a substantive reported problem, reproduction, measured result, or implementation decision.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316-original-claims.json#CBRD-27316-C001",
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316.json#fields.description",
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316-comments.json",
+        "https://jira.cubrid.org/browse/CBRD-27316"
+      ]
+    },
+    {
+      "ids": [
+        2
+      ],
+      "disposition": "non-substantive",
+      "reason": "Original inventory unit is the rendered snapshot's status/priority/type/assignee/reporter/date metadata table, not a live description claim. The report preserves Sub-task and parent scope, leaves ownership and priority to triage, and does not republish the metadata as problem or impact evidence. No substantive live body existed.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316-original-claims.json#CBRD-27316-C002",
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316.json#fields",
+        "https://jira.cubrid.org/browse/CBRD-27316"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": [
+    {
+      "ids": [
+        "CBRD-27316-original-title-and-scope"
+      ],
+      "disposition": "retained",
+      "reason": "Explicit title accounting outside the two non-substantive inventory units: preserve parallel fix + private LRU survey (victimize pattern) as a bounded investigation of concurrent existing fix/unfix, private/shared placement, victim origins and costs. Remove only the drafting marker from the rewritten Korean heading. State that original motivation and the specific parallel execution path are unknown; the operational interpretation is a proposal, not an attributed API request, confirmed defect, benchmark, root cause, design agreement or improvement result. Parent requests for TPC-H consideration and buffer-manager workload/test framework are attributed context. Investigation may conclude current behavior should remain. Neighboring wait-recipient, emergency-supply, index-queue, framework and default/v2 decisions stay in their own issues without a hard dependency.",
+      "evidence": [
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27316.json#fields.summary",
+        "/home/vimkim/.local/share/cubrid-jira/rewrite-CBRD-27193-20261021/CBRD-27193-comments.json",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/session/session.c#L733-L742",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/connection/server_support.c#L2088-L2101",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L6633-L6801",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L9070-L9194",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L16392-L16442",
+        "https://github.com/vimkim/my-cubrid-docs/blob/fd2e244e585de7a78dfccbbdfde722eef1b49210/code-analysis/pgbuf/report-2026-10-02.md#L155-L184"
+      ]
+    }
+  ]
+}

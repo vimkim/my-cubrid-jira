@@ -1,0 +1,27 @@
+{
+  "reports": 20,
+  "reviewed_in_full": 20,
+  "dedicated_writers": 20,
+  "actual_children": 19,
+  "github_blob_link_occurrences_checked": 527,
+  "local_markdown_link_targets_checked": 74,
+  "original_units": 1701,
+  "original_dispositions": {
+    "corrected": 1016,
+    "non-substantive": 246,
+    "retained": 328,
+    "removed": 111
+  },
+  "additional_screenshot_claims": 5,
+  "dry_runs_passed": 20,
+  "live_updates_executed": 0,
+  "converted_character_range": [
+    9522,
+    16530
+  ],
+  "parent_child_table": "exact ordered match",
+  "type_specific_sections": "passed",
+  "report_hashes_match_manifest_audit_and_dryrun": true,
+  "runtime_build_benchmark_lean_execution": "not performed",
+  "https_docserve_reachability": "unverified: hostname did not resolve"
+}

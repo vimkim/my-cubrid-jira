@@ -1,0 +1,1008 @@
+{
+  "issue": "CBRD-27630",
+  "reviewer": "/root",
+  "report_sha256": "bcb4645cc5c6b97150927d1b770634564b18f4e73eeb896bafc94cae91217405",
+  "review": "Groups reviewed against complete rewritten report and relevant pinned evidence. Mixed units are corrected if any material subclaim changes. Non-substantive units are labels, fence delimiters, metadata or reference-only repeats.",
+  "units": [
+    {
+      "id": "CBRD-27630-C001",
+      "origin": "live-description",
+      "text": "**이슈 수행 목적**: 임시 페이지의 로딩 실패를 정리할 때 해당 호출이 소유한 기록만 해제하고, 다른 스레드의 진행 중인 로딩을 보호한다.",
+      "sha256": "55e3abb8be0f97346aeeb0ecd46df71204c3299c0b02461041b63483685e6f44",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27630-C002",
+      "origin": "live-description",
+      "text": "**이슈 수행 이유**: develop `ea57708a785e34b35a91e10cd0694839a53a4fe5` 에서 `pgbuf_claim_bcb_for_fix()` 가 실패 시 로딩 기록을 해제한 뒤 `pgbuf_simple_fix()` 가 같은 정리를 다시 호출한다. 삭제 함수는 페이지 식별자만 비교하므로 두 호출 사이에 다른 스레드가 등록한 기록을 삭제할 수 있다. 이 순서는 소스에서 확인했으며, 소스의 동작을 반영한 Lean 모델에서 소유권 위반 반례를 검증했다.",
+      "sha256": "51efe3ac1a4c60140faa78b67c4d82060d10f57ea369b0a3a5b0783ad7a96335",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27630-C003",
+      "origin": "live-description",
+      "text": "**영향**: 다른 스레드의 로딩 기록이 사라지면 동일 임시 페이지를 여러 스레드가 동시에 읽어들이는 상황이 허용된다. 같은 페이지의 로딩을 직렬화하는 보호가 깨진다. 실제 쿼리에서의 동시 호출·실패 경로 도달과 운영 장애, 데이터 손상은 아직 재현하거나 확인하지 않았다.",
+      "sha256": "26b14766df112c7941cc14da2eb7fe4e6876aebd57b528c6f957518759dfedd9",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27630-C004",
+      "origin": "live-description",
+      "text": "**이슈 수행 방안**: TBD - 합의 미확인. helper와 호출자의 실패 정리 책임을 점검하고, 중복 정리 제거 또는 소유자 확인을 수정 후보로 검토한다. 실제 C\\\\[\\\\]{.ul} 실패·스케줄링 경로를 재현하고 다른 스레드의 기록이 보존되는 회귀 검증을 추가한다.",
+      "sha256": "76c94c9aaf7ef60e479185b05db643afe8d589f54c3af0da757afa105085b3db",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27630-C005",
+      "origin": "live-description",
+      "text": "`pgbuf_simple_fix()` 는 임시 파일의 페이지를 페이지 버퍼에서 찾아 반환하는 함수다. 페이지가 없고 `need_fix=true` 이면 메모리 프레임을 확보하고 페이지를 읽어들인다. 반환한 페이지에는 사용 중임을 나타내는 pin을 추가해 호출자가 사용하는 동안 프레임이 재사용되지 않도록 한다. 함수의 원래 사용 조건은 임시 페이지 읽기이며, 페이지 내용의 동시 쓰기나 일반 FIX/LATCH와의 혼용은 제외한다.",
+      "sha256": "78ebd10b0dd07687da3c53971793c0ea9f0a1eee0be762c81fd6c6051f337185",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27630-C006",
+      "origin": "live-description",
+      "text": "아직 메모리에 없는 페이지는 여러 스레드가 동시에 요청할 수 있다. 이를 직렬화하기 위해 `pgbuf_lock_page()` 는 VPID별 로딩 기록을 등록한다. VPID는 볼륨 번호와 페이지 번호로 구성된 페이지 식별자다. 같은 VPID의 기록을 발견한 다른 스레드는 로더가 되지 않고 대기한다. 로더는 페이지를 해시 체인에 공개하거나 실패를 정리한 뒤 `pgbuf_unlock_page()` 로 기록을 제거한다.",
+      "sha256": "214ba11d7289ac0204786ba3daa765f79d2328a65e8bd54a13976e114eab6b8c",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27630-C007",
+      "origin": "live-description",
+      "text": "확인한 문제는 실패 정리가 두 곳에서 실행되지만, 삭제 대상의 소유권은 확인하지 않는다는 점이다. `pgbuf_claim_bcb_for_fix()` 는 버퍼 할당 실패, 파일 읽기 실패, TDE 복호화 실패에서 로딩 기록을 제거하고 `NULL` 을 반환한다. 호출자인 `pgbuf_simple_fix()` 는 이 `NULL` 을 받아 `pgbuf_unlock_page()` 를 다시 호출한다.",
+      "sha256": "1df177eab6f5b5f2cd825727fb938a7467b574c503bc6ea2aa8d438524ae9efa",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C008",
+      "origin": "live-description",
+      "text": "첫 번째 정리에서 hash mutex가 해제된 뒤 다른 스레드가 동일 VPID의 기록을 등록할 수 있다. 두 번째 정리는 기존 기록과 새 기록을 구별하지 않으므로 새 로더의 기록을 제거할 수 있다. 각 등록·삭제 작업이 mutex로 보호되어도 두 호출 사이의 소유권 변경은 막지 못한다.",
+      "sha256": "faf7ebdb6eaf43915faac71a4667b6b3bf6bb122d4c00ac78eb1cdcdd6d28493",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C009",
+      "origin": "live-description",
+      "text": "분석 기준은 CUBRID `VERSION=11.5.0`, develop 리비전 `ea57708a785e34b35a91e10cd0694839a53a4fe5` 다. 적용되는 정확한 릴리스·패치 범위와 결함 유입 리비전은 TBD다. 기록의 등록·삭제와 대기열 처리는 `SERVER_MODE` 조건부 코드이며, 이 보고서는 해당 동시 실행 경로를 대상으로 한다.",
+      "sha256": "0d5a680f35443b2e4eb5a6268bffba095e0991e906ae2921cac4eb9e7725af67",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27630-C010",
+      "origin": "live-description",
+      "text": "버퍼 할당 실패 경로는 helper에서 먼저 로딩 기록을 정리한다. [page_buffer.c:8418-8425](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8418-L8425)",
+      "sha256": "9f40e0b75ad1a081e088312ee023a4faa17bc5aac2b0bac616d4ce89ead84e5f",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C011",
+      "origin": "live-description",
+      "text": "``` c\nbufptr = pgbuf_allocate_bcb (thread_p, vpid);\nif (bufptr == NULL)\n  {\n    ASSERT_ERROR ();\n    (void) pgbuf_unlock_page (thread_p, hash_anchor, vpid, true);\n    PGBUF_BCB_CHECK_MUTEX_LEAKS ();\n    return NULL;\n  }\n```",
+      "sha256": "506bcbccbcad9e13221e860ff300ab06d48d6533dedcb12ea26c4eef500e6f88",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C012",
+      "origin": "live-description",
+      "text": "호출자는 helper의 실패 후 다시 정리한다. [page_buffer.c:2626-2631](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2626-L2631)",
+      "sha256": "b0da69c95edb9cc160b5e03509480a3155b373bc40327bc555e2cc5d3b38d04f",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C013",
+      "origin": "live-description",
+      "text": "``` c\nbufptr = pgbuf_claim_bcb_for_fix (thread_p, vpid, OLD_PAGE, hash_anchor, NULL, &retry, true);\nif (bufptr == NULL)\n  {\n    (void) pgbuf_unlock_page (thread_p, hash_anchor, vpid, true);\n    return NULL;\n  }\n```",
+      "sha256": "a467e60451f667dfe24c0a367801fb1dac5e68a8786ebb4f95990a26113807d0",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C014",
+      "origin": "live-description",
+      "text": "같은 중복 정리로 이어지는 helper의 실패 경로는 다음과 같다.",
+      "sha256": "cd3c1ceb4fe9b023a298d6f123593d5eb69e511819189c473c8d98ba5a2f0a30",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C015",
+      "origin": "live-description",
+      "text": "| 실패 원인       | helper 내부의 정리   | 호출자의 재정리      |\n|-----------------|----------------------|----------------------|\n| 버퍼 할당 실패  | `page_buffer.c:8422` | `page_buffer.c:2629` |\n| 파일 읽기 실패  | `page_buffer.c:8479` | `page_buffer.c:2629` |\n| TDE 복호화 실패 | `page_buffer.c:8502` | `page_buffer.c:2629` |",
+      "sha256": "2193ce053adf5e3298643194f03708c241a274108c6f1c7d68fa5e62572afed1",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C016",
+      "origin": "live-description",
+      "text": "`pgbuf_lock_page()` 는 {{pgbuf_Pool.buf_lock_table[cur_thrd_entry-\\>index\\]}} 를 사용해 현재 스레드의 기록을 등록한다. \\[등록 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8027-L8036)",
+      "sha256": "1bf0a2df87014455aae264e70dce93b3fcf180aaf8291eb8baf1daeab269e232",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C017",
+      "origin": "live-description",
+      "text": "반면 `pgbuf_unlock_page()` 는 연결 리스트를 순회하면서 `VPID_EQ(&cur_buffer_lock->vpid, vpid)` 만 비교한다. 일치하는 기록을 찾으면 리스트에서 제거하고 대기자들을 깨운다. 호출한 스레드의 슬롯과 같은 기록인지 확인하는 비교는 없다. 마지막 인자인 `need_hash_mutex=true` 는 hash mutex를 획득하라는 뜻이며, 소유권 검사를 의미하지 않는다. [검색·제거 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8068-L8127)",
+      "sha256": "9be03bdbaf62d3b1e4ec6961bc1e6b08bc6a9ffd01d818c128a97953880611f2",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C018",
+      "origin": "live-description",
+      "text": "-   분석 대상: CUBRID `11.5.0` 소스, develop `ea57708a785e34b35a91e10cd0694839a53a4fe5`.",
+      "sha256": "dfa1663626c7a6cbb35931b6247ae32c0e7808f9888edfb37c6a1c3e0a564330",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27630-C019",
+      "origin": "live-description",
+      "text": "-   조건: `SERVER_MODE`, 같은 임시 VPID에 대한 로딩 경로와 실패 정리의 교차 실행.",
+      "sha256": "a19f1689c4f183a1f038309a6967f6adc5ecc9ae836d16b625c0ef4af43eb76c",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27630-C020",
+      "origin": "live-description",
+      "text": "-   실제 엔진 재현 빌드·운영체제·빌드 번호: TBD. 이번 보고서를 위해 엔진을 빌드하거나 쿼리를 실행하지 않았다.",
+      "sha256": "117ca4a4e7b1c542a14e96a7ed9f09e6811d65989be4e29e0564e62b9a33b0eb",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27630-C021",
+      "origin": "live-description",
+      "text": "-   모델 검증 환경: Linux, Lean `4.24.0`, Python 3. 검증일은 2026-10-14다.",
+      "sha256": "a9652e83849844cc0a7123fcf51af073f6cf6af69f477d31d0ae8b6ddb31fc52",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27630-C022",
+      "origin": "live-description",
+      "text": "-   모델·문서 기준 리비전: `oos-lean-verification` 의 `6bddfb23747d38deb780d45222a9df216bff0d17`.",
+      "sha256": "172e7a3cb7a640dc64c69333d0771c405d0f7c4bfc6de84782add519fd456f12",
+      "disposition_group": 8
+    },
+    {
+      "id": "CBRD-27630-C023",
+      "origin": "live-description",
+      "text": "-   관련 소스와 helper 파일의 고정 리비전 지문 검증, 모델 빌드 및 27개 정리의 공리 감사가 통과했다. 이는 C\\\\[\\\\]{.ul} 실행 재현 결과를 의미하지 않는다.",
+      "sha256": "563f87828f9510f076a6e0f972d245755f5a716ef88e54ee665df1674c2142ea",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C024",
+      "origin": "live-description",
+      "text": "페이지가 아직 해시 체인에 공개되지 않았고, 스레드 A가 해당 VPID의 로딩 기록을 소유한 상태에서 시작한다.",
+      "sha256": "46a8bcf47775f2fe49d41d98152559bdd577427c32996c8a21f640d006a898fc",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27630-C025",
+      "origin": "live-description",
+      "text": "| 순서 | 스레드 동작                                                                                                                            | 해당 VPID의 로딩 기록                                                      |\n|------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------|\n| 1    | A의 claim이 실패한다. helper가 `pgbuf_unlock_page(..., true)` 를 호출하고 `NULL` 을 반환한다.                                          | A의 기록이 제거된다.                                                       |\n| 2    | A가 호출자의 두 번째 정리를 실행하기 전에 B가 같은 페이지를 요청한다. B는 `pgbuf_lock_page()` 에서 로더가 되어 페이지를 읽기 시작한다. | B의 기록이 등록된다.                                                       |\n| 3    | A가 `pgbuf_simple_fix()` 의 2629행에서 두 번째 정리를 실행한다.                                                                        | VPID만 일치하는 B의 기록이 제거된다. B는 아직 로딩 중이다.                 |\n| 4    | B가 페이지를 공개하기 전에 C가 같은 페이지를 요청한다.                                                                                 | 기록이 없으므로 C도 로더가 된다. B와 C가 동시에 로딩 중인 상태가 허용된다. |",
+      "sha256": "6d9095a1044acb4a440c5bb9251780d26fe15fb59b3be7ca207ba9aff362f092",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27630-C026",
+      "origin": "live-description",
+      "text": "필요한 조건은 실제로 발생 가능한 claim 실패와, 같은 임시 페이지를 요청하는 스레드들의 교차 실행이다. 모델 반례에는 페이지 내용의 동시 쓰기나 일반 FIX/LATCH 호출이 필요하지 않다. `need_fix=false` 의 miss는 로딩하지 않으므로 반례의 최초 로더 진입에 사용하지 않는다.",
+      "sha256": "18e282a9ef58443488b110bfe075d7d41efbb92a06710bd65650e1928ca72c9f",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27630-C027",
+      "origin": "live-description",
+      "text": "이 명령은 모델의 소유권 위반을 검증한다. 실제 엔진에서 장애를 재현하는 명령은 아니다. Git, Bash, Python 3, elan/Lake가 필요하며 패키지는 Lean 4.24.0을 고정한다.",
+      "sha256": "636952116fefe5e8f46058c19e8e8ad511e204d2a4c8882ec5912542ffc8dd20",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C028",
+      "origin": "live-description",
+      "text": "``` sh\ngit clone https://github.com/vimkim/oos-lean-verification.git\ncd oos-lean-verification\ngit checkout 6bddfb23747d38deb780d45222a9df216bff0d17\n./scripts/check-pgbuf.sh\n```",
+      "sha256": "6c13c0edea70b4d2c2051b9529bf06ce83d8e5e00a6b9f71bfd090632bca1412",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C029",
+      "origin": "live-description",
+      "text": "확인한 출력은 다음과 같다.",
+      "sha256": "94b40f8113159310eafa6d3e3c239d60e0f8a37a2d4a3decee2085670bddf946",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C030",
+      "origin": "live-description",
+      "text": "``` none\nBuild completed successfully (8 jobs).\n'Pgbuf.SimpleFix.duplicate_cleanup_counterexample' does not depend on any axioms\n'Pgbuf.SimpleFix.duplicate_cleanup_allows_two_loaders' does not depend on any axioms\nAudited 27 theorems; only standard logical axioms permitted.\nBundled source snapshot checksum verified; correspondence remains manual.\n```",
+      "sha256": "12a31e7fd8f15614cc68be6242df7ed3798d41868784a4ee36c825197990766b",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C031",
+      "origin": "live-description",
+      "text": "소스의 고정 리비전도 Git 객체로 대조한다. CUBRID clone이 해당 리비전을 포함해야 한다.",
+      "sha256": "052c4c4f5b11ec0d4b3d00a69a842688c654656a6ea25e039dbd92c83244396c",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C032",
+      "origin": "live-description",
+      "text": "``` sh\npython3 scripts/check-pgbuf-source.py --cubrid-repo /path/to/cubrid\n```",
+      "sha256": "038834302fff31a42bacae739b5a05f9459721f79c1be29e388e0f89f2b6cf31",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C033",
+      "origin": "live-description",
+      "text": "`/path/to/cubrid` 는 CUBRID 저장소 경로로 바꾼다. 확인한 출력은 다음과 같다.",
+      "sha256": "d2791e42bbff02d62c3dca19cad9c86bc325b61e83445c33106c2e118989ee90",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C034",
+      "origin": "live-description",
+      "text": "``` none\nPinned source and helper files verified at ea57708a785e34b35a91e10cd0694839a53a4fe5.\n```",
+      "sha256": "65a3d4d51f49a1cddb2631cfbf4755f793d90d7e154db379c2edc6f2872251d5",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C035",
+      "origin": "live-description",
+      "text": "실제 엔진 재현 SQL·명령, 실패 주입 방법, 쿼리 수준의 동일 임시 VPID 동시 접근 시나리오는 TBD다. 우선 다음 조건을 통제할 수 있는 테스트를 구성해야 한다.",
+      "sha256": "e10d5429e7dee15704945c42e553382671794bb41d7a77686870c32e5a54a7f7",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C036",
+      "origin": "live-description",
+      "text": "1.  A가 로딩 기록을 소유한 상태에서 버퍼 할당 또는 파일 읽기 실패를 발생시킨다. 첫 번째 정리가 끝난 뒤 호출자의 두 번째 정리 직전에 A를 대기시킨다.",
+      "sha256": "80a975f43129d2f8ec944abb10896d9da7d413fe5c5666c30efa35fd6906c2fb",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C037",
+      "origin": "live-description",
+      "text": "2.  B가 같은 VPID의 기록을 등록하도록 하고, 해시 공개 전까지 B를 대기시킨다.",
+      "sha256": "8684f795227d08ccbeaf9a661447ec11b3a339b6e3a2aa45be7a663cc461dd8f",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C038",
+      "origin": "live-description",
+      "text": "3.  A의 두 번째 정리를 실행한 뒤 B의 기록이 그대로 연결되어 있는지 확인한다.",
+      "sha256": "00a71bab99ee3e4bb14460a7519610c8773d06d0e871c7417de966d18d8282ad",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C039",
+      "origin": "live-description",
+      "text": "4.  C의 동일 VPID 요청이 새 로더가 되지 않고 기존 로더를 기다리는지 확인한다.",
+      "sha256": "137095423b343fbc39f42d4e7022434b73ae9457b75dfb1e45a8d6f7989a052b",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C040",
+      "origin": "live-description",
+      "text": "5.  실제로 도달 가능한 복호화 실패 경로와 정상 성공 경로도 함께 검증한다.",
+      "sha256": "d2a738874d453dd5daa4e4aa9392b6fda04ae46ceb314efe116de9230ed56b54",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C041",
+      "origin": "live-description",
+      "text": "실제 호출 경로에는 `qfile_put_next_sort_item()` -\\> `qmgr_get_old_page_simple_fix()` -\\> `pgbuf_simple_fix(..., true)` 가 있다. 이 호출 경로의 존재는 소스에서 확인했지만, 동일 임시 VPID의 동시 호출과 실패가 해당 경로에서 함께 발생하는지는 추가 검증해야 한다.",
+      "sha256": "00295ff088d160209fd1fb7c024761043dc276f207e97a25d102b4f63a978490",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27630-C042",
+      "origin": "live-description",
+      "text": "실패 정리는 해당 호출이 소유한 로딩 기록만 해제해야 한다. A의 기록이 이미 제거된 뒤 B가 새 기록을 등록했다면, A의 후속 정리는 B의 기록을 보존해야 한다. B가 로딩 중인 동안 동일 VPID를 요청한 C는 새 로더가 되지 않고 기존 로더를 기다려야 한다.",
+      "sha256": "49737c0ed92bb93c9bacfe6f44411f303470e3a8f874bd6e4cf4273aeddfc2d2",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27630-C043",
+      "origin": "live-description",
+      "text": "소스에서 helper의 실패 정리와 호출자의 재정리, VPID만 확인하는 삭제 동작을 확인했다. 소스의 동작을 반영한 Lean 모델에서는 A의 두 번째 정리가 B의 기록을 지우는 3단계 소유권 위반과, 이후 C까지 로더가 되는 4단계 실행을 검증했다.",
+      "sha256": "068ec0c56ca37ff26d6b9afaabb9c0f9700db60af3d83ac8580dd85989b6a31c",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27630-C044",
+      "origin": "live-description",
+      "text": "실제 C\\\\[\\\\]{.ul} 실행이나 운영 환경에서 같은 스케줄링을 재현한 결과는 없다. 이 반례만으로 중복 프레임 공개, 데이터 손상, 실제 장애 발생을 확정하지 않는다.",
+      "sha256": "1593cb0d87d4e0ecc4a4696d3f9f850a3dd6d3e3a2a0cd43349ebb4de3c6df96",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27630-C045",
+      "origin": "live-description",
+      "text": "정리 함수에서 현재 기록이 호출자의 소유인지 확인하면 다른 스레드의 기록을 보존할 수 있다. `proposed_owner_check_preserves_foreign_record` 는 이 후보의 모델상 성질을 증명한다. 실제 소스 수정이나 채택된 설계는 아니다.",
+      "sha256": "dbb75042a690c8df47a6b4861dbbdcb77ec469fc78a64f7a9740a0a7545bc613",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27630-C046",
+      "origin": "live-description",
+      "text": "중복 정리를 제거하는 방향도 검토할 수 있으나, 먼저 `pgbuf_claim_bcb_for_fix()` 의 반환 경로와 모든 호출자의 정리 책임을 함께 점검해야 한다. 일반 `pgbuf_fix()` 는 이 helper가 `NULL` 을 반환하면 재시도 여부를 확인한 뒤 반환하며, 해당 위치에서 중복 정리하지 않는다. [비교 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2316-L2326)",
+      "sha256": "05e583d84546d462afcfd6aec187157a0e62f1f6c8cf0d31133de6a8d45ffe7c",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27630-C047",
+      "origin": "live-description",
+      "text": "별도의 `dwb_read_page()` 오류 분기는 정리 검토 대상이지만, 고정 리비전의 함수 본문은 모든 정상 반환에서 `NO_ERROR` 를 반환한다. 이번 반례는 그 분기의 도달 가능성에 의존하지 않는다. [DWB 함수 본문](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/double_write_buffer.cpp#L3979-L4015)",
+      "sha256": "eb80c2061bf6526c7e7db4f22df46c8d911a560f6b2cc7a750a74b2068aabddb",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27630-C048",
+      "origin": "live-description",
+      "text": "이번 이슈의 범위는 로딩 기록의 소유권과 실패 정리다. 페이지 내용의 일관성, 전체 C\\\\[\\\\]{.ul} 메모리·동시성 의미론, 함수 종료성, 버퍼 풀 전체의 정확성을 증명한 결과는 아니다.",
+      "sha256": "03d394f83c61303622bc97744740e548407dbeec8c1efedc76b6b8bb2f649a46",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27630-C049",
+      "origin": "live-description",
+      "text": "-   부모 이슈: [CBRD-27193 - page buffer](http://jira.cubrid.org/browse/CBRD-27193).",
+      "sha256": "74f82342ac1e0bea66d9a0633c9e4bb392a42df4a81fc28b9ac8c8e128b72503",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C050",
+      "origin": "live-description",
+      "text": "-   분석 문서: [pgbuf-simple-fix.md](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md).",
+      "sha256": "c15c0123cbec5fb21829b66f3ea3c88967545a2a81e30bedf3fc9818bf27b9b8",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C051",
+      "origin": "live-description",
+      "text": "-   소유권 모델과 반례: [LoadOwnership.lean](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean).",
+      "sha256": "4d6100f1450c86d6c860f364d03ccd5ee27dfd25673762a5f5253c1bbf61f461",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C052",
+      "origin": "live-description",
+      "text": "-   검증 대상 소스 지문: [provenance.json](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/source/provenance.json).",
+      "sha256": "5914b00d97aef42c5b55ae0c93c6b8fe5de89970c2e6bf48bff5b7751987a202",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C053",
+      "origin": "live-description",
+      "text": "아래 행 번호는 모두 CUBRID `ea57708a785e34b35a91e10cd0694839a53a4fe5` 기준이다.",
+      "sha256": "4f00991fb93ef47e7c4773992d69042ddd8eee9d2e5af2df2a9d064da27cb62c",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C054",
+      "origin": "live-description",
+      "text": "| 역할                        | 코드                                                                                                                                              |\n|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|\n| 호출자의 중복 정리          | [page_buffer.c:2626-2631](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2626-L2631)   |\n| 버퍼 할당 실패 정리         | [page_buffer.c:8418-8425](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8418-L8425)   |\n| 파일 읽기·복호화 실패 정리  | [page_buffer.c:8465-8505](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8465-L8505)   |\n| 스레드별 로딩 기록 등록     | [page_buffer.c:8027-8040](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8027-L8040)   |\n| VPID만 비교하는 기록 제거   | [page_buffer.c:8092-8127](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8092-L8127)   |\n| 일반 fix의 helper 실패 처리 | [page_buffer.c:2316-2326](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2316-L2326)   |\n| 실제 simple-fix 호출        | [query_manager.c:2785-2798](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/query/query_manager.c#L2785-L2798) |\n| 정렬 결과 생성 중 호출      | [list_file.c:3839-3844](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/query/list_file.c#L3839-L3844)         |",
+      "sha256": "553dc02b92c4a942142197a602609b6e07d881577b0709371a243eb72d4db70e",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C055",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "**이슈 수행 목적**: 임시 페이지의 로딩 실패를 정리할 때 해당 호출이 소유한 기록만 해제하고, 다른 스레드의 진행 중인 로딩을 보호한다.",
+      "sha256": "55e3abb8be0f97346aeeb0ecd46df71204c3299c0b02461041b63483685e6f44",
+      "disposition_group": 0
+    },
+    {
+      "id": "CBRD-27630-C056",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "**이슈 수행 이유**: develop `ea57708a785e34b35a91e10cd0694839a53a4fe5`에서 `pgbuf_claim_bcb_for_fix()`가 실패 시 로딩 기록을 해제한 뒤 `pgbuf_simple_fix()`가 같은 정리를 다시 호출한다. 삭제 함수는 페이지 식별자만 비교하므로 두 호출 사이에 다른 스레드가 등록한 기록을 삭제할 수 있다. 이 순서는 소스에서 확인했으며, 소스의 동작을 반영한 Lean 모델에서 소유권 위반 반례를 검증했다.",
+      "sha256": "0dd7c4a01f3fce90366c87fddb3cba2f90a1bd301b352e6dbb8874a0399b77a8",
+      "disposition_group": 1
+    },
+    {
+      "id": "CBRD-27630-C057",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "**영향**: 다른 스레드의 로딩 기록이 사라지면 동일 임시 페이지를 여러 스레드가 동시에 읽어들이는 상황이 허용된다. 같은 페이지의 로딩을 직렬화하는 보호가 깨진다. 실제 쿼리에서의 동시 호출·실패 경로 도달과 운영 장애, 데이터 손상은 아직 재현하거나 확인하지 않았다.",
+      "sha256": "26b14766df112c7941cc14da2eb7fe4e6876aebd57b528c6f957518759dfedd9",
+      "disposition_group": 2
+    },
+    {
+      "id": "CBRD-27630-C058",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "**이슈 수행 방안**: TBD - 합의 미확인. helper와 호출자의 실패 정리 책임을 점검하고, 중복 정리 제거 또는 소유자 확인을 수정 후보로 검토한다. 실제 C++ 실패·스케줄링 경로를 재현하고 다른 스레드의 기록이 보존되는 회귀 검증을 추가한다.",
+      "sha256": "b36f893f56049c590bdbed40ea59c68d354d7c5280a7d0dfce185b9cdced25e6",
+      "disposition_group": 3
+    },
+    {
+      "id": "CBRD-27630-C059",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "`pgbuf_simple_fix()`는 임시 파일의 페이지를 페이지 버퍼에서 찾아 반환하는 함수다. 페이지가 없고 `need_fix=true`이면 메모리 프레임을 확보하고 페이지를 읽어들인다. 반환한 페이지에는 사용 중임을 나타내는 pin을 추가해 호출자가 사용하는 동안 프레임이 재사용되지 않도록 한다. 함수의 원래 사용 조건은 임시 페이지 읽기이며, 페이지 내용의 동시 쓰기나 일반 FIX/LATCH와의 혼용은 제외한다.",
+      "sha256": "7d3e7bfef011adb0e1f6edb377ed5ab5b1a57f0045b04c7baae92423f60a638a",
+      "disposition_group": 4
+    },
+    {
+      "id": "CBRD-27630-C060",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "아직 메모리에 없는 페이지는 여러 스레드가 동시에 요청할 수 있다. 이를 직렬화하기 위해 `pgbuf_lock_page()`는 VPID별 로딩 기록을 등록한다. VPID는 볼륨 번호와 페이지 번호로 구성된 페이지 식별자다. 같은 VPID의 기록을 발견한 다른 스레드는 로더가 되지 않고 대기한다. 로더는 페이지를 해시 체인에 공개하거나 실패를 정리한 뒤 `pgbuf_unlock_page()`로 기록을 제거한다.",
+      "sha256": "0dd80c006c44306c93367e069fe846f8c0de927e49b49b70a492ed4343b02a40",
+      "disposition_group": 5
+    },
+    {
+      "id": "CBRD-27630-C061",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "확인한 문제는 실패 정리가 두 곳에서 실행되지만, 삭제 대상의 소유권은 확인하지 않는다는 점이다. `pgbuf_claim_bcb_for_fix()`는 버퍼 할당 실패, 파일 읽기 실패, TDE 복호화 실패에서 로딩 기록을 제거하고 `NULL`을 반환한다. 호출자인 `pgbuf_simple_fix()`는 이 `NULL`을 받아 `pgbuf_unlock_page()`를 다시 호출한다.",
+      "sha256": "db21eb6ac64f0452812b702e9c6a320e54d594c2cc62dd3466bd301898a94444",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C062",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "첫 번째 정리에서 hash mutex가 해제된 뒤 다른 스레드가 동일 VPID의 기록을 등록할 수 있다. 두 번째 정리는 기존 기록과 새 기록을 구별하지 않으므로 새 로더의 기록을 제거할 수 있다. 각 등록·삭제 작업이 mutex로 보호되어도 두 호출 사이의 소유권 변경은 막지 못한다.",
+      "sha256": "faf7ebdb6eaf43915faac71a4667b6b3bf6bb122d4c00ac78eb1cdcdd6d28493",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C063",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "분석 기준은 CUBRID `VERSION=11.5.0`, develop 리비전 `ea57708a785e34b35a91e10cd0694839a53a4fe5`다. 적용되는 정확한 릴리스·패치 범위와 결함 유입 리비전은 TBD다. 기록의 등록·삭제와 대기열 처리는 `SERVER_MODE` 조건부 코드이며, 이 보고서는 해당 동시 실행 경로를 대상으로 한다.",
+      "sha256": "1ccdd421135233c3ff14419733b916834ee7d99cee3f7c179797593675ff3c1e",
+      "disposition_group": 7
+    },
+    {
+      "id": "CBRD-27630-C064",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "버퍼 할당 실패 경로는 helper에서 먼저 로딩 기록을 정리한다. [page_buffer.c:8418-8425](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8418-L8425)",
+      "sha256": "9f40e0b75ad1a081e088312ee023a4faa17bc5aac2b0bac616d4ce89ead84e5f",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C065",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```c\nbufptr = pgbuf_allocate_bcb (thread_p, vpid);\nif (bufptr == NULL)\n  {\n    ASSERT_ERROR ();\n    (void) pgbuf_unlock_page (thread_p, hash_anchor, vpid, true);\n    PGBUF_BCB_CHECK_MUTEX_LEAKS ();\n    return NULL;\n  }\n```",
+      "sha256": "606057d2424f5252acd4c0593e1d5f56ed167f278ad97bbcc518b702c2dd36bc",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C066",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "호출자는 helper의 실패 후 다시 정리한다. [page_buffer.c:2626-2631](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2626-L2631)",
+      "sha256": "b0da69c95edb9cc160b5e03509480a3155b373bc40327bc555e2cc5d3b38d04f",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C067",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```c\nbufptr = pgbuf_claim_bcb_for_fix (thread_p, vpid, OLD_PAGE, hash_anchor, NULL, &retry, true);\nif (bufptr == NULL)\n  {\n    (void) pgbuf_unlock_page (thread_p, hash_anchor, vpid, true);\n    return NULL;\n  }\n```",
+      "sha256": "c93a8d7208f9be37b4b72d67c464aec5a7b35b310192228b73a279890d5660e9",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C068",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "같은 중복 정리로 이어지는 helper의 실패 경로는 다음과 같다.",
+      "sha256": "cd3c1ceb4fe9b023a298d6f123593d5eb69e511819189c473c8d98ba5a2f0a30",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C069",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "| 실패 원인 | helper 내부의 정리 | 호출자의 재정리 |\n|---|---|---|\n| 버퍼 할당 실패 | `page_buffer.c:8422` | `page_buffer.c:2629` |\n| 파일 읽기 실패 | `page_buffer.c:8479` | `page_buffer.c:2629` |\n| TDE 복호화 실패 | `page_buffer.c:8502` | `page_buffer.c:2629` |",
+      "sha256": "7b176d1ce50590f1bff448fef9fe0c3dc2c5e1448e4b6bdf8d80fa2ebfaa59be",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C070",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "`pgbuf_lock_page()`는 `pgbuf_Pool.buf_lock_table[cur_thrd_entry->index]`를 사용해 현재 스레드의 기록을 등록한다. [등록 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8027-L8036)",
+      "sha256": "89836153f1f16f6a5bcee22378c2204e4b3471daa07ae9c1eaba00de519ceb18",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C071",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "반면 `pgbuf_unlock_page()`는 연결 리스트를 순회하면서 `VPID_EQ(&cur_buffer_lock->vpid, vpid)`만 비교한다. 일치하는 기록을 찾으면 리스트에서 제거하고 대기자들을 깨운다. 호출한 스레드의 슬롯과 같은 기록인지 확인하는 비교는 없다. 마지막 인자인 `need_hash_mutex=true`는 hash mutex를 획득하라는 뜻이며, 소유권 검사를 의미하지 않는다. [검색·제거 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8068-L8127)",
+      "sha256": "16eb50d797cb29b44a3e27767738d0ee9ac5960479c68807f4400aabc577ead3",
+      "disposition_group": 6
+    },
+    {
+      "id": "CBRD-27630-C072",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "- 분석 대상: CUBRID `11.5.0` 소스, develop `ea57708a785e34b35a91e10cd0694839a53a4fe5`.\n- 조건: `SERVER_MODE`, 같은 임시 VPID에 대한 로딩 경로와 실패 정리의 교차 실행.\n- 실제 엔진 재현 빌드·운영체제·빌드 번호: TBD. 이번 보고서를 위해 엔진을 빌드하거나 쿼리를 실행하지 않았다.\n- 모델 검증 환경: Linux, Lean `4.24.0`, Python 3. 검증일은 2026-10-14다.\n- 모델·문서 기준 리비전: `oos-lean-verification`의 `6bddfb23747d38deb780d45222a9df216bff0d17`.\n- 관련 소스와 helper 파일의 고정 리비전 지문 검증, 모델 빌드 및 27개 정리의 공리 감사가 통과했다. 이는 C++ 실행 재현 결과를 의미하지 않는다.",
+      "sha256": "145ba9004d1f4d08b2b52ce0a4178a52f5df3f166114288836caabcb95c743ac",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C073",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "페이지가 아직 해시 체인에 공개되지 않았고, 스레드 A가 해당 VPID의 로딩 기록을 소유한 상태에서 시작한다.",
+      "sha256": "46a8bcf47775f2fe49d41d98152559bdd577427c32996c8a21f640d006a898fc",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27630-C074",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "| 순서 | 스레드 동작 | 해당 VPID의 로딩 기록 |\n|---|---|---|\n| 1 | A의 claim이 실패한다. helper가 `pgbuf_unlock_page(..., true)`를 호출하고 `NULL`을 반환한다. | A의 기록이 제거된다. |\n| 2 | A가 호출자의 두 번째 정리를 실행하기 전에 B가 같은 페이지를 요청한다. B는 `pgbuf_lock_page()`에서 로더가 되어 페이지를 읽기 시작한다. | B의 기록이 등록된다. |\n| 3 | A가 `pgbuf_simple_fix()`의 2629행에서 두 번째 정리를 실행한다. | VPID만 일치하는 B의 기록이 제거된다. B는 아직 로딩 중이다. |\n| 4 | B가 페이지를 공개하기 전에 C가 같은 페이지를 요청한다. | 기록이 없으므로 C도 로더가 된다. B와 C가 동시에 로딩 중인 상태가 허용된다. |",
+      "sha256": "6fcae91a3ed65d73ee0f47220166526df9e640ac4c02176c70963212dad3858d",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27630-C075",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "필요한 조건은 실제로 발생 가능한 claim 실패와, 같은 임시 페이지를 요청하는 스레드들의 교차 실행이다. 모델 반례에는 페이지 내용의 동시 쓰기나 일반 FIX/LATCH 호출이 필요하지 않다. `need_fix=false`의 miss는 로딩하지 않으므로 반례의 최초 로더 진입에 사용하지 않는다.",
+      "sha256": "516958c1887f23f857eb31406637073b73872a30e32072850299f76fbaf0a609",
+      "disposition_group": 10
+    },
+    {
+      "id": "CBRD-27630-C076",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "이 명령은 모델의 소유권 위반을 검증한다. 실제 엔진에서 장애를 재현하는 명령은 아니다. Git, Bash, Python 3, elan/Lake가 필요하며 패키지는 Lean 4.24.0을 고정한다.",
+      "sha256": "636952116fefe5e8f46058c19e8e8ad511e204d2a4c8882ec5912542ffc8dd20",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C077",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```sh\ngit clone https://github.com/vimkim/oos-lean-verification.git\ncd oos-lean-verification\ngit checkout 6bddfb23747d38deb780d45222a9df216bff0d17\n./scripts/check-pgbuf.sh\n```",
+      "sha256": "318f9174160c53f5af4d4a088be7618a6dc67ebc042dcdc5804cb8e736fc1e86",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C078",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "확인한 출력은 다음과 같다.",
+      "sha256": "94b40f8113159310eafa6d3e3c239d60e0f8a37a2d4a3decee2085670bddf946",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C079",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```text\nBuild completed successfully (8 jobs).\n'Pgbuf.SimpleFix.duplicate_cleanup_counterexample' does not depend on any axioms\n'Pgbuf.SimpleFix.duplicate_cleanup_allows_two_loaders' does not depend on any axioms\nAudited 27 theorems; only standard logical axioms permitted.\nBundled source snapshot checksum verified; correspondence remains manual.\n```",
+      "sha256": "89e99bf55962a0eb2912bab9481cbd595ca407eacdca5e39d2bd2f4ad4807c4d",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C080",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "소스의 고정 리비전도 Git 객체로 대조한다. CUBRID clone이 해당 리비전을 포함해야 한다.",
+      "sha256": "052c4c4f5b11ec0d4b3d00a69a842688c654656a6ea25e039dbd92c83244396c",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C081",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```sh\npython3 scripts/check-pgbuf-source.py --cubrid-repo /path/to/cubrid\n```",
+      "sha256": "d910627ba40ba8e7e2f1583e2b79da53990a69d66880bd008f4fbc99cdcd255b",
+      "disposition_group": 12
+    },
+    {
+      "id": "CBRD-27630-C082",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "`/path/to/cubrid`는 CUBRID 저장소 경로로 바꾼다. 확인한 출력은 다음과 같다.",
+      "sha256": "16e5146a73e3516832ab7efd53852dd837579de2433c3865f6721569cd3fbcd7",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C083",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "```text\nPinned source and helper files verified at ea57708a785e34b35a91e10cd0694839a53a4fe5.\n```",
+      "sha256": "e67fcfafb17021898ffeb36fb32fa145050bf941798e93b7e0d7504689aa4fd5",
+      "disposition_group": 9
+    },
+    {
+      "id": "CBRD-27630-C084",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "실제 엔진 재현 SQL·명령, 실패 주입 방법, 쿼리 수준의 동일 임시 VPID 동시 접근 시나리오는 TBD다. 우선 다음 조건을 통제할 수 있는 테스트를 구성해야 한다.",
+      "sha256": "e10d5429e7dee15704945c42e553382671794bb41d7a77686870c32e5a54a7f7",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C085",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "1. A가 로딩 기록을 소유한 상태에서 버퍼 할당 또는 파일 읽기 실패를 발생시킨다. 첫 번째 정리가 끝난 뒤 호출자의 두 번째 정리 직전에 A를 대기시킨다.\n2. B가 같은 VPID의 기록을 등록하도록 하고, 해시 공개 전까지 B를 대기시킨다.\n3. A의 두 번째 정리를 실행한 뒤 B의 기록이 그대로 연결되어 있는지 확인한다.\n4. C의 동일 VPID 요청이 새 로더가 되지 않고 기존 로더를 기다리는지 확인한다.\n5. 실제로 도달 가능한 복호화 실패 경로와 정상 성공 경로도 함께 검증한다.",
+      "sha256": "8db6f507e4ca2be17817c1c0b4271ba5726e364fcd6ad61832528492f3a6143b",
+      "disposition_group": 13
+    },
+    {
+      "id": "CBRD-27630-C086",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "실제 호출 경로에는 `qfile_put_next_sort_item()` -> `qmgr_get_old_page_simple_fix()` -> `pgbuf_simple_fix(..., true)`가 있다. 이 호출 경로의 존재는 소스에서 확인했지만, 동일 임시 VPID의 동시 호출과 실패가 해당 경로에서 함께 발생하는지는 추가 검증해야 한다.",
+      "sha256": "373bf3ba6abdfb308ab5bfa96ce60d8de3420f985dc812a22526e18cfb29e369",
+      "disposition_group": 14
+    },
+    {
+      "id": "CBRD-27630-C087",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "실패 정리는 해당 호출이 소유한 로딩 기록만 해제해야 한다. A의 기록이 이미 제거된 뒤 B가 새 기록을 등록했다면, A의 후속 정리는 B의 기록을 보존해야 한다. B가 로딩 중인 동안 동일 VPID를 요청한 C는 새 로더가 되지 않고 기존 로더를 기다려야 한다.",
+      "sha256": "49737c0ed92bb93c9bacfe6f44411f303470e3a8f874bd6e4cf4273aeddfc2d2",
+      "disposition_group": 15
+    },
+    {
+      "id": "CBRD-27630-C088",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "소스에서 helper의 실패 정리와 호출자의 재정리, VPID만 확인하는 삭제 동작을 확인했다. 소스의 동작을 반영한 Lean 모델에서는 A의 두 번째 정리가 B의 기록을 지우는 3단계 소유권 위반과, 이후 C까지 로더가 되는 4단계 실행을 검증했다.",
+      "sha256": "068ec0c56ca37ff26d6b9afaabb9c0f9700db60af3d83ac8580dd85989b6a31c",
+      "disposition_group": 11
+    },
+    {
+      "id": "CBRD-27630-C089",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "실제 C++ 실행이나 운영 환경에서 같은 스케줄링을 재현한 결과는 없다. 이 반례만으로 중복 프레임 공개, 데이터 손상, 실제 장애 발생을 확정하지 않는다.",
+      "sha256": "1a2f8db7e93ffa4c1cc44edf4cd9350fd774cdfddd5daec9322633481c371688",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27630-C090",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "정리 함수에서 현재 기록이 호출자의 소유인지 확인하면 다른 스레드의 기록을 보존할 수 있다. `proposed_owner_check_preserves_foreign_record`는 이 후보의 모델상 성질을 증명한다. 실제 소스 수정이나 채택된 설계는 아니다.",
+      "sha256": "71c0f973af44364635369db17d7dc4c3fdc5ad89af6d231712e62136e2c43aa1",
+      "disposition_group": 17
+    },
+    {
+      "id": "CBRD-27630-C091",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "중복 정리를 제거하는 방향도 검토할 수 있으나, 먼저 `pgbuf_claim_bcb_for_fix()`의 반환 경로와 모든 호출자의 정리 책임을 함께 점검해야 한다. 일반 `pgbuf_fix()`는 이 helper가 `NULL`을 반환하면 재시도 여부를 확인한 뒤 반환하며, 해당 위치에서 중복 정리하지 않는다. [비교 코드](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2316-L2326)",
+      "sha256": "e0b0ddd15e5524fe31f0841695ad6684a24ab9d552cb93ba6db1c33a6a35597c",
+      "disposition_group": 18
+    },
+    {
+      "id": "CBRD-27630-C092",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "별도의 `dwb_read_page()` 오류 분기는 정리 검토 대상이지만, 고정 리비전의 함수 본문은 모든 정상 반환에서 `NO_ERROR`를 반환한다. 이번 반례는 그 분기의 도달 가능성에 의존하지 않는다. [DWB 함수 본문](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/double_write_buffer.cpp#L3979-L4015)",
+      "sha256": "4db4ad10ceebc2f85b5afd24ff4e1efb717a1a825cbede100d215d3236b33ba4",
+      "disposition_group": 19
+    },
+    {
+      "id": "CBRD-27630-C093",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "이번 이슈의 범위는 로딩 기록의 소유권과 실패 정리다. 페이지 내용의 일관성, 전체 C++ 메모리·동시성 의미론, 함수 종료성, 버퍼 풀 전체의 정확성을 증명한 결과는 아니다.",
+      "sha256": "0c39d21188dae0cb86cca97da64c236b07ea0948c543c6f21b994084cef0c25f",
+      "disposition_group": 16
+    },
+    {
+      "id": "CBRD-27630-C094",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "- 부모 이슈: [CBRD-27193 - page buffer](http://jira.cubrid.org/browse/CBRD-27193).\n- 분석 문서: [pgbuf-simple-fix.md](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md).\n- 소유권 모델과 반례: [LoadOwnership.lean](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean).\n- 검증 대상 소스 지문: [provenance.json](https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/source/provenance.json).",
+      "sha256": "ea8e1b86639c3c5fc936e298e68f6f20552965294e7b21ca0fd52b9e535b7365",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C095",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "아래 행 번호는 모두 CUBRID `ea57708a785e34b35a91e10cd0694839a53a4fe5` 기준이다.",
+      "sha256": "4f00991fb93ef47e7c4773992d69042ddd8eee9d2e5af2df2a9d064da27cb62c",
+      "disposition_group": 20
+    },
+    {
+      "id": "CBRD-27630-C096",
+      "origin": "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+      "text": "| 역할 | 코드 |\n|---|---|\n| 호출자의 중복 정리 | [page_buffer.c:2626-2631](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2626-L2631) |\n| 버퍼 할당 실패 정리 | [page_buffer.c:8418-8425](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8418-L8425) |\n| 파일 읽기·복호화 실패 정리 | [page_buffer.c:8465-8505](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8465-L8505) |\n| 스레드별 로딩 기록 등록 | [page_buffer.c:8027-8040](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8027-L8040) |\n| VPID만 비교하는 기록 제거 | [page_buffer.c:8092-8127](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L8092-L8127) |\n| 일반 fix의 helper 실패 처리 | [page_buffer.c:2316-2326](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/storage/page_buffer.c#L2316-L2326) |\n| 실제 simple-fix 호출 | [query_manager.c:2785-2798](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/query/query_manager.c#L2785-L2798) |\n| 정렬 결과 생성 중 호출 | [list_file.c:3839-3844](https://github.com/CUBRID/cubrid/blob/ea57708a785e34b35a91e10cd0694839a53a4fe5/src/query/list_file.c#L3839-L3844) |",
+      "sha256": "1b3813cefa56f92254343d6be7b241d4a324bf9b675c3b7cee918325af0478f6",
+      "disposition_group": 20
+    }
+  ],
+  "groups": [
+    {
+      "ids": [
+        1,
+        55
+      ],
+      "disposition": "retained",
+      "reason": "로딩 기록을 해제한 호출이 다른 호출의 새 기록을 보존해야 한다는 문제/목적을 유지한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2649-L2653",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8100-L8139"
+      ]
+    },
+    {
+      "ids": [
+        2,
+        56
+      ],
+      "disposition": "corrected",
+      "reason": "소스 분석 기준을 f6cac312로 갱신한다. ea57708에 대응하는 Lean6bddfb2 결과는 과거 추상 모델의 반례이며 엔진 도달성 증명이 아님을 명시한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2649-L2653",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8430-L8516",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L18-L89"
+      ]
+    },
+    {
+      "ids": [
+        3,
+        57
+      ],
+      "disposition": "corrected",
+      "reason": "두 로더 허용을 조건부 결과로 한정한다. 실제 동일 임시 VPID 동시 접근, 실패와 스케줄의 결합, 중복 공개·손상·운영 장애는 미확인으로 유지한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L116-L124",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L76-L89"
+      ]
+    },
+    {
+      "ids": [
+        4,
+        58
+      ],
+      "disposition": "corrected",
+      "reason": "수행 방안은 현재 skill의 ANALYSIS TBD로 정리한다. 중복 정리 해소와 소유권 확인은 미선택 후보로 비교하며 회귀 검증은 도달성 확인을 전제로 한다. 손상된 C++ 렌더링도 수정한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L134-L138",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L91-L99"
+      ]
+    },
+    {
+      "ids": [
+        5,
+        59
+      ],
+      "disposition": "corrected",
+      "reason": "임시 파일 읽기용·latchless 경고를 유지하고 실제 주소 반환/fcnt 계약을 설명한다. need_fix=false도 resident hit에 pin을 추가하며 파일 정리 호출자는 miss loader가 아님을 보강한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2614-L2724",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4074-L4089",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4280-L4288"
+      ]
+    },
+    {
+      "ids": [
+        6,
+        60
+      ],
+      "disposition": "corrected",
+      "reason": "로딩 기록의 등록·대기·제거 메커니즘을 유지하되 같은 임시 VPID의 실제 동시 query 접근은 검증되지 않았음을 분리한다. 로딩 기록을 page latch/transaction lock과 구분한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7951-L8052",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8100-L8139"
+      ]
+    },
+    {
+      "ids": [
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        15,
+        16,
+        17,
+        61,
+        62,
+        64,
+        65,
+        66,
+        67,
+        69,
+        70,
+        71
+      ],
+      "disposition": "corrected",
+      "reason": "주요 로직은 그대로 확인되었다. 인용과 행 번호를 f6cac312에 맞춰 갱신하고 첫 cleanup 뒤 재등록은 조건부 소스 추론임을 명시한다. 세 실패의 cleanup/NULL, caller second cleanup, thread slot 등록과 VPID-only 제거를 직접 대조했다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2644-L2656",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8430-L8516",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8039-L8052",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8069-L8139"
+      ]
+    },
+    {
+      "ids": [
+        9,
+        18,
+        63
+      ],
+      "disposition": "corrected",
+      "reason": "현재 분석은 f6cac312이고 과거 모델의 CUBRID 기준은 ea57708임을 나눈다. 원 보고서의 VERSION11.5.0 기록을 배포 릴리스 영향 증거로 확장하지 않으며 유입/적용 버전은 TBD다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md#L71-L78",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/source/provenance.json#L1-L26",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7958-L7959"
+      ]
+    },
+    {
+      "ids": [
+        19,
+        20,
+        21,
+        22
+      ],
+      "disposition": "retained",
+      "reason": "SERVER_MODE와 동일 VPID 조건, 엔진 재현 미수행, Linux/Lean4.24.0/Python3 및 2026-10-14 과거 검증 기록, 모델 고정 commit을 유지한다. 이번 실행 결과와 구분한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md#L71-L78",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/lean-toolchain",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/source/provenance.json#L1-L26"
+      ]
+    },
+    {
+      "ids": [
+        23,
+        30,
+        34,
+        72,
+        79,
+        83
+      ],
+      "disposition": "corrected",
+      "reason": "과거 빌드·27개 공리 감사·소스 지문 검사 출력은 원 보고서의 기록으로 보존한다. 이번 작성의 재실행이 아님을 명시하며 저장된 axiom-audit와 provenance를 직접 확인했다. 수동 correspondence가 엔진 전체 검증을 뜻하지 않음을 보강한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md#L73-L125",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/axiom-audit.txt",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/source/provenance.json#L1-L26",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L158-L170"
+      ]
+    },
+    {
+      "ids": [
+        24,
+        26,
+        73,
+        75
+      ],
+      "disposition": "retained",
+      "reason": "모델 시작 조건과 실제 오류/동시 접근이라는 도달성 조건, 쓰기·일반 FIX/LATCH가 모델에 불필요함, need_fix=false miss는 loader가 아님을 유지한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L5-L44",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2636-L2649",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L116-L124"
+      ]
+    },
+    {
+      "ids": [
+        25,
+        43,
+        74,
+        88
+      ],
+      "disposition": "corrected",
+      "reason": "A/B/C 순서와 소유권 반례는 유지하지만 제목/서술을 실제 관측 순서에서 모델의 조건부 실행으로 고친다. 모델 step은 claim failure와 재진입을 허용하며 자연 오류나 엔진 scheduler를 증명하지 않는다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L18-L89",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L116-L124"
+      ]
+    },
+    {
+      "ids": [
+        27,
+        28,
+        31,
+        32,
+        76,
+        77,
+        80,
+        81
+      ],
+      "disposition": "retained",
+      "reason": "동일 고정 revision의 portable clone/checkout/check 명령과 선택적 source verification 명령을 유지한다. 모델검사이며 C++ 재현명령이 아님을 명시한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/scripts/check-pgbuf.sh",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/scripts/check-pgbuf-source.py",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/lean-toolchain"
+      ]
+    },
+    {
+      "ids": [
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        84,
+        85
+      ],
+      "disposition": "retained",
+      "reason": "실제 엔진 SQL/실패주입/동일 VPID 동시 시나리오가 TBD임을 유지하고 A/B/C 제어·소유 기록 보존·C의 대기·성공/복호화 검증을 미실행 계획으로 보존한다. 자연 오류와 주입 오류를 구분하도록 보강한다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md#L128-L138",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L116-L124",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8271-L8349",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_io.c#L3962-L3986",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/tde.c#L1018-L1054"
+      ]
+    },
+    {
+      "ids": [
+        41,
+        86
+      ],
+      "disposition": "corrected",
+      "reason": "실제 sort→qmgr→simple_fix(true) 호출 경로를 f6cac312에서 재확인한다. NULL_VOLID memory 경로와 file-manager(false) 두 호출을 분리하여 호출 존재를 동시 접근 증거로 오인하지 않게 한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/list_file.c#L3834-L3878",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/query/query_manager.c#L2775-L2817",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4074-L4089",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/file_manager.c#L4280-L4288"
+      ]
+    },
+    {
+      "ids": [
+        42,
+        87
+      ],
+      "disposition": "retained",
+      "reason": "자신의 기록만 정리하고 새 foreign record/대기열 및 진행 중 loader 직렬화를 보존해야 한다는 기대 결과를 유지한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L54-L99",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L7976-L7984"
+      ]
+    },
+    {
+      "ids": [
+        44,
+        48,
+        89,
+        93
+      ],
+      "disposition": "retained",
+      "reason": "실제 C++/운영 재현 부재, 중복 공개·손상·장애 미확정, page bytes/global pool/C++ memory semantics/termination 검증 범위 밖이라는 한계를 유지한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L57-L98",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L116-L124",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L167-L170"
+      ]
+    },
+    {
+      "ids": [
+        45,
+        90
+      ],
+      "disposition": "retained",
+      "reason": "owner-check theorem의 추상 모델 성질을 보존한다. 엔진 수정이나 채택된 설계가 아니며 record lifetime/다른 호출자 계약/비용을 확인해야 한다는 비판을 추가한다.",
+      "evidence": [
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/proofs/pgbuf-simple-fix/Pgbuf/SimpleFix/LoadOwnership.lean#L91-L99"
+      ]
+    },
+    {
+      "ids": [
+        46,
+        91
+      ],
+      "disposition": "corrected",
+      "reason": "중복 정리 제거 후보와 전체 반환/호출자 정리 감사 필요를 유지하고 일반 fix의 현재 실패 처리 및 실제 두 helper 호출을 f6cac312에서 재확인한다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2319-L2329",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L2649-L2653",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8378-L8412",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8467-L8471"
+      ]
+    },
+    {
+      "ids": [
+        47,
+        92
+      ],
+      "disposition": "corrected",
+      "reason": "DWB read의 모든 정상 반환은 NO_ERROR라는 제한을 현재 f6cac312에도 확인한다. helper의 방어적 error 반환 cleanup 감사는 별도이며 이를 도달 가능한 반례나 CBRD-27262 의존성으로 쓰지 않는다.",
+      "evidence": [
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c#L8467-L8471",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/double_write_buffer.cpp#L3979-L4015",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md#L140-L144"
+      ]
+    },
+    {
+      "ids": [
+        14,
+        29,
+        33,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        68,
+        78,
+        82,
+        94,
+        95,
+        96
+      ],
+      "disposition": "non-substantive",
+      "reason": "표 소개, 출력 소개, 부모/자료 링크 목록, 행 번호 안내와 반복 Code References는 독립된 주장이 아니다. 실질 근거는 현재 코드/고정 모델의 문장별 inline link로 옮겼고 역사적 notes 링크를 별도로 남겼다.",
+      "evidence": [
+        "https://github.com/vimkim/my-cubrid-jira/blob/da39b0f3ee0bc1c55d2063588c3969a808a95687/issues/CBRD-27630-pgbuf-simple-fix-load-ownership_ea57708_codex.md",
+        "https://github.com/vimkim/oos-lean-verification/blob/6bddfb23747d38deb780d45222a9df216bff0d17/docs/pgbuf-simple-fix.md",
+        "https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/storage/page_buffer.c"
+      ]
+    }
+  ],
+  "supplemental_claim_groups": []
+}

@@ -2,7 +2,7 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: `<termio.h>`를 제공하지 않는 Linux 개발 환경에서도 `broker_monitor.c`의 터미널 제어 코드를 컴파일할 수 있도록 빌드 호환성을 확보한다.
+**이슈 수행 목적**: `<termio.h>`를 제공하지 않는 Linux 개발 환경에서도 `broker_monitor.c`의 터미널 제어 코드를 컴파일할 수 있도록 빌드 호환성을 확보한다. Ubuntu 26.04와 Fedora 등 최신 glibc를 사용하는 환경에서 구버전 빌드 환경으로 우회해야 하는 제약을 줄이고 CUBRID 소스 빌드와 개발을 쉽게 한다.
 
 **이슈 수행 이유**: `broker_monitor.c`는 `struct termios`, `tcgetattr`, `tcsetattr`를 사용하면서 `<termio.h>`를 포함한다. glibc 2.42에서 이 호환 헤더가 제거되었으므로, 해당 헤더를 제공하지 않는 환경에서는 실제 터미널 API 사용 여부와 관계없이 전처리 단계에서 빌드가 차단된다. 기존 이슈에 빌드 실패가 보고되어 있으며, 현재 develop 소스에도 같은 의존이 남아 있음을 확인한다.
 
@@ -30,7 +30,7 @@
 
 이 오류는 실행 중 특정 모니터 기능을 선택했을 때 발생하는 문제가 아니다. 소스를 컴파일하는 단계에서 헤더를 찾지 못하므로, 해당 빌드 대상이 포함된 빌드는 결과물을 만들기 전에 중단된다. 그 환경에서 CUBRID를 개발하거나 패키징하려는 사용자는 소스를 별도로 수정하거나 다른 빌드 환경을 마련해야 한다.
 
-`broker/CMakeLists.txt:78-99,113-125`에서는 `broker_monitor.c`를 공통 소스 목록에 넣고 C++로 컴파일하며, 이 목록으로 `broker_monitor`와 `gateway_monitor`를 생성한다. 따라서 파일명만 보고 브로커 모니터 한 대상에만 영향이 있다고 한정할 수 없다. 두 대상의 실제 실패 로그와 전체 빌드에 미치는 결과는 ANALYSIS에서 확인한다.
+`broker/CMakeLists.txt:78-99,113-125`에서는 `broker_monitor.c`를 공통 소스 목록에 넣고 `C++`로 컴파일하며, 이 목록으로 `broker_monitor`와 `gateway_monitor`를 생성한다. 따라서 파일명만 보고 브로커 모니터 한 대상에만 영향이 있다고 한정할 수 없다. 두 대상의 실제 실패 로그와 전체 빌드에 미치는 결과는 ANALYSIS에서 확인한다.
 
 기존 이슈는 여러 배포판과 musl 환경을 실패 환경으로 나열했으나, 정확한 패키지 버전과 CUBRID 빌드 로그를 제시하지 않았다. 따라서 모든 해당 환경의 실패를 검증된 결과로 보지 않는다. 소스와 glibc 변경 기록으로 확인한 것은 `<termio.h>` 미제공 환경에서 발생하는 빌드 장애 조건이다. 운영 중인 DB의 장애나 데이터 손실을 보여주는 근거는 없다.
 
@@ -42,12 +42,33 @@
 
 glibc의 제거가 이미 릴리스에 반영되었고 현재 확인한 소스에도 의존이 남아 있다는 점이 분석 착수 근거다. 다만 고객 영향 규모나 납기 근거는 없으므로 긴급도와 우선순위는 별도로 판단한다.
 
+### 최신 개발 환경에서의 기대 효과
+
+Ubuntu 26.04와 Fedora 등 최신 glibc를 사용하는 개발 환경에서도, 이 헤더 문제 때문에 별도의 구버전 OS나 빌드 컨테이너로 옮기지 않고 CUBRID 소스 빌드를 진행할 수 있도록 하는 것이 장점이다. 개발자가 평소 사용하는 환경에서 코드 수정, 빌드와 검증을 이어갈 수 있어 환경 준비 비용과 외부 기여의 진입 장벽을 줄일 수 있다. 패키지 관리자에게도 배포판별 임시 헤더나 별도 소스 패치를 관리할 필요를 줄이는 효과가 있다.
+
+2026-10-21에 확인한 공식 자료의 환경 예시는 다음과 같다. 표의 버전은 배포판이 제공하는 glibc 버전이며, CUBRID 전체 빌드 성공을 검증한 목록은 아니다.
+
+| 개발 환경 예시 | glibc 버전 | 확인 근거 |
+|---|---|---|
+| Ubuntu 26.04 LTS | 2.43 | [Ubuntu 공식 릴리스 노트](https://documentation.ubuntu.com/release-notes/26.04/changes-since-previous-interim/) |
+| Fedora 43 | 2.42 | [Fedora 공식 패키지 목록](https://packages.fedoraproject.org/pkgs/glibc/glibc/) |
+| Fedora 44 | 2.43 | [Fedora 개발 헤더 패키지](https://packages.fedoraproject.org/pkgs/glibc/glibc-devel/fedora-44.html) |
+| Fedora 45 | 2.44 | [Fedora 개발 헤더 패키지](https://packages.fedoraproject.org/pkgs/glibc/glibc-devel/fedora-45.html) |
+
+이 기대 효과는 기존 빌드 요구사항과 다른 소스의 호환성 문제도 해결되어 있다는 전제에서 평가한다. 본 변경이 제거하는 것은 터미널 호환 헤더에 따른 장애이며, 각 환경에서 CUBRID 전체 빌드가 성공하는지는 별도 실행으로 확인한다.
+
+### glibc 버전 범위의 해석
+
+`<termios.h>`로 교체한다고 해서 최소 glibc 버전이 2.42로 올라가지는 않는다. [glibc 2.28의 헤더](https://github.com/bminor/glibc/blob/glibc-2.28/termios/termios.h)에도 `struct termios` 관련 정의의 포함과 `tcgetattr`, `tcsetattr` 선언이 있으며, 이번 확인 환경인 glibc 2.34에서는 해당 API를 사용하는 구문 검사가 성공하였다. [glibc 2.42의 헤더](https://github.com/bminor/glibc/blob/glibc-2.42/termios/termios.h)에도 이 인터페이스가 유지된다. 따라서 기존 환경의 인터페이스를 유지하면서 glibc 2.42부터 발생한 호환 헤더 제거에 대응하는 방향이다.
+
+이 근거로 CUBRID 전체의 빌드 가능 범위를 “glibc 2.28부터 2.44까지”로 확정하지는 않는다. 2.28은 소스에서 API를 확인한 기존 버전의 예시이고, 2.44는 위 배포판 예시의 glibc 버전이다. 실제 최소 버전, 검증된 최신 버전, 아키텍처별 차이는 CUBRID 전체 소스와 의존 라이브러리의 빌드 검증으로 결정한다. 또한 특정 CUBRID 릴리스에 이 수정이 포함되거나 적용되기 전까지 그 릴리스의 호환성이 자동으로 바뀌지는 않는다.
+
 ## Test Build
 
 | 구분 | 환경 또는 기준 | 확인 결과와 한계 |
 |---|---|---|
 | 소스 확인 | develop `f6cac312310f39f46711693da157a08f0e725693` | `<termio.h>` 의존과 공통 빌드 대상 구성을 확인하였다. 이 커밋의 전체 빌드는 미실행이다. |
-| 이번 확인 환경 | Rocky Linux 9.6, glibc 2.34, GCC/G++ 11.5.0 | `<termio.h>`만 포함한 코드와 `<termios.h>`로 사용 API를 선언한 코드의 구문 검사가 각각 성공한다. CUBRID 전체 빌드나 수정 후 검증 결과가 아니다. |
+| 이번 확인 환경 | Rocky Linux 9.6, glibc 2.34, `GCC/G++` 11.5.0 | `<termio.h>`만 포함한 코드와 `<termios.h>`로 사용 API를 선언한 코드의 구문 검사가 각각 성공한다. CUBRID 전체 빌드나 수정 후 검증 결과가 아니다. |
 | 기존 실패 보고 | glibc 2.42 이상 및 일부 배포판, musl 환경 | 기존 이슈에 실패 주장이 있다. 전체 빌드 버전, 커밋, OS와 개발 헤더 패키지 버전, 원본 로그는 TBD다. 이번 작성에서는 독립 재현하지 않았다. |
 | 릴리스 영향 | 이전에 릴리스된 CUBRID 버전 | TBD - 소스 기준만으로 영향을 확정하지 않고 버전별로 확인한다. |
 
@@ -108,6 +129,8 @@ git submodule update --init --recursive
 
 `<termio.h>`를 제공하지 않고 필요한 POSIX 터미널 인터페이스를 제공하는 대상 Linux 환경에서 `broker_monitor.c`의 헤더 의존 때문에 빌드가 실패하지 않아야 한다. 이를 사용하는 `broker_monitor`와 `gateway_monitor`의 빌드 결과를 확인한다.
 
+Ubuntu 26.04와 Fedora 등 최신 glibc 환경을 검증 후보로 포함하고, 이 헤더를 보충하거나 이 문제 때문에 구버전 환경으로 전환할 필요가 없어졌는지 확인한다. 전체 빌드 결과와 이 헤더 문제의 해소 여부를 함께 기록한다.
+
 기존 빌드 환경에서도 컴파일이 유지되고, 모니터의 터미널 입력 설정과 종료 시 복원 동작이 유지되어야 한다. 검증할 환경 조합과 상세 실행 절차는 ANALYSIS에서 확정한다. 이 이슈 하나로 해당 환경의 모든 CUBRID 빌드 문제 해결이나 새 플랫폼의 공식 지원을 보장하지 않는다.
 
 ## Actual Result
@@ -127,7 +150,7 @@ src/broker/broker_monitor.c:52:10: fatal error: termio.h: No such file or direct
 - [확인한 CUBRID 소스](https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/src/broker/broker_monitor.c#L45-L54), [공통 빌드 대상](https://github.com/CUBRID/cubrid/blob/f6cac312310f39f46711693da157a08f0e725693/broker/CMakeLists.txt#L78-L125)을 근거로 한다. `src`에서 `<termio.h>`를 직접 포함하는 위치는 이 파일 한 곳으로 확인한다.
 - 기존 본문이 제안한 `<termios.h>` 직접 포함은 실제 사용 인터페이스와 부합하는 해결 후보다. 필요한 선언의 누락 여부와 기존 환경의 호환성을 확인한 뒤 ANALYSIS에서 방안을 결정한다. 동작이나 ABI에 영향이 없다는 결론도 검증 전에 확정하지 않는다.
 - 배포판 이름만으로 영향 여부를 판정하지 않는다. 기존 본문의 Fedora 42 이상, Debian trixie 이상, Arch Linux 및 Alpine/musl에 대한 일괄 실패 주장과 공식 CI 통과 주장은 환경별 기록이 없어 확인 대상으로 남긴다.
-- [CBRD-26809](https://jira.cubrid.org/browse/CBRD-26809)는 별도 파일의 C++ 표준 헤더 의존 문제다. 기존 본문은 리뷰 의견에 따라 이 이슈를 분리했다고 설명한다. 본 이슈는 `broker_monitor.c`의 터미널 헤더 의존 문제로 범위를 한정한다.
+- [CBRD-26809](https://jira.cubrid.org/browse/CBRD-26809)는 별도 파일의 `C++` 표준 헤더 의존 문제다. 기존 본문은 리뷰 의견에 따라 이 이슈를 분리했다고 설명한다. 본 이슈는 `broker_monitor.c`의 터미널 헤더 의존 문제로 범위를 한정한다.
 
 ## Triage Request
 
@@ -135,4 +158,4 @@ src/broker/broker_monitor.c:52:10: fatal error: termio.h: No such file or direct
 
 1. 실패 환경의 OS, libc 및 개발 헤더 패키지, 컴파일러, 전체 CUBRID 빌드 버전과 커밋, 원본 로그를 확보한다. 기존 보고 환경과 이전 릴리스의 영향을 구분한다.
 2. `broker_monitor`와 `gateway_monitor`의 빌드 경로를 확인하고, 실제 사용하는 선언을 기준으로 해결 방안과 변경 범위를 결정한다.
-3. 헤더 미제공 환경과 기존 빌드 환경에서의 빌드 검증, 터미널 입력 설정 및 복원 동작 확인 절차를 정한다.
+3. Ubuntu 26.04와 Fedora 등 헤더 미제공 환경과 기존 빌드 환경을 대상으로 검증할 버전 조합을 정한다. 전체 빌드, 터미널 입력 설정 및 복원 동작 확인 절차와 검증 결과를 기록한다.

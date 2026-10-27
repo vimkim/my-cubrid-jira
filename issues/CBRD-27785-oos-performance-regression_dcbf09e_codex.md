@@ -135,9 +135,9 @@ raw artifact root: `/mnt/nvme/data-5/tmp/CBRD-27785-20261027`. SQL, 원시 count
 
 ## First Implementation Spec
 
-사용자는 첫 구현 범위를 일반 테이블 읽기 경로 회귀와 SQL 기반 성능·정확성 검증으로 승인했다. 원인 분석 결과를 반영한 첫 spec은 엔진 작업 checkout의 `.scratch/oos-performance/spec.md`이며, 고정 컬럼 읽기와 가변 컬럼 읽기를 순서대로 완성하는 두 티켓을 검토한다. 각 티켓에 정확성 검사와 성능 검증을 포함한다. 최종 instructions 증가 2% 이하를 제안하며 티켓 분할과 함께 검토한다.
+사용자는 첫 구현 범위를 일반 테이블 읽기 경로 회귀와 SQL 기반 성능·정확성 검증으로 승인했다. 원인 분석 결과를 반영한 첫 spec은 엔진 작업 checkout의 `.scratch/oos-performance/spec.md`다. 사용자는 고정 컬럼 읽기와 가변 컬럼 읽기를 순서대로 완성하는 두 티켓, 1 → 2 의존성, 최종 instructions 증가 2% 이하 기준을 승인했다. 각 티켓에 정확성 검사와 성능 검증을 포함한다.
 
-CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범위로 남긴다. 티켓 분할 승인 전에는 구현 티켓 발행이나 implement-spec을 시작하지 않는다.
+CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범위로 남긴다. 승인된 로컬 티켓을 한 파일씩 발행했고 implement-spec으로 티켓 01부터 별도 worktree와 새 context에서 구현한다. 이 구현 진행은 제품용 수정의 검증 완료를 뜻하지 않는다.
 
 ## Acceptance Criteria
 

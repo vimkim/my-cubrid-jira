@@ -139,13 +139,30 @@ raw artifact root: `/mnt/nvme/data-5/tmp/CBRD-27785-20261027`. SQL, 원시 count
 
 CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범위로 남긴다. 승인된 로컬 티켓을 한 파일씩 발행했고 implement-spec으로 티켓 01부터 별도 worktree와 새 context에서 구현한다. 이 구현 진행은 제품용 수정의 검증 완료를 뜻하지 않는다.
 
+### 티켓 01 결과
+
+제품용 코드·테스트 커밋은 `34d505ff4`, 검증 기록은 `a99d248c7`이다. 고정값·기본값 읽기에서 OOS Resolve scratch와 grouped prefetch 준비를 분리하고, 기존 변환·검증·소유권 처리를 공유한다. 진단용 기준 reader 복사본을 채택하지 않았다.
+
+| 티켓 01의 독립 환경 비교 | 좁은 컬럼 / 기준 | 여러 컬럼 / 기준 |
+| --- | --- | --- |
+| 수정 전 red | +5.330598% | +9.029324% |
+| 수정 후 정순 | +1.105223% | +5.757702% |
+| 수정 후 역순 | +1.105909% | +5.759927% |
+
+좁은 컬럼은 두 순서 모두 승인된 2% 기준을 충족한다. 유지 표본의 instructions 범위는 0.006% 미만이었다. 여러 컬럼은 개선됐지만 최종 2% 기준은 아직 충족하지 못해 티켓 02가 남는다. 따라서 두 쿼리를 함께 검사하는 comparator의 종료 코드 1은 이 단계에서 예상한 결과다.
+
+SERVER_MODE·SA_MODE를 포함한 release 빌드·설치, 집중 CTest 12/12, formatter 적용 후 SQL CRUD fixture 3/3을 통과했다. 집중 검증에는 identity 오류, server/MVCC, SQL CRUD·DDL·transaction·visible version·workspace bytes·pending/deferred write가 포함된다. 전체 회사 CI, ASAN, HA와 대용량 성능 인증은 수행하지 않았다.
+
+근거는 raw artifact root의 `ticket01/`에 보존했다. `ticket01-verdict.json`, `finalforward-budget2.json`, `finalreverse-budget2.json`, `correctness-final.log`와 source·설치 파일 fingerprint가 있다. native benchmark 프로세스는 중단했고 DB·로그와 작업 환경 metadata는 보존했다.
+
 ## Acceptance Criteria
 
 - [x] 한 명령으로 동일한 입력과 쿼리의 일반 테이블 스캔 차이를 반복 측정할 수 있다.
 - [x] 보고 당시 head, merge-base, 현재 head의 비교 결과와 정확성 검사 결과가 보존된다.
 - [x] 재현 여부, 원인 확인 여부, 호스트 간섭과 측정 한계가 구분된다.
 - [x] 재현한 회귀의 원인과 수정 범위 또는 다음 분석에 필요한 근거가 기록된다.
-- [ ] 최종 성능 기준과 정확성 검증 범위를 합의한 후 spec과 의존성을 가진 구현 티켓을 작성한다.
+- [x] 최종 성능 기준과 정확성 검증 범위를 합의한 후 spec과 의존성을 가진 구현 티켓을 작성한다.
+- [ ] 첫 spec의 제품용 수정에서 두 스캔 모두 instructions 증가 2% 이하와 정확성 검증을 충족하고, 전체 변경 리뷰를 완료한다.
 
 ## Definition of done
 

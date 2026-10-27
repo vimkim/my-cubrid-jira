@@ -2,7 +2,7 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS 적용 전후에 양쪽 모두 heap에 저장되는 경우(1번)와, 기존 overflow 저장을 OOS로 대체하는 경우(3번)의 CRUD 성능 저하를 조사하고 개선한다. CRUD는 INSERT·SELECT·UPDATE·DELETE를 뜻한다.
+**이슈 수행 목적**: 4팀 박세훈 팀장님(shparkcubrid)이 [GitHub PR #7990](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6434778190)에서 측정·보고하신 OOS 적용 후 성능 저하의 원인을 조사하고 개선하기 위함이다.
 
 **이슈 수행 이유**: OOS에는 heap page에 더 많은 record를 담기 위해 큰 컬럼 값을 밖으로 옮기는 설계상 장단점이 있다. 이 때문에 기존 heap 저장이 OOS 저장으로 바뀌는 경우(2번)는 일부 작업이 느려질 수 있다. 이 비용을 먼저 설명하고, 이번 이슈의 개선 범위를 1·3번으로 한정한다.
 

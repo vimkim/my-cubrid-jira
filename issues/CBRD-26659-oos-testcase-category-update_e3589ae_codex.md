@@ -16,7 +16,7 @@
 
 이 이슈는 [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357)의 개발자 회귀 테스트 하위 작업이다. OOS(Out-of-row Overflow Storage)의 전체 값 보존뿐 아니라 실제 저장 레코드의 `HAS_OOS` 설정·해제, 파일·청크 소유권, 트랜잭션·복구와 정리 동작을 검증 대상으로 삼는다.
 
-초기 전달 이후 피드백을 여섯 검증 영역으로 정리하고 테스트를 보완하여 두 TC PR에 게시했다. 이후 실제 두 노드 HA 복제 TC를 추가했다. **현재 두 TC PR은 OPEN, Ready for review이며, 최신 전체 CI는 [[CI 대기: run40557885817 결과]].** 테스트 작성·게시, 활성 선택의 통과와 요구사항 전체의 검증 완료는 각각 구분한다.
+초기 전달 이후 피드백을 여섯 검증 영역으로 정리하고 테스트를 보완하여 두 TC PR에 게시했다. 이후 실제 두 노드 HA 복제 TC를 추가했다. **현재 두 TC PR은 OPEN, Ready for review이며, 동일 입력 최신 전체 CI(run40557885817)는 build·SQL·shell·medium 모두 PASS다.** 테스트 작성·게시, 활성 선택의 통과와 요구사항 전체의 검증 완료는 각각 구분한다.
 
 | 산출물 | 전체 보유 수 | 정규 실행 활성 | 비활성 또는 검증 한계 |
 | --- | ---: | ---: | --- |
@@ -73,7 +73,13 @@
 
 Shell TC PR에는 이전 기록의 `98723aa` 이후 두 커밋이 추가됐다. `5a3c7d8ff`는 native helper가 OOS page를 page type 14로 읽도록 고쳤다. Engine `1e8701b4f`가 OOS page를 type 8 대신 14로 저장하기 때문이다. `3bba57e1f`는 HA 복제 진입점을 추가했다.
 
-**[최신 전체 CI run40557885817](https://github.com/CUBRID/cubrid/actions/runs/40557885817)는 [[CI 대기: 결과]].** 입력은 engine `e3589ae`, public TC `45e21ad`, private TC `3bba57e1f`다. [[CI 대기: suite별 결과, 활성 OOS shell 진입점과 HA 진입점의 결과]]
+**[최신 전체 CI run40557885817](https://github.com/CUBRID/cubrid/actions/runs/40557885817)는 build·SQL·shell·medium 모두 PASS다.** 입력은 engine `e3589ae`, public TC `45e21ad`, private TC `3bba57e1f`다. 재실행 없이 첫 시도에서 통과했고, head `e3589ae`의 `gha-ci` context 다섯 개가 모두 이 run을 가리킨다.
+
+- SQL: shard 10개의 CTP summary 합계가 17,653건 성공, 실패 0건이다.
+- Shell: shard 50개에서 3,530건 OK, NOK 0건, skip 30건이다. 활성 OOS shell 진입점 69개와 HA 복제 진입점 `cbrd_26659_ha_replication`(shard 05)을 합한 70개가 모두 OK다.
+- Medium: shard 1개가 PASS했다.
+
+이전 run에서 실패한 OOS 외 두 건(`cbrd_23280_auth`, `_enhance_1008`)도 이 run에서는 OK다.
 
 ### 2026-10-27 PR #8128 CI 경과
 
@@ -97,7 +103,6 @@ OOS 외 실패 두 건(`cbrd_23280_auth`, `_enhance_1008`)은 같은 engine에�
 
 ## Remaining Work
 
-- [[CI 대기: run40557885817 결과에 따라 최신 전체 CI 항목을 갱신]]
 - 비활성 SQL 3개·shell 64개의 실패 원인·후속 수정 연결과 장시간 사례의 별도 실행 경로를 정리한다. 모든 실패를 엔진 결함으로 일괄 확정하지 않는다.
 - 지원 연산별 적용 가능한 `HAS_OOS` 상태, 독립 기대값, 실제 실행 phase와 C++ 필수 선택을 [연산 요구 목록][operations] 및 [C++ 인벤토리][cpp]와 최종 대조한다. 파티션 소유권, 정책 roundtrip, 물리 target, notification·회수 등 남은 항목의 완료를 활성 선택 통과만으로 선언하지 않는다.
 - 큰 키 종합 선택 `SH-073`은 과거 PASS 관측이 있지만 381.773초로 비활성이다. 기능 결과로 성능 저하가 없다고 판단하지 않으며 성능 비교는 계속 보류한다.

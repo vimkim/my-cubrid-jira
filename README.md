@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27788 최신 PR #7990 OOS SELECT 실측, 2026-10-27](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md):
+  정확한 revision과 실제 저장 진단, 기본 200개 표본과 저장장치 읽기 보조 24개 표본.
 - [CBRD-27014 OOS impact and measured SELECT performance, 2026-10-27](issues/CBRD-27014-oos-impact-and-performance_3173d3b_codex.md):
   completed presentation deliverables, workload-specific benefits and costs,
   fixed benchmark revisions, attachment links and measurement limits.

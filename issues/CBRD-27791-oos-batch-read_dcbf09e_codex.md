@@ -2,11 +2,11 @@
 
 ## Issue Triage
 
-**이슈 수행 목적**: 현실적인 범위의 OOS batch read로 큰 값 조회의 읽기 대기를 줄이면서 작은 컬럼 조회의 이득과 값·MVCC·identity 검증을 보존한다.
+**이슈 수행 목적**: 읽기 요청을 제한된 범위로 모아 처리하는 batch read로 큰 값 조회의 대기를 줄인다. 작은 컬럼 조회의 이득과 조회 결과의 정확성을 유지한다.
 
-**이슈 수행 이유**: PR #7990의 `dcbf09e` 에서 작업 전용 파일 캐시 해제 요청 후 큰 값 하나를 비교하는 SELECT가 기준 2.38초에서 OOS 5.72초로 느려졌다. OOS의 엔진 읽기와 CPU 시간은 더 적다. 읽기 순서·요청 방식을 바꾼 별도 재생 대조에서 개선 여지가 확인되어, 엔진에서 가능한 batch 범위와 비용을 분석할 필요가 있다.
+**이슈 수행 이유**: 작업 전용 파일의 OS 캐시 해제를 요청한 뒤 큰 값 하나를 비교하는 SELECT를 실행하자, 기준 엔진은 2.38초, OOS 엔진은 5.72초가 걸렸다. 읽기 순서를 바꾼 별도 실험에서 개선 가능성이 보여, 실제 엔진에서 가능한 처리 범위와 비용을 분석할 필요가 있다.
 
-**영향**: 큰 가변 길이 컬럼이 있는 테이블에서 큰 값의 내용을 비교·집계하는 사용자는 읽는 바이트가 줄어도 더 긴 조회 대기를 겪을 수 있다. 특정 fixture와 호스트에서 확인한 영향이며 빈도와 일반 workload의 개선율은 미확정이다. 작은 컬럼만 조회하는 이득은 유지해야 한다.
+**영향**: 큰 컬럼의 내용을 비교하거나 집계하는 사용자는 조회 결과를 더 오래 기다릴 수 있다. 특정 입력과 호스트에서 확인한 영향이며, 실서비스에서 얼마나 자주 발생하는지는 아직 모른다.
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 
@@ -14,51 +14,128 @@
 
 ## AI-Generated Context
 
-> 아래는 2026-10-28 Asia/Seoul에 재검증한 source·native SQL·offline 읽기 재생의 상세 맥락이다. 재생 결과는 엔진 수정 후 SQL 성능이 아니며, 미합의 설계와 기준은 ANALYSIS 항목으로 구분한다.
+> 측정·근거 확인일은 2026-10-28이며, 문장도 같은 날 개정했다. 시간대는 Asia/Seoul이다. 아래의 실제 SQL 실행 결과와 엔진 밖 읽기 재생 결과를 구분한다. 엔진 수정 후의 성능은 아직 측정하지 않았으며, 구현 후보와 미합의 기준은 ANALYSIS 항목으로 남긴다.
 
 ## Description
 
 ### 무엇이 문제인가
 
-OOS는 큰 값을 heap record 밖의 value chain에 저장하고, 필요한 속성만 Resolve한다. 작은 컬럼을 조회할 때 큰 값의 page를 읽지 않는 이득이 있다. 반면 큰 값을 읽는 조회는 heap에서 얻은 참조로 OOS page를 찾아가야 한다.
+OOS는 큰 컬럼 값을 행의 기본 저장 공간 밖에 따로 저장하는 방식이다. 이름은 Out-of-row Overflow Storage의 약자다. 행의 기본 저장 공간인 heap record에는 큰 값이 저장된 위치를 가리키는 참조를 남긴다. 필요한 컬럼을 읽을 때 이 참조를 따라 실제 값을 가져오는 동작을 Resolve라고 한다.
 
-이번 대상은 [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978)의 성능 후속 Sub-task다. 기존 제목의 batch read 목표를 유지한다. [CBRD-27788](https://jira.cubrid.org/browse/CBRD-27788)은 SELECT 실측 결과이고, [CBRD-27785](https://jira.cubrid.org/browse/CBRD-27785)의 일반 heap CPU 회귀 대응과 이번 읽기 대기 개선은 별도로 검증한다. 본 작업을 PR #7990의 merge 선행 조건으로 지정한 결정은 확인하지 못했다.
+이 방식은 큰 값을 쓰지 않는 조회에 유리하다. 예를 들어 작은 컬럼만 읽으면 큰 값이 있는 페이지를 읽을 필요가 없고, 더 작아진 heap을 읽는 이득을 얻는다. 반면 큰 컬럼의 내용을 비교하거나 집계하려면 heap에서 참조를 얻은 뒤 큰 값이 있는 OOS 페이지까지 찾아가야 한다. 페이지는 엔진이 데이터를 읽는 단위다.
 
-기존 `heap_oos_read_grouped_payloads` 는 한 record의 여러 OOS 속성을 모으고, `oos_read_many` 는 같은 head page를 공유한 요청의 page fix를 줄인다. 여러 행을 모으거나 연속 page I/O를 발행하는 기능은 아니다. Q4처럼 OOS 속성 하나를 읽는 경우에는 scalar Resolve를 사용한다.
+이번 실측에서는 큰 값을 읽는 조회가 OOS 적용 전보다 느렸다. 특히 큰 값 하나의 내용을 비교한 Q4에서는 읽는 양과 CPU 시간이 줄었는데 전체 조회 시간은 늘었다. 따라서 읽는 양을 줄이는 효과와 함께, 읽는 순서와 요청 방식을 분석해야 한다.
+
+목표는 여러 읽기 요청을 모아 순서나 묶음을 조절하는 batch read로 이 대기를 줄이는 것이다. 엔진이 모든 행의 주소를 미리 알고 있다고 가정할 수 없으므로, 실제로 수집 가능한 제한된 범위에서 효과를 확인해야 한다. 한 번에 모아 처리할 범위를 window라고 한다. 그 크기와 적용할 조회 종류는 아직 정하지 않았다.
 
 ### 왜 문제인가
 
-사용자는 큰 컬럼 내용으로 조건을 검사하거나 전체 값을 집계해 결과를 얻으려 한다. 같은 100,000행을 비교한 Q4에서 파일 캐시 해제 요청 후 기준 2.38초, OOS 5.72초가 걸렸다. OOS는 엔진 ioread가 200,087회에서 133,339회로 줄었지만 조회 대기는 약 2.4배가 됐다. 따라서 작은 컬럼 이득이나 엔진 읽기 감소만으로 큰 값 조회도 빨라진다고 판단할 수 없다.
+사용자가 큰 컬럼의 내용을 조건과 비교하거나 전체 값을 집계하면, 결과를 내기 위해 실제 큰 값을 읽어야 한다. 같은 100,000행을 조회한 결과는 다음과 같다. 이 입력은 행이 커서 기준 엔진이 heap 페이지 밖의 overflow 저장을 쓰는 경우다. 기준 엔진은 OOS 적용 전 비교 대상이고, OOS 엔진은 PR #7990의 `dcbf09e`다.
 
-OS 캐시 조건은 구분해야 한다. 같은 overflow Q4의 warm 조건에서는 기준 1.23초, OOS 1.00초였다. 단순 재시작 표본에는 OS cache hit와 실제 읽기가 섞인다. 이번 영향은 파일 캐시 해제 요청 후의 불연속 읽기 조건에서 확인했으며, 장치 cache 초기화나 모든 storage의 동작을 뜻하지 않는다.
+| 조회 내용 | 기준 엔진 | OOS 엔진 | 사용자에게 뜻하는 차이 |
+| --- | ---: | ---: | --- |
+| 작은 컬럼만 읽기, Q1 | 1.88초 | 0.82초 | 큰 값을 읽지 않는 이득이 있다. |
+| 큰 컬럼 하나의 내용 비교, Q4 | 2.38초 | 5.72초 | 같은 결과를 얻는 데 약 2.4배 오래 기다린다. |
+| 전체 값 읽기, Q5 | 3.46초 | 4.12초 | 여러 큰 값을 읽는 경우에도 더 오래 걸리지만 차이는 Q4와 다르다. |
+
+위 표는 작업 전용 파일의 OS 캐시 해제를 요청한 뒤 실행한 SQL 시간의 3회 중앙값이다. OS 캐시는 운영체제가 앞서 읽은 파일 내용을 메모리에 보관하는 기능이다. 이를 얼마나 다시 사용할 수 있는지에 따라 읽기 대기와 비교 결과가 달라진다.
+
+같은 Q4도 SQL을 한 번 실행한 뒤 다시 조회하는 warm 조건에서는 기준 1.23초, OOS 1.00초였다. DB만 재시작한 표본에는 OS 캐시에서 읽은 경우와 실제 파일 읽기가 섞였다. 따라서 이번에 확인한 영향은 파일 캐시 해제 요청 후의 불연속 읽기 조건에 한정한다. 모든 저장 장치나 모든 조회에서 OOS가 느리다는 결론으로 넓히지 않는다. 파일 캐시 해제 요청의 구체적인 절차는 아래 재현 항목에 남긴다.
 
 ### 왜 해결해야 하는가
 
-큰 값을 다시 읽어야 하는 workload에서는 compact heap의 이득과 별도로 읽기 대기를 줄일 방법이 필요하다. OS readahead를 끄는 `data_file_os_advise=3` 은 기존 대조에서 양쪽을 느리게 했으므로 해결책으로 제안하지 않는다. 전체 요청을 사후 정렬한 재생은 미래 주소를 모두 아는 대조여서 그대로 엔진 전략이 될 수 없다.
+작은 컬럼 조회가 빨라져도 큰 값을 읽어야 하는 사용자의 대기는 남는다. OOS의 두 조회 특성을 함께 평가하고, 큰 값을 읽을 때의 비용을 줄일 방법이 필요하다. 다만 실서비스 발생 빈도와 긴급도는 미확정이므로, 확인한 실험만으로 우선순위를 올리거나 PR 통합을 차단할 근거로 삼지 않는다.
 
-제한된 범위에서 주소를 수집하고 읽는 순서·묶음을 조절하는 batch read의 실현성과 비용을 분석할 근거는 있다. 다만 작은 범위와 병합의 효과는 일정하지 않으며 gap 읽기는 요청량을 늘린다. 성능·메모리·첫 결과 지연을 함께 평가해야 한다. 실서비스 발생 빈도와 긴급도는 미확정이므로 이 본문으로 우선순위를 올리거나 통합을 차단하지 않는다.
+이미 확인한 우회책에도 한계가 있다. 운영체제가 다음 데이터를 미리 읽는 readahead를 끄는 `data_file_os_advise=3`은 기존 대조에서 양쪽 엔진을 모두 느리게 했다. 전체 읽기 주소를 모아 사후에 정렬한 실험은 미래 주소를 모두 아는 조건이므로, 그대로 실제 엔진의 처리 방식으로 채택할 수 없다.
+
+이번에는 범위를 제한해 읽는 순서와 요청 묶음을 바꾸어 보았다. 엔진 밖의 읽기 재생 실험에서 개선 가능성이 남아 있어, 실제 엔진에서도 가능한지 분석할 근거가 있다. 다만 요청을 모으는 범위에 따라 효과가 달랐고, 요청을 합친 경우가 더 느리기도 했다. 원래 요청 목록에 없던 구간까지 함께 읽는 gap 읽기는 시간을 줄이는 대신 읽기 요청량을 늘렸다. 속도와 함께 추가 읽기, 메모리 사용량, 첫 결과를 반환할 때까지의 지연을 확인해야 한다.
+
+## Triage Request
+
+부모 [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978)의 batch read 후속 성능 과제로 문제와 필요한 결과를 확인하고, 기존 담당자 측에서 ANALYSIS를 진행하도록 요청한다. 분석에서는 실제로 모을 수 있는 요청 범위, 효과가 있는 조회·캐시 조건, 추가 비용과 적용 한계를 결정한다.
+
+현재 Sub-task 유형과 parent를 유지한다. [CBRD-27788](https://jira.cubrid.org/browse/CBRD-27788)은 SELECT 실측을 기록한 이슈이고, [CBRD-27785](https://jira.cubrid.org/browse/CBRD-27785)의 일반 heap CPU 회귀 대응은 이번 읽기 대기 개선과 별도로 검증한다. 본 작업을 PR #7990의 merge 선행 조건으로 지정한 결정은 확인하지 못했다. 제목·우선순위·담당자·상태 변경은 이 본문으로 요청하지 않는다.
+
+## Specification Changes
+
+batch read로 큰 값 조회 대기를 줄이는 결과가 필요하다. 적용할 scan, window와 메모리 정책은 ANALYSIS에서 정한다. 저장 형식 변경은 현재 선택하지 않았다.
+
+성능을 바꾸더라도 다음 동작을 보존해야 한다. 아래는 기존 요구사항이며 새 설계의 채택을 뜻하지 않는다.
+
+| 보존할 동작 | 필요한 이유와 확인할 조건 |
+| --- | --- |
+| 조회 시점에 맞는 값 읽기 | MVCC snapshot에 맞는 행의 참조를 사용한다. 과거 버전은 undo record의 참조를 따른다. |
+| 참조가 아직 같은 값을 가리키는지 확인 | 오래된 참조, 해제되거나 다른 종류로 바뀐 페이지, slot과 identity stamp를 검사한다. 잘못된 값을 정상 SQL 결과로 내보내지 않는다. |
+| 동시 접근과 결과의 수명 유지 | page latch 규칙과 결과 복사 수명을 보존한다. 실패·취소 뒤에도 부분 결과를 공개하거나 자원을 남기지 않아야 한다. |
+| 필요한 컬럼만 읽기 | 필요한 시점에만 Resolve하는 lazy 동작을 유지한다. 조건식의 앞부분에서 결과가 정해져 뒷부분을 평가하지 않는 predicate short-circuit도 보존한다. |
+
+`FILE_OOS`는 엔진이 관리하는 논리 파일이다. 별도 OS 파일 하나와 동일한 대상으로 취급하지 않는다.
+
+## Implementation
+
+TBD - ANALYSIS 단계에서 결정한다.
+
+어디서 무엇을 맡을지는 다음 책임을 기준으로 검토한다. 세부 호출 방식과 인터페이스는 아직 정하지 않았다.
+
+| 위치 | 검토할 책임 |
+| --- | --- |
+| scan 층 | 현재 조회에서 보이는 행과 필요한 컬럼을 판단하고, 제한된 범위의 참조를 모은다. |
+| OOS 층 | 읽는 순서와 요청 묶음을 조절하고, 참조가 올바른 값을 가리키는지 검증한다. |
+| page buffer 층 | 캐시를 관리하고, 같은 페이지를 동시에 처음 읽는 요청을 조정하며 실제 페이지 I/O를 맡는다. 이중 쓰기 버퍼인 DWB와 데이터 암호화인 TDE 처리도 보존한다. |
+
+기존처럼 요청한 값을 읽되 순서를 바꾸는 방법, 필요한 페이지를 미리 읽는 방법, 기존 grouped Resolve의 확장은 분석 후보다. 하나를 채택한 상태는 아니다. 엔진 밖 실험의 raw `pread`나 저수준 함수 `fileio_read_pages`를 직접 호출하는 것으로 page buffer의 책임을 대체하지 않는다.
+
+현재 `heap_oos_read_grouped_payloads`는 한 행의 여러 OOS 컬럼을 모아 읽는다. `oos_read_many`는 같은 head page를 공유하는 요청에서 페이지를 고정하는 page fix를 줄인다. 여러 행을 모으거나 연속 페이지 I/O를 발행하는 기능은 아니다. Q4처럼 OOS 컬럼 하나를 읽으면 하나씩 Resolve하는 scalar 경로를 쓴다. 따라서 기존 함수를 호출하는 변경만으로 여러 행의 batch read가 완성되지는 않는다.
+
+## Acceptance Criteria
+
+- [ ] 실제로 수집 가능한 제한된 batch가 큰 값 조회 대기를 줄이는지, 엔진을 통한 SQL 실행으로 확인한다. 개선율과 캐시·조회 조건의 범위는 ANALYSIS에서 합의한다.
+- [ ] 정답, MVCC, 참조의 identity 검증, latch, 결과 복사 수명을 보존하고 실패·취소를 처리한다.
+- [ ] 작은 컬럼만 읽는 이득과 필요한 시점에만 값을 가져오는 lazy Resolve를 유지한다. 허용 회귀 예산은 TBD다.
+- [ ] 추가 읽기, 최대 메모리 사용량, 실제 첫 결과 반환 지연의 상한과 실측을 제시한다. 제품 상한은 TBD다.
+- [ ] 하나 또는 여러 OOS 컬럼, 여러 chunk에 걸친 값인 multi-chunk, DB buffer 경계 중 실제 설계 위험에 필요한 집중 검증 범위를 결정하고 결과를 남긴다.
+
+## Definition of done
+
+ANALYSIS에서 인터페이스, 수집 범위와 상한, 적용할 수 없을 때 기존 읽기로 돌아가는 fallback, 성능 예산을 결정한다. 구현 후 같은 revision 계열의 독립 설치·DB에서 정확성과 성능을 집중 비교한다. 최종 SQL 성능은 요청을 기록하는 tracer를 붙이지 않고 측정한다.
+
+필요한 CTest·SQL·shell·medium과 PR CI 범위는 실제 변경에 맞춰 정한다. 이번 분석과 읽기 재생이 끝났다는 이유로 실제 batch read 구현 이슈를 완료 처리하지 않는다.
 
 ## Measurement Evidence
+
+### 실제 SQL 실행에서 확인한 근거
+
+아래는 수정하지 않은 두 엔진의 SQL 실측 조건이다. 앞의 Q1·Q4·Q5 시간도 이 비교에서 얻었다.
 
 | 구분 | 확인 내용 |
 | --- | --- |
 | 비교 source | base `4781495f01523a3ecc5891e3377ad62cf876a1cd`, OOS `dcbf09e4f7fd02ff9c8fc6493ec8887fc2919d67` |
-| 빌드 | GCC 11.5.0, RelWithDebInfo/O2, 테스트 계측 없음. 각 revision의 독립 설치·DB와 matching CSQL/DSO를 확인했다. |
-| 입력 | 100,000행, 기준은 평균 22,016B record overflow, OOS는 평균 4,040B heap과 속성별 chain. 큰 값은 7,000/6,000/5,000B다. |
-| 조건 | 16KiB DB/log page, DB buffer 512MiB, query cache 0, 직렬 TABLE SCAN. CPU affinity와 실행 순서 교대, 반복별 정답 검증. |
-| 파일 캐시 해제 요청 후 Q4 | 3회 중앙값: base 2.38초, OOS 5.72초. CPU task-clock 2,333.30ms/2,266.97ms. |
-| 작은 컬럼 Q1 | 같은 overflow 입력의 파일 캐시 해제 요청 조건에서 base 1.88초, OOS 0.82초. |
-| 전체 값 Q5 | 같은 조건에서 base 3.46초, OOS 4.12초. 큰 컬럼 하나와 여러 개의 동작도 구분한다. |
+| 빌드 | GCC 11.5.0, RelWithDebInfo/O2, 테스트 계측 없음. 각 revision의 독립 설치·DB와 그에 맞는 CSQL·공유 라이브러리 DSO를 확인했다. |
+| 입력 | 100,000행. 기준 엔진은 평균 22,016B record overflow, OOS는 평균 4,040B heap과 컬럼별 값의 연결 구조인 chain을 사용한다. 큰 값은 7,000/6,000/5,000B다. |
+| 조건 | 16KiB DB/log page, DB buffer 512MiB, query cache 0, 직렬 TABLE SCAN. 실행할 CPU를 고정하는 CPU affinity를 적용하고 엔진 실행 순서를 교대했다. 반복마다 정답을 확인했다. |
+| 파일 캐시 해제 요청 후 Q4 | 3회 중앙값은 base 2.38초, OOS 5.72초다. CPU task-clock은 각각 2,333.30ms, 2,266.97ms다. |
+| 같은 Q4의 엔진 읽기 횟수 | ioread는 base 200,087회, OOS 133,339회다. CPU 시간과 엔진 읽기 횟수가 줄었는데 전체 시간은 늘었다. |
 
-기존 trace를 독립 파서로 재조립하고 FD 전후 일치·요청 순서·페이지 중복 횟수를 대조했다. 새 trace도 같은 요청 수와 주소 패턴을 재현했다. strace를 붙인 시간은 성능 수치에서 제외했다. 읽기 주소는 OS volume 파일 offset이며 NVMe LBA가 아니다.
+기존 trace를 독립 파서로 다시 조립하고, 열린 파일을 가리키는 FD의 전후 일치, 요청 순서와 페이지 중복 횟수를 대조했다. 새 trace도 같은 요청 수와 주소 패턴을 재현했다. 요청을 기록하는 `strace`를 붙인 실행의 시간은 성능 수치에서 제외했다. 기록한 읽기 주소는 OS volume 파일의 offset이며 NVMe 장치의 LBA가 아니다.
 
-새 offline 재생에서 OOS 원래 순서는 4.413초, 64 heap-page 단위 정렬은 3.449초였다. 같은 범위에서 인접 요청을 병합하면 3.974초로 정렬만 한 경우보다 느렸다. gap까지 읽으면 1.965초지만 요청 바이트가 72.4% 늘었다. 각각 3회 중앙값이다. 이 대조도 trace의 주소를 미리 아는 모델이며, 실제 행 수집·MVCC·latch·buffer hit와 첫 행 반환 비용을 수행하지 않는다. 따라서 엔진 구현의 효과와 상한은 native prototype에서 검증해야 한다.
+### 엔진 밖 읽기 재생에서 확인한 가능성과 한계
 
-기존 결과: [전체 SELECT 실측](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27788/CBRD-27788-oos-select-performance_dcbf09e_codex.md), [읽기 순서·요청 방식 진단](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27788/CBRD-27788-oos-cold-read-diagnosis_dcbf09e_codex.md). 이번 [상세 재측정](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/CBRD-27791-oos-batch-read-analysis_dcbf09e_codex.md)과 [구현·검증 계획](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/CBRD-27791-oos-batch-read-plan_dcbf09e_codex.md)에 수치·범위·후속 단계를 정리했다.
+읽기 재생은 SQL 실행 때 기록한 파일 주소를 별도 도구로 다시 읽는 실험이다. SQL을 다시 실행하는 과정과 구분된다. 원래 순서와 순서를 바꾼 경우를 비교해 읽기 순서·요청 방식의 영향을 살폈다.
+
+| 같은 OOS trace를 읽는 방식 | 3회 중앙값 | 의미 |
+| --- | ---: | --- |
+| 원래 순서 | 4.413초 | 재생 실험의 비교 기준이다. |
+| heap 페이지 64개 단위로 나누어 OOS 요청 정렬 | 3.449초 | 전체 trace보다 작은 범위에서도 순서 변경의 효과가 남았다. |
+| 같은 범위에서 인접 요청 병합 | 3.974초 | 맞닿은 읽기 요청을 합쳐도 정렬만 한 경우보다 느렸다. |
+| 같은 범위에서 gap까지 병합 | 1.965초 | 요청 사이 구간까지 함께 읽어 시간을 줄였지만 요청 바이트가 72.4% 늘었다. |
+
+heap 페이지 64개라는 범위는 trace를 나누는 모델이며 실제 행 64개를 뜻하지 않는다. 이 모델도 범위 안의 주소는 미리 알고 있다. 실제 엔진에서 행을 모으는 비용, MVCC 가시성 판단, latch, buffer hit와 첫 행 반환을 수행하지 않는다. 따라서 재생 결과를 엔진 수정 후 SQL의 개선율로 사용할 수 없다. 효과와 상한은 실제 엔진 prototype으로 검증해야 한다.
 
 ## Repro
 
-아래 SQL은 양쪽 독립 DB에 [동일 fixture](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/fixture.sql)를 적재한 후 실행한다. 이 입력은 최초 실측 파일과 byte 단위로 같다. 각 matching install의 `csql -C -u dba -i fixture.sql <database>` 로 새 DB에 적재한다. 전체 byte 내용 비교이므로 길이만 읽는 최적화와 구분된다.
+양쪽 revision의 독립 설치·DB에 [동일 fixture](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/fixture.sql)를 적재한다. 이 입력은 최초 실측 파일과 byte 단위로 같다. 각 설치에 맞는 `csql -C -u dba -i fixture.sql <database>`로 새 DB에 적재한다. 기존 DB를 다른 revision으로 열지 않는다.
+
+아래는 Q4다. 큰 값의 전체 byte 내용을 비교하므로 길이만 읽는 최적화와 구분된다.
 
 ```sql
 SELECT /*+ NO_MERGE RECOMPILE PARALLEL(0) NO_PARALLEL_HEAP_SCAN */ COUNT(*)
@@ -66,32 +143,13 @@ FROM perf_overflow_22000
 WHERE cold_1 = CAST(REPEAT(X'AA', 7000) AS BIT VARYING);
 ```
 
-정답은 100,000이다. 각 engine의 `csql -C -u dba -i q4.sql <database>` 로 실행한다. 파일 캐시 조건은 서버를 정지한 뒤 작업 전용 permanent volume에만 `fsync` 와 `POSIX_FADV_DONTNEED` 를 적용하고 `fincore` 로 residency를 확인해 만들었다. 단순 DB 재시작과 같은 조건이 아니다. 기존 DB를 다른 revision으로 열지 않는다.
+정답은 100,000이다. 각 엔진의 설치에 맞는 `csql -C -u dba -i q4.sql <database>`로 실행한다.
 
-## Specification Changes
+파일 캐시 해제 요청 조건은 서버를 정지한 뒤 작업 전용 permanent volume에만 `fsync`와 `POSIX_FADV_DONTNEED`를 적용해 만들었다. 이후 `fincore`로 파일 내용이 메모리에 남아 있는 정도인 residency를 확인했다. DB만 재시작하면 OS 캐시는 남을 수 있으므로 같은 조건이 아니다. 이 절차는 장치 내부 캐시를 초기화한 것도 아니다.
 
-batch read로 큰 값 조회 대기를 줄이는 결과가 필요하다. 적용할 scan과 window·메모리 정책은 ANALYSIS에서 정한다. 저장 형식 변경은 현재 선택하지 않았다.
+## References
 
-MVCC snapshot과 undo record의 참조, stale/deallocated/retyped page·slot·identity stamp 검사, page latch, 결과 복사 수명을 보존한다. 필요한 속성만 Resolve하는 계약과 predicate short-circuit을 유지한다. `FILE_OOS` 는 logical file이며 별도 OS 파일과 동일시하지 않는다.
-
-## Implementation
-
-TBD - ANALYSIS 단계에서 결정한다.
-
-수집 책임은 가시성과 필요한 속성을 아는 scan 층, 읽기 순서와 참조 검증은 OOS 층, cache·동시 miss·DWB·TDE를 포함한 실제 page I/O는 page buffer 층에서 검토한다. 기존 grouped Resolve 확장, bounded demand-read 순서 변경, 선행 읽기는 후보이며 채택된 구현이 아니다. raw `pread` 재생이나 `fileio_read_pages` 직접 호출로 page buffer 계약을 대체하지 않는다.
-
-## Acceptance Criteria
-
-- [ ] 현실적인 bounded batch가 큰 값 조회 대기를 줄이는 native SQL 근거를 제시한다. 개선율과 cache/workload 범위는 ANALYSIS에서 합의한다.
-- [ ] 정답·MVCC·identity·latch·복사 수명과 실패·취소 처리를 보존한다.
-- [ ] 작은 컬럼만 읽는 이득과 lazy Resolve를 유지한다. 허용 회귀 예산은 TBD다.
-- [ ] 추가 읽기, peak memory, first-result latency의 상한과 실측을 제시한다. 제품 상한은 TBD다.
-- [ ] 단일/다중 속성, multi-chunk와 buffer 경계 중 실제 설계 위험에 필요한 집중 검증 범위를 결정하고 결과를 남긴다.
-
-## Definition of done
-
-ANALYSIS에서 인터페이스·수집 범위·상한·fallback과 성능 예산을 결정한다. 구현 후 동일 revision 계열의 독립 환경에서 집중 정확성 및 tracer 없는 성능 대조를 수행한다. 필요한 CTest·SQL·shell·medium 및 PR CI 범위는 실제 변경에 맞춰 정한다. 이번 분석·재생 완료만으로 이 구현 이슈를 완료 처리하지 않는다.
-
-## Triage Request
-
-부모 CBRD-26978의 batch read 후속 성능 과제로 문제와 필요한 결과를 확인하고, 기존 담당자 측에서 ANALYSIS를 진행하도록 요청한다. 현재 Sub-task 유형과 parent를 유지하며, summary·우선순위·담당자·상태 변경은 이 본문 게시 범위에 포함하지 않는다.
+- [전체 SELECT 실측](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27788/CBRD-27788-oos-select-performance_dcbf09e_codex.md)은 작은 컬럼과 큰 값 조회의 실제 SQL 결과를 설명한다.
+- [읽기 순서·요청 방식 진단](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27788/CBRD-27788-oos-cold-read-diagnosis_dcbf09e_codex.md)은 앞선 읽기 대기 진단을 기록한다.
+- [이번 상세 재측정](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/CBRD-27791-oos-batch-read-analysis_dcbf09e_codex.md)은 수치, 제한된 재생 모델과 소스 근거를 정리한다.
+- [구현·검증 계획](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27791/CBRD-27791-oos-batch-read-plan_dcbf09e_codex.md)은 실제 엔진에서 비교할 후보와 검증 순서를 설명한다.

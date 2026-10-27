@@ -13,6 +13,9 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27259 STORAGE FORCE_INLINE and fixed-type DEFAULT, 2026-10-27](issues/CBRD-27259-storage-force-inline_bc8a895_codex.md):
+  locally reviewed description draft covering policy semantics, overflow limits,
+  ALTER analysis questions and acceptance criteria; publication pending.
 - [CBRD-26659 OOS testcase categories, 2026-10-27](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
   reviewed description with six coverage categories, SQL/SH/UT aliases,
   detailed Markdown references and revision-specific CI results.

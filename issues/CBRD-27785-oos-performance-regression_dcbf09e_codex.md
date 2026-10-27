@@ -8,7 +8,7 @@
 
 **영향**: 기존 일반 테이블을 조회하는 사용자와 큰 가변 컬럼을 읽거나 갱신하는 사용자가 CPU 비용 또는 응답 시간 증가를 겪을 수 있다. 운영 환경의 발생 빈도와 크기는 확인되지 않았다. 변경 없는 OOS 값의 UPDATE 재적재는 기존 CBRD-27230과 연결하고, 중복 구현하지 않는다.
 
-**이슈 수행 방안**: 재현과 원인 분석 후 수정 범위, 성능 판정 기준, spec과 구현 티켓을 확정한다. 구체적인 최적화와 OOS 비활성화 설정은 ANALYSIS 단계에서 결정한다.
+**이슈 수행 방안**: 일반 행 읽기 회귀를 재현·분석하고, 승인된 두 구현 티켓과 2% 기준의 검증을 완료했다. 검토할 제품 패치는 `bcb900d1696756a120ec0a2b7885c212f71ebc07`이다. 큰 값·UPDATE·I/O와 OOS 설정은 별도 후속 범위다. 아래는 첫 spec의 로컬 구현·검증 결과이며, 이 문서만으로 JIRA 상태를 변경하지 않는다.
 
 ---
 
@@ -49,7 +49,7 @@ OOS는 큰 가변 값을 행 밖에 저장하여 작은 컬럼만 읽는 쿼리�
 
 이번 4G buffer·일반 행 스캔 실험은 경우 1의 CPU 회귀를 검출한다. 경우 2·3의 UPDATE나 I/O trade-off를 검증한 결과가 아니다. 후속 I/O 실험은 heap 집적도, buffer hit/miss, page fetch, 엔진 read와 실제 storage I/O를 함께 확인해야 한다.
 
-리뷰어는 일반 테이블의 속성 디코드 비용, 변경 없는 OOS 값의 UPDATE 재적재, 큰 값 스캔의 지연 원인을 확인해 달라고 요청했다. OOS 비활성화 수단과 buffer보다 큰 데이터에서의 이득 검증도 요청했다. 속성 디코드와 스캔 병렬성에 대한 설명은 검증할 가설이며 현재 이슈에서 확인한 원인이 아니다.
+리뷰어는 일반 테이블의 속성 디코드 비용, 변경 없는 OOS 값의 UPDATE 재적재, 큰 값 스캔의 지연 원인을 확인해 달라고 요청했다. OOS 비활성화 수단과 buffer보다 큰 데이터에서의 이득 검증도 요청했다. 일반 행 읽기는 아래 통제 실험과 제품 수정으로 원인을 좁혔다. 큰 OOS 값의 스캔 병렬성·지연 원인은 이번 범위에서 확정하지 않았다.
 
 ### 왜 문제인가
 
@@ -101,6 +101,7 @@ OOS는 큰 가변 값을 행 밖에 저장하여 작은 컬럼만 읽는 쿼리�
 ### 빌드와 설정
 
 - OS: Linux x86_64, GCC 11.5.0, RelWithDebInfo, `-O2 -ggdb3 -DNDEBUG -finline-functions`. 세 빌드의 compiler 및 최적화 cache 설정이 일치한다.
+- feature 빌드에는 기존 OOS native 테스트용 `CUBRID_UNIT_TEST_ENABLED`가 포함된다. baseline에는 이 OOS 테스트 코드가 없으며, 모든 compile definition이 동일하다고 주장하지 않는다.
 - commit과 설치 파일 hash는 `builds.json`에 보존했다. 비교한 엔진은 앞의 세 full SHA다. 측정 중 엔진 소스를 수정하지 않았다.
 - 각 빌드에서 새 DB `oos27785`를 독립 생성했다. 설치, registry, master port, TMP를 분리했고 benchmark 서버를 직렬 실행했다.
 - `data_buffer_size=4G`, `log_buffer_size=16M`, `max_clients=20`, `max_query_cache_entries=0`, `query_cache_size_in_pages=0`. 독립 할당된 master port를 제외한 설정이 일치한다.
@@ -141,7 +142,7 @@ raw artifact root: `/mnt/nvme/data-5/tmp/CBRD-27785-20261027`. SQL, 원시 count
 
 두 번째 실험은 첫 실험에 비해 행별 prefetch/dispatch 호출 경로를 우회한다. 원래 SQL과 입력의 결과·문장 수는 계속 일치했고 instructions 표본도 안정적이었다. 비 OOS 읽기의 OOS 대응 행 분기 및 속성 reader 비용이 관찰한 회귀의 주요 부분을 설명한다. 다만 개별 함수, scratch 크기, inlining과 코드 배치 각각의 기여분을 이 두 실험만으로 분해하지 않는다.
 
-실험은 기준 reader를 복사한 진단용 코드다. malformed 입력, 모든 type·schema 표현, OOS/pending·MVCC 경로를 검증한 제품 패치가 아니다. 패치와 소스·설치 파일 hash를 artifact root에 보존하고, 실험 후 원래 소스로 복원하여 다시 빌드·설치했다. 복원 후 1회 스캔 비교에서 증가분이 +5.14% / +8.90%로 돌아온 것도 확인했다. 진단용 코드는 작업 브랜치와 설치에 남아 있지 않다. 실제 구현은 중복 코드를 그대로 채택하지 않고 기존 검증·소유권 계약을 보존해야 한다. 제품용 성능 개선과 정확성 검증은 아직 완료하지 않았다.
+실험은 기준 reader를 복사한 진단용 코드다. malformed 입력, 모든 type·schema 표현, OOS/pending·MVCC 경로를 검증한 제품 패치가 아니다. 패치와 소스·설치 파일 hash를 artifact root에 보존하고, 실험 후 원래 소스로 복원하여 다시 빌드·설치했다. 복원 후 1회 스캔 비교에서 증가분이 +5.14% / +8.90%로 돌아온 것도 확인했다. 진단용 코드는 작업 브랜치와 설치에 남아 있지 않다. 아래 제품 구현은 복사본을 채택하지 않고 기존 변환·검증·소유권 처리를 공유한다.
 
 - [직접 inline 읽기 통제 실험](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/diagnostic-outer-vs-base.json)
 - 진단 패치: `diagnostic-inline-reader.patch`, `diagnostic-outer-inline.patch`.
@@ -151,7 +152,7 @@ raw artifact root: `/mnt/nvme/data-5/tmp/CBRD-27785-20261027`. SQL, 원시 count
 
 사용자는 첫 구현 범위를 일반 테이블 읽기 경로 회귀와 SQL 기반 성능·정확성 검증으로 승인했다. 원인 분석 결과를 반영한 첫 spec은 엔진 작업 checkout의 `.scratch/oos-performance/spec.md`다. 사용자는 고정 컬럼 읽기와 가변 컬럼 읽기를 순서대로 완성하는 두 티켓, 1 → 2 의존성, 최종 instructions 증가 2% 이하 기준을 승인했다. 각 티켓에 정확성 검사와 성능 검증을 포함한다.
 
-CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범위로 남긴다. 승인된 로컬 티켓을 한 파일씩 발행했고 implement-spec으로 티켓 01부터 별도 worktree와 새 context에서 구현한다. 이 구현 진행은 제품용 수정의 검증 완료를 뜻하지 않는다.
+CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범위로 남긴다. 승인된 로컬 티켓을 한 파일씩 발행했고 implement-spec으로 각 티켓을 별도 worktree와 새 context에서 순서대로 구현했다. 두 티켓의 결과와 최종 리뷰는 다음과 같다.
 
 ### 티켓 01 결과
 
@@ -169,6 +170,33 @@ SERVER_MODE·SA_MODE를 포함한 release 빌드·설치, 집중 CTest 12/12, fo
 
 근거는 raw artifact root의 `ticket01/`에 보존했다. `ticket01-verdict.json`, `finalforward-budget2.json`, `finalreverse-budget2.json`, `correctness-final.log`와 source·설치 파일 fingerprint가 있다. native benchmark 프로세스는 중단했고 DB·로그와 작업 환경 metadata는 보존했다.
 
+### 티켓 02 및 최종 결과
+
+제품용 코드·테스트 커밋은 `e77ffbf0e3c4a2dcf1f3a918bafcabf91ac136cd`다. 가변값 읽기는 기존 layout의 header·entry 경계를 사용하고, 한 번의 BYTE/SHORT/INT 분기로 시작·끝 offset을 읽는다. 실제 IS_OOS 필드만 Resolve를 수행한다. collection/LOB의 다음 큰 offset 탐색, NULL·기본값·구 schema 표현, pending 값의 수명·COPY·해제 처리는 유지한다.
+
+최종 게시용 브랜치 `CBRD-27785-oos-read-performance`의 tip은 `bcb900d1696756a120ec0a2b7885c212f71ebc07`이다. 비공개 로컬 spec·작업 기록을 제외하고 하네스·제품 코드·테스트만 모았다. 이 브랜치의 엔진·C++ 테스트 blob은 위 검증 빌드와 동일하다. 게시용 tip 자체를 별도로 빌드했다고 주장하지 않는다.
+
+리뷰에서 하네스가 다른 설치본의 CSQL을 허용하는 문제가 발견되어 수정했다. 수정 전에는 실제 다른 CSQL로 측정을 완료했지만, 수정 후 같은 잘못된 선택은 SQL·counter 시작과 결과 디렉터리 생성 전에 종료 코드 2로 거부된다. 선택한 CSQL의 절대 경로와 SHA-256을 저장하고 모든 SQL에 같은 실행 파일을 사용한다. 하네스가 달라졌으므로 아래 정순·역순 전체 측정을 새로 수행했으며, 이전 raw 결과는 덮어쓰지 않았다.
+
+| 최종 하네스의 비교 | 좁은 컬럼 / 기준 | 여러 컬럼 / 기준 |
+| --- | ---: | ---: |
+| 보고 당시 head, 정순의 음성 대조군 | +5.127452% | +8.886182% |
+| 수정 후 정순: base, report, candidate | **+1.106605%** | **+1.362198%** |
+| 수정 후 역순: candidate, report, base | **+1.107484%** | **+1.362450%** |
+
+두 최종 비교는 승인된 경우 1의 2% 기준을 통과했다. 입력·SQL·반복 조건은 앞의 20만 행·20회 스캔·2라운드·5회 조건과 같고, checksum·문장 수·counter 유효성·실행 파일 fingerprint를 확인했다. 유지 표본의 범위는 0.009% 미만이며, warm trace는 두 쿼리 모두 TABLE SCAN·worker 4개·I/O read 0이었다. 경과 시간은 CPU 회귀의 판정 근거로 사용하지 않았다.
+
+`SHOW HEAP CAPACITY OF n`은 세 설치본 모두 heap 행 200,000개, overflow 행 0개, heap 페이지 1,653개, 평균 행 길이 108바이트였다. report와 candidate의 `SHOW HEAP OOS OF n`은 연결된 OOS 파일 없음, OOS 페이지·행 0개였다. 선언된 VARCHAR 길이가 아닌 실제 저장 진단으로 경우 1을 확인했다. 이 fixture에 DML을 추가하지 않은 채 마지막 하네스 측정을 반복했다.
+
+정확성 검증은 SERVER_MODE·SA_MODE release 빌드·설치 후 집중 CTest **15/15**, snapshot/vacuum 선택 **3/3**, formatter 적용 후 새 characterization **4/4**를 통과했다. 고정값·기본값·구 표현, NULL·빈 값·큰 inline 값, 명시적 BYTE/SHORT/INT offset, collection 순서, inline/OOS 혼합 읽기, source 값 소멸 후 pending grouped/scalar Resolve의 내용과 수명을 검사했다. 마지막 하네스 수정은 Python·README만 변경하여 C++ 재빌드·정확성 재실행은 하지 않았다.
+
+전체 변경을 Standards와 Spec 두 관점에서 독립 리뷰했다. 하네스 설치본 확인 문제를 수정한 뒤 최종 delta 리뷰까지 완료했으며, 남은 규칙 위반·명세 불일치 지적은 0개다. 전체 회사 CI, ASAN, HA, 경우 2·3, UPDATE 및 대용량 I/O 검증은 수행하지 않았다.
+
+최종 근거는 `ticket02/`의 `ticket02-verdict.json`, `actual-storage.json`, `correctness-contract.json`과 `review-fixes/`의 `review-fixes-verdict.json`, `merger-integration.json`이다. 최종 하네스 SHA-256은 `57c344a47a70bbdc1b91d01634c31a29d0c106a0b3d9d6dc40424662d51f679b`, 측정한 candidate engine DSO는 `041c7c07b74e7cb69c3fdab3cbdb9c60c44d71c033c91c33fdba273fa95902ec`다. 작업 소유 native 프로세스는 중단했고 DB·로그·설치를 보존했다.
+
+- [최종 측정 및 CSQL 설치본 오류 검증](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/review-fixes/review-fixes-verdict.json)
+- [실제 heap/OOS 저장 경로](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/ticket02/actual-storage.json)
+
 ## Acceptance Criteria
 
 - [x] 한 명령으로 동일한 입력과 쿼리의 일반 테이블 스캔 차이를 반복 측정할 수 있다.
@@ -176,7 +204,7 @@ SERVER_MODE·SA_MODE를 포함한 release 빌드·설치, 집중 CTest 12/12, fo
 - [x] 재현 여부, 원인 확인 여부, 호스트 간섭과 측정 한계가 구분된다.
 - [x] 재현한 회귀의 원인과 수정 범위 또는 다음 분석에 필요한 근거가 기록된다.
 - [x] 최종 성능 기준과 정확성 검증 범위를 합의한 후 spec과 의존성을 가진 구현 티켓을 작성한다.
-- [ ] 첫 spec의 제품용 수정에서 두 스캔 모두 instructions 증가 2% 이하와 정확성 검증을 충족하고, 전체 변경 리뷰를 완료한다.
+- [x] 첫 spec의 제품용 수정에서 두 스캔 모두 instructions 증가 2% 이하와 정확성 검증을 충족하고, 전체 변경 리뷰를 완료한다.
 
 ## Definition of done
 

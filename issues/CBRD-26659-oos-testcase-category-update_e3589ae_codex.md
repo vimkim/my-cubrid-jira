@@ -10,13 +10,13 @@
 
 ## AI-Generated Context
 
-> 아래는 기존 이슈, 테스트 문서와 2026-10-27 확인한 PR·CI 근거를 바탕으로 정리한 진행 기록이다. 과거 검증 결과와 최신 PR의 상태를 구분한다.
+> 아래는 기존 이슈, 테스트 문서와 2026-10-28(Asia/Seoul) 확인한 PR·CI 근거를 바탕으로 정리한 진행 기록이다. 과거 검증 결과와 최신 PR의 상태를 구분한다.
 
 ## Description
 
 이 이슈는 [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357)의 개발자 회귀 테스트 하위 작업이다. OOS(Out-of-row Overflow Storage)의 전체 값 보존뿐 아니라 실제 저장 레코드의 `HAS_OOS` 설정·해제, 파일·청크 소유권, 트랜잭션·복구와 정리 동작을 검증 대상으로 삼는다.
 
-초기 전달 이후 피드백을 여섯 검증 영역으로 정리하고 테스트를 보완하여 두 TC PR에 게시했다. **현재 두 TC PR은 OPEN, Ready for review이며, 최신 전체 CI는 shell 실패로 FAIL이다.** 테스트 작성·게시, 활성 선택의 통과와 요구사항 전체의 검증 완료는 각각 구분한다.
+초기 전달 이후 피드백을 여섯 검증 영역으로 정리하고 테스트를 보완하여 두 TC PR에 게시했다. 이후 실제 두 노드 HA 복제 TC를 추가했다. **현재 두 TC PR은 OPEN, Ready for review이며, 최신 전체 CI는 [[CI 대기: run40557885817 결과]].** 테스트 작성·게시, 활성 선택의 통과와 요구사항 전체의 검증 완료는 각각 구분한다.
 
 | 산출물 | 전체 보유 수 | 정규 실행 활성 | 비활성 또는 검증 한계 |
 | --- | ---: | ---: | --- |
@@ -24,7 +24,7 @@
 | 비공개 OOS shell 진입점 | 133개 | 69개 | 실패 또는 60초 초과 64개를 보존한다. FAIL 61개와 장시간 8개 중 5개가 중복된다. |
 | C++ 보완 테스트 함수 | 14개 | 위 SQL/shell 집계와 별도 | 기존 내부 계약 유지와 보완 함수 수다. 최신 리비전의 PASS 수를 뜻하지 않는다. |
 
-위 수는 기존 TC를 포함한 현재 보유 수이며, 이번에 새로 추가한 수가 아니다. Shell helper 자체는 TC 수에 포함하지 않는다.
+위 수는 기존 TC를 포함한 2026-10-27 스냅샷의 보유 수이며, 이번에 새로 추가한 수가 아니다. 그 뒤 비공개 shell에 HA 복제 진입점 `cbrd_26659_ha_replication` 1개를 추가했고, 이 진입점은 정규 실행에 포함된다. 별칭 `SH-001`–`SH-133`에는 들어 있지 않다. Shell helper 자체는 TC 수에 포함하지 않는다.
 
 ## Implementation
 
@@ -50,19 +50,41 @@
 - 실패·장시간 사례는 정규 발견 경로 밖에 보존하고 원본 경로·리비전·hash·실행 결과·비활성 사유를 기록한다. 비활성화를 위해 본문·assertion·expected answer를 바꾸지 않았으며, 실패를 통과 커버리지로 계산하지 않는다.
 - C++는 동등한 대체 assertion을 확인하지 못한 내부 계약을 유지하고 14개 함수를 보완했다. 기존 302개 GTest의 과거 PASS는 해당 리비전의 증거로 유지하며 최신 엔진의 전체 PASS로 확대하지 않는다.
 
+### 두 노드 HA 복제
+
+- `shell/_40_guava/cbrd_26659_ha_replication`은 shell case 하나 안에서 격리된 HA 노드 두 개(active, standby)를 구성한다. 노드마다 UTS·network·PID·IPC·mount namespace를 두고 veth로 연결한다. 그래서 별도 HA job, 두 번째 컨테이너나 SSH 없이 PR CI의 shell suite에서 실행된다. 공통 구성은 `oos_common/oos_ha_pair.sh`와 `oos_common/oos_veth_pair.pl`이다.
+- 쓰기는 master에서만 한다. standby에는 copylogdb·applylogdb 복제로만 변경이 도달한다. 단계마다 master의 barrier 행을 갱신하고, standby에서 그 값이 보일 때까지 최대 120초 polling한다. 고정 sleep은 쓰지 않는다.
+- 각 노드를 TC에 적은 독립 기대값과 따로 비교한다. 두 노드를 서로 비교하지 않는다. 노드마다 전체 값 equality와 `octet_length`, 행별 `HAS_OOS`(`SELECT_RECORD_INFO`의 `t_flags`), `SHOW HEAP OOS`의 chunk 수와 바이트를 검사한다. OOS OID는 노드마다 다를 수 있으므로 비교하지 않는다.
+- 검사 범위: INSERT, UPDATE(할당·미할당·inline에서 OOS로), rollback, DELETE; DEFAULT·`PREFER_INLINE`·`FORCE_OUTLINE` 정책; OOS `bit varying` PK와 `ON DELETE CASCADE` FK; inline `varchar` 키 대조군.
+- standby의 applylogdb를 정지한 변형 실행에서 barrier 시간 초과로 NOK가 되는 것을 확인했다.
+- 범위 밖: 장애 전환, 재기동, 이전 master 재합류; `async`·`semisync` 복제 모드(`sync`만 실행); 대량·동시 쓰기의 queue alignment; 네트워크 지연·단절과 노드 단위 host 장애. 실행 기록과 근거는 [HA 복제 증거 문서][ha]에 있다.
+
 ## Validation
 
 ### 최신 PR과 전체 CI
 
-2026-10-27 확인한 세 PR의 base는 모두 `feature/oos-merge`다. 두 TC PR의 head branch는 `tc/pr-8128`이다.
+2026-10-28 확인한 세 PR의 base는 모두 `feature/oos-merge`다. 두 TC PR의 head branch는 `tc/pr-8128`이다. 두 TC branch는 각 저장소의 최신 `feature/oos-merge`를 포함한다.
 
 | 대상 | 현재 head | 현재 상태 |
 | --- | --- | --- |
 | [Engine PR #8128](https://github.com/CUBRID/cubrid/pull/8128) | `e3589ae42d42b04eb020e1ae43e165b01d31b12a` | OPEN, draft |
 | [SQL TC PR #3688](https://github.com/CUBRID/cubrid-testcases/pull/3688) | `45e21ad799d82ebadc04a93c7d2f69517d53bf39` | OPEN, Ready for review |
-| [Shell TC PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365) | `98723aa473cde722abbc729799cf489b7f3f732f` | OPEN, Ready for review |
+| [Shell TC PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365) | `3bba57e1f89e958810013ff35c4dc642a662ec1b` | OPEN, Ready for review |
 
-**[최신 전체 CI run40472072791](https://github.com/CUBRID/cubrid/actions/runs/40472072791)는 FAIL이다.** Plan 로그에서 위 Engine·public TC·private TC 입력을 확인했다. Debug/release build, SQL과 medium은 PASS이고 shell shard 14·23·40은 실패했다. 이 갱신에서는 개별 실패 원인과 OOS TC 귀속을 분석하지 않았으므로, 세 shard 실패를 세 OOS 결함이나 세 TC 실패로 계산하지 않는다.
+Shell TC PR에는 이전 기록의 `98723aa` 이후 두 커밋이 추가됐다. `5a3c7d8ff`는 native helper가 OOS page를 page type 14로 읽도록 고쳤다. Engine `1e8701b4f`가 OOS page를 type 8 대신 14로 저장하기 때문이다. `3bba57e1f`는 HA 복제 진입점을 추가했다.
+
+**[최신 전체 CI run40557885817](https://github.com/CUBRID/cubrid/actions/runs/40557885817)는 [[CI 대기: 결과]].** 입력은 engine `e3589ae`, public TC `45e21ad`, private TC `3bba57e1f`다. [[CI 대기: suite별 결과, 활성 OOS shell 진입점과 HA 진입점의 결과]]
+
+### 2026-10-27 PR #8128 CI 경과
+
+| 실행 | 입력·결과 | 해석 |
+| --- | --- | --- |
+| [전체 run40472072791](https://github.com/CUBRID/cubrid/actions/runs/40472072791) | private `98723aa`. Build·SQL·medium PASS. Shell NOK 3건: `cbrd_26659_record_residual`, `cbrd_26659_record_layout`, `cbrd_26659_record_keys` | 세 건은 native helper의 page type 가정 때문에 실패했다. `5a3c7d8ff` 커밋 설명에 실패 메시지(`stopped page identity/type/encryption mismatch`)와 원인이 기록돼 있다. |
+| [전체 run40499093799](https://github.com/CUBRID/cubrid/actions/runs/40499093799) | private `5a3c7d8ff`. Build·SQL·medium PASS. 활성 OOS shell 진입점 69개 모두 OK. Shell NOK 1건: `_35_cherry/issue_21654_server_side_loaddb/cbrd_23280_auth` | 위 세 건은 OK가 됐다. 남은 1건은 OOS TC가 아니다. |
+| [shell run40507894187](https://github.com/CUBRID/cubrid/actions/runs/40507894187) | private `3bba57e1f`. HA 복제 진입점 OK(shard 18, 그 shard의 72건 모두 OK). Shell NOK 1건: `_35_cherry/issue_21654_server_side_loaddb/loaddb_CS/_01_utility/_17_loaddb/_enhance_1008` | 실패 1건은 OOS TC가 아니다. 직전 run에서는 OK였다. |
+| [shell 재실행 run40552401255](https://github.com/CUBRID/cubrid/actions/runs/40552401255) | 위 run의 실패 case만 재실행. `_enhance_1008` OK | Head `e3589ae`의 `gha-ci` 필수 context 다섯 개가 모두 pass가 됐다. 그러나 SQL·medium은 private `5a3c7d8ff`, shell은 `3bba57e1f`로 입력이 달라 동일 입력 전체 PASS로 세지 않는다. |
+
+OOS 외 실패 두 건(`cbrd_23280_auth`, `_enhance_1008`)은 같은 engine에서 서로 다른 run에서는 OK였다. 간헐 실패로 보이지만 원인은 분석하지 않았다.
 
 ### 상세 보고서가 보존하는 이전 실행 근거
 
@@ -75,10 +97,11 @@
 
 ## Remaining Work
 
-- 최신 전체 CI의 실패 shard에서 개별 실패를 확인하고 원인·처리 범위를 정리한다. 과거 활성 OOS 69개 PASS로 최신 실패를 덮지 않는다.
+- [[CI 대기: run40557885817 결과에 따라 최신 전체 CI 항목을 갱신]]
 - 비활성 SQL 3개·shell 64개의 실패 원인·후속 수정 연결과 장시간 사례의 별도 실행 경로를 정리한다. 모든 실패를 엔진 결함으로 일괄 확정하지 않는다.
 - 지원 연산별 적용 가능한 `HAS_OOS` 상태, 독립 기대값, 실제 실행 phase와 C++ 필수 선택을 [연산 요구 목록][operations] 및 [C++ 인벤토리][cpp]와 최종 대조한다. 파티션 소유권, 정책 roundtrip, 물리 target, notification·회수 등 남은 항목의 완료를 활성 선택 통과만으로 선언하지 않는다.
-- 큰 키 종합 선택 `SH-073`은 과거 PASS 관측이 있지만 381.773초로 비활성이다. 기능 결과로 성능 저하가 없다고 판단하지 않으며 성능 비교와 HA Work463은 계속 보류한다.
+- 큰 키 종합 선택 `SH-073`은 과거 PASS 관측이 있지만 381.773초로 비활성이다. 기능 결과로 성능 저하가 없다고 판단하지 않으며 성능 비교는 계속 보류한다.
+- HA는 정상 복제 경로만 검증했다. 장애 전환·재기동·재합류, `async`·`semisync` 모드, 대량·동시 쓰기의 queue alignment는 미검증이며 다음 범위를 정해야 한다.
 - QA·동료 리뷰에서 전달 범위와 잔여 공백을 확인한다. 두 TC PR이 OPEN이므로 TC Merge Gate의 두 TC PR 병합 또는 close 조건은 아직 충족하지 못했다. TC PR의 병합·close는 동료가 결정한다.
 
 ## Acceptance Criteria
@@ -95,8 +118,10 @@
 - [CBRD-26659 문서 목록][index]
 - [연산·상태별 요구사항과 후속 검증 지도][operations]
 - [기존 C++ 내부 계약 유지·검증 범위][cpp]
+- [두 노드 OOS HA 복제 TC와 PR CI 실행 기록][ha]
 
 [coverage]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/CBRD-26659-feedback-testcase-coverage-report_20261027_codex.md
 [index]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/README.md
 [operations]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-operation-inventory-work456-20261021.md
 [cpp]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-cpp-inventory-work456-20261021.md
+[ha]: https://github.com/vimkim/my-cubrid-docs/blob/247c580eee59261615652903aa385a881542e56c/cbrd-26659/ci-replan/ha-replication.md

@@ -127,7 +127,7 @@ raw artifact root: `/mnt/nvme/data-5/tmp/CBRD-27785-20261027`. SQL, 원시 count
 
 두 번째 실험은 첫 실험에 비해 행별 prefetch/dispatch 호출 경로를 우회한다. 원래 SQL과 입력의 결과·문장 수는 계속 일치했고 instructions 표본도 안정적이었다. 비 OOS 읽기의 OOS 대응 행 분기 및 속성 reader 비용이 관찰한 회귀의 주요 부분을 설명한다. 다만 개별 함수, scratch 크기, inlining과 코드 배치 각각의 기여분을 이 두 실험만으로 분해하지 않는다.
 
-실험은 기준 reader를 복사한 진단용 코드다. malformed 입력, 모든 type·schema 표현, OOS/pending·MVCC 경로를 검증한 제품 패치가 아니다. 패치와 소스·설치 파일 hash를 artifact root에 보존하고, 실험 후 원래 소스와 설치로 복원한다. 실제 구현은 중복 코드를 그대로 채택하지 않고 기존 검증·소유권 계약을 보존해야 한다. 제품용 성능 개선과 정확성 검증은 아직 완료하지 않았다.
+실험은 기준 reader를 복사한 진단용 코드다. malformed 입력, 모든 type·schema 표현, OOS/pending·MVCC 경로를 검증한 제품 패치가 아니다. 패치와 소스·설치 파일 hash를 artifact root에 보존하고, 실험 후 원래 소스로 복원하여 다시 빌드·설치했다. 복원 후 1회 스캔 비교에서 증가분이 +5.14% / +8.90%로 돌아온 것도 확인했다. 진단용 코드는 작업 브랜치와 설치에 남아 있지 않다. 실제 구현은 중복 코드를 그대로 채택하지 않고 기존 검증·소유권 계약을 보존해야 한다. 제품용 성능 개선과 정확성 검증은 아직 완료하지 않았다.
 
 - [직접 inline 읽기 통제 실험](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/diagnostic-outer-vs-base.json)
 - 진단 패치: `diagnostic-inline-reader.patch`, `diagnostic-outer-inline.patch`.
@@ -144,7 +144,7 @@ CBRD-27230의 UPDATE 재사용, OOS 설정과 대용량 I/O 검증은 후속 범
 - [x] 한 명령으로 동일한 입력과 쿼리의 일반 테이블 스캔 차이를 반복 측정할 수 있다.
 - [x] 보고 당시 head, merge-base, 현재 head의 비교 결과와 정확성 검사 결과가 보존된다.
 - [x] 재현 여부, 원인 확인 여부, 호스트 간섭과 측정 한계가 구분된다.
-- [ ] 재현한 회귀의 원인과 수정 범위 또는 다음 분석에 필요한 근거가 기록된다.
+- [x] 재현한 회귀의 원인과 수정 범위 또는 다음 분석에 필요한 근거가 기록된다.
 - [ ] 최종 성능 기준과 정확성 검증 범위를 합의한 후 spec과 의존성을 가진 구현 티켓을 작성한다.
 
 ## Definition of done

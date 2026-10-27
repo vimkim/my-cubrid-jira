@@ -11,6 +11,12 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
   current-skill rewrites against CUBRID `f6cac312`, with per-issue review,
   original-claim accounting, shared scope and description-publication status.
 
+## Proposed issue updates
+
+- [CBRD-26659 OOS testcase categories, 2026-10-27](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
+  proposed description with six coverage categories, SQL/SH/UT aliases,
+  detailed Markdown references and revision-specific CI results; not uploaded.
+
 ## Upload to Jira
 
 Use the `upload` just recipe to interactively upload a Markdown file to Jira:

@@ -55,7 +55,7 @@ OOS chunk 삭제(`oos_delete_chain`, `src/storage/oos_file.cpp`)는 chunk 마다
 
 따라서 현실적인 경로는 1, 2 의 오류 시 abort 와, 같은 sysop 이 끝나기 전에 서버가 죽어 restart recovery 가 그 sysop 을 되돌리는 경우다.
 
-**PR 리뷰어가 든 발생 경로.** 2026-10-27 PR #7990 리뷰어(shparkcubrid)가 인라인 코멘트(https://github.com/CUBRID/cubrid/pull/7990#discussion_r4385247875, review 5662427700)에서 이 결함을 블로킹으로 지적했다. 리뷰어는 코드로만 확인했다고 적었다. 리뷰어가 든 경로와 이 이슈의 판단은 다음과 같다.
+**PR 리뷰어가 든 발생 경로.** 2026-10-27 PR #7990 리뷰어(shparkcubrid)가 review 5662427700 의 인라인 코멘트 https://github.com/CUBRID/cubrid/pull/7990#discussion_r4385247875 에서 이 결함을 블로킹으로 지적했다. 리뷰어는 코드로만 확인했다고 적었다. 리뷰어가 든 경로와 이 이슈의 판단은 다음과 같다.
 
 | 리뷰어가 든 경로 | 이 이슈의 대응 | 판단 | 근거 |
 |---|---|---|---|
@@ -307,7 +307,7 @@ Assertion `slot_p->offset_to_record == SPAGE_EMPTY_OFFSET' failed.
 ## Additional Information
 
 - 발견 경위: PR #7990 Greptile 리뷰 https://github.com/CUBRID/cubrid/pull/7990#discussion_r4380243533
-- 리뷰어 지적: PR #7990 review 5662427700(shparkcubrid, CHANGES_REQUESTED, 2026-10-27, 대상 commit `4408135c0`)의 인라인 코멘트 https://github.com/CUBRID/cubrid/pull/7990#discussion_r4385247875. 리뷰어는 Greptile 지적이 맞다고 보고, 코드로만 확인한 블로킹 항목으로 적었다. 리뷰어가 든 발생 경로 중 SA 모드와 in-place update 는 이 판에서 해당하지 않는다고 판단했고, in-place update 경로는 이 판에서 처음 분석했다("무엇이 문제인가" 참조).
+- 리뷰어 지적: PR #7990 review 5662427700(shparkcubrid, CHANGES_REQUESTED, 2026-10-27, 대상 commit `4408135c0`)의 인라인 코멘트 https://github.com/CUBRID/cubrid/pull/7990#discussion_r4385247875 에서 지적했다. 리뷰어는 Greptile 지적이 맞다고 보고, 코드로만 확인한 블로킹 항목으로 적었다. 리뷰어가 든 발생 경로 중 SA 모드와 in-place update 는 이 판에서 해당하지 않는다고 판단했고, in-place update 경로는 이 판에서 처음 분석했다("무엇이 문제인가" 참조).
 - 분리 경위: PR #7990 작성자의 결정으로 이 결함을 PR #7990 범위에서 분리해 이 이슈에서 다룬다(2026-10-27). PR #7990 에는 엔진 변경을 넣지 않았고, 회귀 테스트는 Repro 의 패치로 남겼다.
 - 상위 이슈: CBRD-26978 (OOS TODO 추적)
 - SQL 수준 재현 시도: `db_serial` comment 로 eager 경로를 SERVER_MODE 에서 일으키려 했으나, comment 1024 바이트 제한으로 OOS 대상이 될 수 없음을 확인했다. vacuum 오류 경로를 SQL 로 결정적으로 일으키는 방법은 아직 없다(오류 주입 필요).

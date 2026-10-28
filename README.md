@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-26835 OOS 병합 전 회귀 처리 요약, 2026-10-28](issues/CBRD-26835-oos-regression-brief_38093ea_codex.md):
+  develop 병합 전 정합성·성능 회귀의 분석·수정·재검증 범위와 한계를 간략히 정리한다.
 - [CBRD-26198 OOS 사전 조사 요약, 2026-10-28](issues/CBRD-26198-oos-survey-brief_38093ea_codex.md):
   타 DBMS 조사와 CUBRID 코드 분석·개념 설계의 범위를 정리하고 제품 개발과 구분한다.
 - [CBRD-26584 OOS M1 요약, 2026-10-28](issues/CBRD-26584-oos-m1-brief_38093ea_codex.md):

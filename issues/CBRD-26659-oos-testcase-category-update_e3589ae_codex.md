@@ -137,8 +137,8 @@ OOS 외 실패 두 건(`cbrd_23280_auth`, `_enhance_1008`)은 같은 engine에�
 - [두 노드 OOS HA 복제 TC와 PR CI 실행 기록][ha]
 - [OOS HA 장애 전환·재합류·failback TC와 PR CI 실행 기록][ha-failover]
 
-[coverage]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/CBRD-26659-feedback-testcase-coverage-report_20261027_codex.md
-[index]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/README.md
+[coverage]: https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-26659/CBRD-26659-feedback-testcase-coverage-report_20261027_codex.md
+[index]: https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-26659/README.md
 [operations]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-operation-inventory-work456-20261021.md
 [cpp]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-cpp-inventory-work456-20261021.md
 [ha]: https://github.com/vimkim/my-cubrid-docs/blob/58a2b8d8a63f0126463d22dacb900cdc827bf778/cbrd-26659/ci-replan/ha-replication.md

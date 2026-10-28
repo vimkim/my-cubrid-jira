@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-26659 공유 자료 링크 검증, 2026-10-28](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
+  개인 열람 링크를 제거한 TC 대응표와 문서 목록을 참조한다. 실행 결과와 검증 범위는 유지한다.
 - CBRD-27785·CBRD-27788·CBRD-27791 병합 전 성능 검토 배경과 관계 정리, 2026-10-28:
   [27785](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md)에 공통 배경과 역할을 기록하고,
   [27788](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md)·[27791](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md)의 수행 이유에 연결한다.

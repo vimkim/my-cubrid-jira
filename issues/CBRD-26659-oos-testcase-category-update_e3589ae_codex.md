@@ -81,11 +81,11 @@
 | --- | --- | --- |
 | [Engine PR #8128](https://github.com/CUBRID/cubrid/pull/8128) | `e3589ae42d42b04eb020e1ae43e165b01d31b12a` | OPEN, draft |
 | [SQL TC PR #3688](https://github.com/CUBRID/cubrid-testcases/pull/3688) | `45e21ad799d82ebadc04a93c7d2f69517d53bf39` | OPEN, Ready for review |
-| [Shell TC PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365) | `479035a45f06545db1974e1369e88000fb98a89a` | OPEN, Ready for review |
+| [Shell TC PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365) | `4ef07ee34219a7dce7e5c5d84a2f6c6031b10ec3` | OPEN, Ready for review |
 
-Shell TC PR에는 이전 기록의 `98723aa` 이후 네 커밋이 추가됐다. `5a3c7d8ff`는 native helper가 OOS page를 page type 14로 읽도록 고쳤다. Engine `1e8701b4f`가 OOS page를 type 8 대신 14로 저장하기 때문이다. `3bba57e1f`는 HA 복제 진입점을 추가했다. `c0400c8f2`는 HA 장애 전환 진입점을 추가하고, HA 복제 진입점의 검사 함수를 공용 파일로 옮겼다. `479035a45`는 여러 값 복제 진입점 두 개와 비활성 재현 진입점 두 개를 추가하고 harness를 바꿨다.
+Shell TC PR에는 이전 기록의 `98723aa` 이후 다섯 커밋이 추가됐다. `5a3c7d8ff`는 native helper가 OOS page를 page type 14로 읽도록 고쳤다. Engine `1e8701b4f`가 OOS page를 type 8 대신 14로 저장하기 때문이다. `3bba57e1f`는 HA 복제 진입점을 추가했다. `c0400c8f2`는 HA 장애 전환 진입점을 추가하고, HA 복제 진입점의 검사 함수를 공용 파일로 옮겼다. `479035a45`는 여러 값 복제 진입점 두 개와 비활성 재현 진입점 두 개를 추가하고 harness를 바꿨다. `4ef07ee34`는 CI 뒤에 barrier 함수의 주석만 고쳤다(barrier를 다시 보내는 이유).
 
-**[최신 전체 CI run40643373124](https://github.com/CUBRID/cubrid/actions/runs/40643373124)는 build·SQL·shell·medium 모두 PASS다.** 입력은 engine `e3589ae`, public TC `45e21ad`, private TC `479035a45`다. 2026-10-28 `/run all`로 실행했고 재실행 없이 첫 시도에서 통과했다. head `e3589ae`의 `gha-ci` context 다섯 개가 모두 이 run을 가리킨다.
+**[최신 전체 CI run40643373124](https://github.com/CUBRID/cubrid/actions/runs/40643373124)는 build·SQL·shell·medium 모두 PASS다.** 입력은 engine `e3589ae`, public TC `45e21ad`, private TC `479035a45`다. 현재 PR head `4ef07ee34`와는 주석 한 곳만 다르다. 2026-10-28 `/run all`로 실행했고 재실행 없이 첫 시도에서 통과했다. head `e3589ae`의 `gha-ci` context 다섯 개가 모두 이 run을 가리킨다.
 
 - SQL: 17,653건 성공, 실패 0건이다.
 - Shell: shard 50개에서 3,533건 OK, NOK 0건, skip 30건이다. 활성 OOS shell 진입점 69개와 HA 진입점 4개를 합한 73개가 모두 OK다. HA 진입점은 shard 24(failover, 약 50초), 08(replication), 46(queue), 01(async)에서 실행됐다.
@@ -156,6 +156,6 @@ OOS 외 실패 두 건(`cbrd_23280_auth`, `_enhance_1008`)은 같은 engine에�
 [index]: https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-26659/README.md
 [operations]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-operation-inventory-work456-20261021.md
 [cpp]: https://github.com/vimkim/my-cubrid-docs/blob/343344b44377fb62604d104a5eac84d07210c45a/cbrd-26659/supplement-cpp-inventory-work456-20261021.md
-[ha]: https://github.com/vimkim/my-cubrid-docs/blob/6af5beb43013cc4bb3e9e99afef4b29a949252df/cbrd-26659/ci-replan/ha-replication.md
-[ha-failover]: https://github.com/vimkim/my-cubrid-docs/blob/6af5beb43013cc4bb3e9e99afef4b29a949252df/cbrd-26659/ci-replan/ha-failover.md
-[ha-queue]: https://github.com/vimkim/my-cubrid-docs/blob/6af5beb43013cc4bb3e9e99afef4b29a949252df/cbrd-26659/ci-replan/ha-queue.md
+[ha]: https://github.com/vimkim/my-cubrid-docs/blob/5895c7f9241eec3523dd6103325811935f6e445a/cbrd-26659/ci-replan/ha-replication.md
+[ha-failover]: https://github.com/vimkim/my-cubrid-docs/blob/5895c7f9241eec3523dd6103325811935f6e445a/cbrd-26659/ci-replan/ha-failover.md
+[ha-queue]: https://github.com/vimkim/my-cubrid-docs/blob/5895c7f9241eec3523dd6103325811935f6e445a/cbrd-26659/ci-replan/ha-queue.md

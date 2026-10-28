@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-26584 OOS M1 요약, 2026-10-28](issues/CBRD-26584-oos-m1-brief_38093ea_codex.md):
+  기본 기능 검증의 목표·범위와 M2로 넘긴 운영 기능을 간략히 정리한다.
 - [CBRD-26583 OOS M2 요약, 2026-10-28](issues/CBRD-26583-oos-m2-brief_38093ea_codex.md):
   목표, 범위와 한계를 간략히 정리하고 세부 진행 상태는 JIRA 하위 작업에서 관리한다.
 - [CBRD-27791 OOS batch read 검토, 2026-10-28](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md):

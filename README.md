@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27816 일반 UPDATE 잔여 비용 후속, 2026-10-28](issues/CBRD-27816-ordinary-update-residual-cost_02df4d9_codex.md):
+  CBRD-26978의 Sub-task로 생성하고 CBRD-27785와 relates to로 연결했다. 이번 편입에서 관측된 약 +5%를 수용한다는 작성자 결정과 기존 +2% 미달 결과를 구분한다. 후속 로컬 추적은 Work 571이다.
 - [CBRD-27785 PR7990 성능 수락 기준 반영, 2026-10-28](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md):
   1·3번 우선·잠정 약 +2% 목표, PR8299 선반영과 현재 버전의 이득·손해 공유를 AC로 기록한다. 2번은 threshold를 기존 overflow와 맞춘 뒤 후속 재측정한다.
   기존 두 SELECT의 +2% 검증 완료는 보존하고 현재 판정과 구분한다. 사용자 승인 후 JIRA 설명에 반영하고 재조회로 검증했다.

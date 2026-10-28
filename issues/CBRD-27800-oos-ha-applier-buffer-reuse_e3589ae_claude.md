@@ -121,4 +121,4 @@ slave의 모든 행이 master와 같다. 최소 재현의 slave 조회 결과는
 - 관련 코드: `LA_MAX_UNFLUSHED_REPL_ITEMS`(`log_applier.c:85`), pool 초기화(`log_applier.c:9336`), `la_assign_recdes_from_pool`, `la_flush_repl_items`의 `pending_oos_flush` 조건(`log_applier.c:5656`), `la_apply_oos_insert_log`의 `pending_oos_flush` 설정(`log_applier.c:6366`).
 - 원인 설명은 코드 읽기와 위 실행 결과를 맞춘 것이다. 버퍼 덮어쓰기를 디버거로 직접 관찰하지는 않았다.
 - 같은 TC 묶음의 활성 TC(`cbrd_26659_ha_queue`, `cbrd_26659_ha_async`)는 barrier 사이 항목을 200개 아래로 두어 이 조건을 피한다.
-- 함께 찾은 별도 문제: 복합 기본 키 테이블에서 OOS 값이 있는 행을 UPDATE하면 slave의 applylogdb가 assertion으로 반복 종료한다. 원인과 조건이 달라 별도 이슈로 작성한다.
+- 함께 찾은 별도 문제: 복합 기본 키 테이블에서 OOS 값이 있는 행을 UPDATE하면 slave의 applylogdb가 assertion으로 반복 종료한다. 원인과 조건이 달라 [CBRD-27801](http://jira.cubrid.org/browse/CBRD-27801)에서 다룬다.

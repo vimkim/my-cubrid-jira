@@ -129,4 +129,4 @@ slave의 `tag`가 1초 안팎에 `y`가 되고, applylogdb가 계속 실행된�
 ## Additional Information
 
 - 같은 TC 묶음의 활성 TC(`cbrd_26659_ha_queue`, `cbrd_26659_ha_async`)는 파티션 테이블의 기본 키를 파티션 키 하나로 두어 이 조건을 피한다.
-- 함께 찾은 별도 문제: applylogdb가 flush를 미룬 동안 record buffer를 재사용해, slave에 다른 행의 레코드를 OOS 값으로 저장한다. 원인과 조건이 달라 별도 이슈로 작성한다.
+- 함께 찾은 별도 문제: applylogdb가 flush를 미룬 동안 record buffer를 재사용해, slave에 다른 행의 레코드를 OOS 값으로 저장한다. 원인과 조건이 달라 [CBRD-27800](http://jira.cubrid.org/browse/CBRD-27800)에서 다룬다.

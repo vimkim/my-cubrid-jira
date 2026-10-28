@@ -1,4 +1,4 @@
-# [OOS] HA applylogdb가 flush를 미룬 동안 record buffer를 재사용해 slave에 다른 행의 레코드를 OOS 값으로 저장한다
+# [OOS] [TODO] [bug] HA applylogdb가 flush를 미룬 동안 record buffer를 재사용해 slave에 다른 행의 레코드를 OOS 값으로 저장한다
 
 ## Issue Triage
 
@@ -92,7 +92,7 @@ SELECT id, OCTET_LENGTH(a), OCTET_LENGTH(b) FROM t2 WHERE id = 1;
 
 `LEVEL <= 66`이면 정상이다.
 
-같은 문제는 `cubrid-testcases-private-ex`의 `tc/pr-8128`에 있는 비활성 TC로도 재현된다(커밋 `479035a45`, PR #4365에 반영 예정). TC는 120행 INSERT ... SELECT를 쓴다. 다른 TC에 영향을 주지 않도록 실행 전에 원래 위치로 옮긴다.
+같은 문제는 `cubrid-testcases-private-ex`의 `tc/pr-8128`에 있는 비활성 TC로도 재현된다([커밋 `479035a45`](https://github.com/CUBRID/cubrid-testcases-private-ex/commit/479035a45f06545db1974e1369e88000fb98a89a), [PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365)). TC는 120행 INSERT ... SELECT를 쓴다. 다른 TC에 영향을 주지 않도록 실행 전에 원래 위치로 옮긴다.
 
 ```sh
 cd cubrid-testcases-private-ex

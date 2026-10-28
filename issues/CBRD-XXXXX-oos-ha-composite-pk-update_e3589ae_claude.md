@@ -1,4 +1,4 @@
-# [OOS] 복합 기본 키 테이블에서 OOS 값이 있는 행을 UPDATE하면 HA slave의 applylogdb가 assertion으로 반복 종료한다
+# [OOS] [TODO] [bug] 복합 기본 키 테이블에서 OOS 값이 있는 행을 UPDATE하면 HA slave의 applylogdb가 assertion으로 반복 종료한다
 
 ## Issue Triage
 
@@ -100,7 +100,7 @@ UPDATE t SET tag = 'y' WHERE id = 1;
 
 slave에서 `SELECT tag FROM t WHERE id = 1;`의 결과와 slave의 `$CUBRID/log/*applylogdb*.err`, `$CUBRID/log/coredump`를 확인한다.
 
-같은 문제는 `cubrid-testcases-private-ex`의 `tc/pr-8128`에 있는 비활성 TC로도 재현된다(커밋 `479035a45`, PR #4365에 반영 예정).
+같은 문제는 `cubrid-testcases-private-ex`의 `tc/pr-8128`에 있는 비활성 TC로도 재현된다([커밋 `479035a45`](https://github.com/CUBRID/cubrid-testcases-private-ex/commit/479035a45f06545db1974e1369e88000fb98a89a), [PR #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365)).
 
 ```sh
 cd cubrid-testcases-private-ex

@@ -21,8 +21,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
   기본 기능 검증의 목표·범위와 M2로 넘긴 운영 기능을 간략히 정리한다.
 - [CBRD-26583 OOS M2 요약, 2026-10-28](issues/CBRD-26583-oos-m2-brief_38093ea_codex.md):
   목표, 범위와 한계를 간략히 정리하고 세부 진행 상태는 JIRA 하위 작업에서 관리한다.
-- [CBRD-27791 OOS batch read 검토, 2026-10-28](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md):
-  현재 읽기 동작, SQL 성능 저하, 원인 가설과 실제 엔진에서 검증할 개선 방법을 순서대로 설명한다.
+- [CBRD-27791 OOS 큰 값 조회의 읽기 지역성 개선, 2026-10-28](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md):
+  제한된 참조 수집·주소순 읽기·선행 읽기·요청 병합의 후보와 검증 순서, 성능 회귀 추적과의 관계 및 저장 배치 변경의 별도 범위를 설명한다.
 - [CBRD-27788 최신 PR #7990 OOS SELECT 실측, 2026-10-27](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md):
   정확한 revision과 실제 저장 진단, 기본 200개 표본과 저장장치 읽기 보조 24개 표본.
   2026-10-28 Conclusion과 Limitation 보완: 조회별 이득·비용, 후속 읽기 진단과 일반화·검증의 한계.

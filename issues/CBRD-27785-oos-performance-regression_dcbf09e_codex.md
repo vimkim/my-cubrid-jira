@@ -10,6 +10,18 @@
 
 **이슈 수행 방안**: 실제 저장 위치를 확인한 뒤 1·3번의 CRUD를 같은 조건에서 비교한다. 확인된 성능 저하의 원인을 분석하고 개선한다. 1번의 SELECT 스캔 수정·검증은 완료했으며, 나머지 작업의 구현과 최종 판정 기준은 ANALYSIS에서 정한다.
 
+### 진행 배경 및 관련 이슈
+
+`feature/oos-merge`를 `develop`에 병합하는 [PR #7990](https://github.com/CUBRID/cubrid/pull/7990)의 검토 과정에서, 4팀 박세훈 팀장님(shparkcubrid)이 [성능 저하 측정 결과](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6434778190)를 공유하고 최종 병합 전에 성능 점검과 OOS의 이점 입증을 요청하셨다.
+
+이에 성능 저하 원인 조사와 OOS의 이득·비용 측정을 진행했으며, 측정과 후속 진단에서 확인한 읽기 지역성 개선 가능성을 바탕으로 batch read를 후속 작업 후보로 정리했다. 각 이슈의 역할은 다음과 같다.
+
+- **CBRD-27785(본 이슈)**: heap → heap 및 overflow → OOS의 CRUD 성능 저하 원인을 조사하고 개선 결과와 남은 비용을 추적·판정한다.
+- **[CBRD-27788](https://jira.cubrid.org/browse/CBRD-27788)**: OOS의 작은 컬럼 조회 이득과 큰 값 조회 비용을 측정하고, 성능 검토를 위한 실측·재현 근거를 보존한다.
+- **[CBRD-27791](https://jira.cubrid.org/browse/CBRD-27791)**: 측정과 후속 진단에서 도출한 batch read 등 읽기 지역성 개선 후보를 분석하고 실제 엔진에서 검증한다.
+
+batch read는 후속 개선 후보로 관리하며, 실제 엔진에서의 개선 효과는 추가 검증이 필요하다. 다른 성능 저하 원인도 계속 조사 중이다. 세 이슈는 서로 `관련 있음`으로 연결하며, batch read의 병합 전 필수 완료 여부는 별도 판단한다.
+
 ---
 
 ## AI-Generated Context

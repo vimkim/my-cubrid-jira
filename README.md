@@ -13,6 +13,10 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- CBRD-27785·CBRD-27788·CBRD-27791 병합 전 성능 검토 배경과 관계 정리, 2026-10-28:
+  [27785](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md)에 공통 배경과 역할을 기록하고,
+  [27788](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md)·[27791](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md)의 수행 이유에 연결한다.
+  batch read는 후속 개선 후보로 관리하며 다른 성능 저하 원인 조사는 계속한다.
 - [CBRD-26835 OOS 병합 전 회귀 처리 요약, 2026-10-28](issues/CBRD-26835-oos-regression-brief_38093ea_codex.md):
   develop 병합 전 정합성·성능 회귀의 분석·수정·재검증 범위와 한계를 간략히 정리한다.
 - [CBRD-26198 OOS 사전 조사 요약, 2026-10-28](issues/CBRD-26198-oos-survey-brief_38093ea_codex.md):

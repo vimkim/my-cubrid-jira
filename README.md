@@ -13,6 +13,9 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27785 PR7990 성능 수락 기준 개정안, 2026-10-28](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md):
+  리뷰어의 일반 테이블·기본 설정4–16KB 전체 읽기 비회귀, PR8299 선반영, 현재 버전의 이득·손해 공유를 AC로 기록한다.
+  기존 두 SELECT의 +2% 검증 완료는 보존하고 최신 수락 판정과 구분한다. 게시 전 개정안이다.
 - [CBRD-26659 공유 자료 링크 검증, 2026-10-28](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
   개인 열람 링크를 제거한 TC 대응표와 문서 목록을 참조한다. 실행 결과와 검증 범위는 유지한다.
 - CBRD-27785·CBRD-27788·CBRD-27791 병합 전 성능 검토 배경과 관계 정리, 2026-10-28:

@@ -113,10 +113,10 @@ PostgreSQL과 같은 취지로, heap에 남는 record를 한 page에 4개 담을
 아래 자료에 원본 성능 보고, 정확한 비교 revision, 재현 방법, 통제 실험, 구현과 검증 기록을 보존한다.
 
 - [원본 리뷰어의 성능 비교 보고](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6434778190): 독립 실험은 보고된 조건을 토대로 재구성했으며, 리뷰어의 원본 SQL·하네스를 그대로 재실행한 결과는 아니다.
-- [분석·재현·구현·검증 상세 문서](https://dev2.baboon-rudd.ts.net:8443/home/vimkim/gh/my-cubrid-docs/cbrd-27785/CBRD-27785-oos-read-performance_bcb900d_codex.md)
-- [최종 성능 측정과 실행 파일 검증](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/review-fixes/review-fixes-verdict.json)
-- [실제 heap·overflow·OOS 저장 상태](https://dev2.baboon-rudd.ts.net:8443/mnt/nvme/data-5/tmp/CBRD-27785-20261027/ticket02/actual-storage.json)
-- [수용 record 수와 unfill space를 설명하는 OOS 사양](https://dev2.baboon-rudd.ts.net:8443/home/vimkim/gh/cubrid-oos-context/OOS-CONTEXT.md)
+- [분석·재현·구현·검증 상세 문서](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27785/CBRD-27785-oos-read-performance_bcb900d_codex.md)
+- 최종 성능 측정과 실행 파일 검증: 위 공개 상세 문서에 정순·역순의 CPU 명령 수 증가율, 정확성 검사 결과와 측정 하네스·실행 파일의 SHA-256을 기록했다. 핵심 성능·정확성 결과는 본문의 `Current Results`에도 보존한다.
+- 실제 heap·overflow·OOS 저장 상태: 비교한 세 설치 모두 heap에 200,000행, overflow에 0행이 저장됐다. OOS 적용본에는 연결된 OOS 파일이 없음을 확인했으며, 위 공개 상세 문서에 저장 진단 방법과 결과를 기록했다.
+- [수용 record 수와 unfill space를 설명하는 OOS 사양](https://github.com/vimkim/cubrid-oos-context/blob/main/OOS-CONTEXT.md)
 
 기존 분석의 수정 전 feature revision은 `dcbf09e4f7fd02ff9c8fc6493ec8887fc2919d67`, 검토할 제품 패치는 `bcb900d1696756a120ec0a2b7885c212f71ebc07`이다. 정확한 빌드 revision과 게시용 패치의 관계는 상세 문서에 기록한다.
 

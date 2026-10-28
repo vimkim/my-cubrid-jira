@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-26198 OOS 사전 조사 요약, 2026-10-28](issues/CBRD-26198-oos-survey-brief_38093ea_codex.md):
+  타 DBMS 조사와 CUBRID 코드 분석·개념 설계의 범위를 정리하고 제품 개발과 구분한다.
 - [CBRD-26584 OOS M1 요약, 2026-10-28](issues/CBRD-26584-oos-m1-brief_38093ea_codex.md):
   기본 기능 검증의 목표·범위와 M2로 넘긴 운영 기능을 간략히 정리한다.
 - [CBRD-26583 OOS M2 요약, 2026-10-28](issues/CBRD-26583-oos-m2-brief_38093ea_codex.md):

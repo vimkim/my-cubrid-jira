@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-26583 OOS M2 요약, 2026-10-28](issues/CBRD-26583-oos-m2-brief_38093ea_codex.md):
+  목표, 범위와 한계를 간략히 정리하고 세부 진행 상태는 JIRA 하위 작업에서 관리한다.
 - [CBRD-27791 OOS batch read 검토, 2026-10-28](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md):
   현재 읽기 동작, SQL 성능 저하, 원인 가설과 실제 엔진에서 검증할 개선 방법을 순서대로 설명한다.
 - [CBRD-27788 최신 PR #7990 OOS SELECT 실측, 2026-10-27](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md):

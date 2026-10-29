@@ -13,8 +13,9 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
-- [CBRD-27724 페이지 버퍼 부하 벤치마크 결과와 결론, 2026-10-29](issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md):
-  세 부하의 A/B 각 3쌍과 단회 교착 탐지 주기 개입을 정리한다. 객체 잠금 대기 증폭의 기여와 미확인 감속 시작 원인을 구분한다.
+- [CBRD-27724 페이지 버퍼 부하 실험의 설계·해석과 결론, 2026-10-29](issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md):
+  처음 읽는 독자를 위한 논문형 실험 보고서이다. 세 부하를 선택한 이유, 실제 SQL과 통제 조건, 시간별 감속, 객체 잠금 대기 증폭 가설과 단회 개입을 연결한다.
+  OS 파일 캐시 해석, 스캔 전체 적중률의 한계와 미확인 감속 시작 원인을 구분한다.
   [측정값과 검산 스크립트](reviews/CBRD-27724-benchmark/)를 함께 보존한다. JIRA 본문에 반영하고 재조회로 확인했다.
 - [CBRD-27816 일반 UPDATE 잔여 비용 후속, 2026-10-28](issues/CBRD-27816-ordinary-update-residual-cost_02df4d9_codex.md):
   CBRD-26978의 Sub-task로 생성하고 CBRD-27785와 relates to로 연결했다. 이번 편입에서 관측된 약 +5%를 수용한다는 작성자 결정과 기존 +2% 미달 결과를 구분한다. 후속 로컬 추적은 Work 571이다.

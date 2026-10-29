@@ -43,6 +43,10 @@ for family in ("capacity", "tpcc", "scan"):
                 latencies.append(measurement["p99_ms"])
         drops.append((rates[0] - rates[1]) / rates[0] * 100)
         p99_changes.append((latencies[1] - latencies[0]) / latencies[0] * 100)
+        if family == "tpcc":
+            assert f"| {pair} | {rates[0]:,.3f} | {rates[1]:,.3f} | {latencies[0]:g} | {latencies[1]:g} |" in report
+        else:
+            assert f"| {pair} | {rates[0]:,.2f} | {rates[1]:,.2f} | {latencies[0]:.2f} | {latencies[1]:.2f} |" in report
     assert f"{statistics.median(drops):.4f}%" in report
     assert f"{min(drops):.4f}~{max(drops):.4f}%" in report
     if family != "tpcc":
@@ -67,6 +71,42 @@ hits = counts["ordinary_hit"] + counts["simple_hit"]
 misses = counts["ordinary_miss"] + counts["simple_miss"]
 assert math.isclose(hits / (hits + misses) * 100, diagnostic["actual_hit_pct"])
 assert f"{diagnostic['actual_hit_pct']:.4f}%" in report
+
+explanation = data["explanatory_evidence"]
+for item in explanation["diagnostic_residency"].values():
+    counts = item["counts"]
+    assert counts["requests"] == sum(value for key, value in counts.items() if key != "requests")
+    hits = counts["ordinary_hit"] + counts["simple_hit"]
+    misses = counts["ordinary_miss"] + counts["simple_miss"]
+    assert math.isclose(hits / (hits + misses) * 100, item["actual_hit_pct"])
+    assert f"{item['actual_hit_pct']:.4f}%" in report
+
+for pair in range(1, 4):
+    io = explanation["capacity_io"][f"capacity-{pair}-B"]
+    assert io["owned_process_read_bytes_all_devices_estimate"] == 0
+    assert io["io_full_psi_avg10"] == 0
+
+for index, control_minute in enumerate(explanation["tpcc_control_minutes"]):
+    baseline_minutes = [minutes[index] for minutes in explanation["tpcc_baseline_minutes"].values()]
+    start = control_minute["start_elapsed_seconds"]
+    assert start == index * 60
+    assert all(minute["start_elapsed_seconds"] == start for minute in baseline_minutes)
+    baseline_rate = statistics.median(minute["neworder_nonrollback_per_s"] for minute in baseline_minutes)
+    baseline_p99 = statistics.median(minute["neworder_p99_ms"] for minute in baseline_minutes)
+    control_rate = control_minute["new_order_nonrollback_per_second"]
+    control_p99 = control_minute["new_order_p99_ms"]
+    phase = "예열" if start < 120 else "측정"
+    assert f"| {start}~{start + 60} | {phase} | {baseline_rate:.3f} | {baseline_p99:g} | {control_rate:.3f} | {control_p99:g} |" in report
+
+protocol = explanation["protocol"]
+assert protocol["node"] == 1 and protocol["reserved"] is False
+assert len(protocol["server_cpus"]) == 16 and len(protocol["client_cpus"]) == 4
+assert protocol["conditions"]["capacity-1-A"]["data_buffer_size"] == "8G"
+assert protocol["conditions"]["capacity-1-B"]["data_buffer_size"] == "512M"
+assert all(protocol["conditions"][name]["data_buffer_size"] == "1G" for name in ("scan-1-A", "scan-1-B", "tpcc-1-A", "tpcc-1-B"))
+assert protocol["conditions"]["tpcc-1-B"]["clients"] == 32
+assert all(item["clients"] == 8 for name, item in protocol["conditions"].items() if name != "tpcc-1-B")
+print("Paper evidence verified: separate residency, capacity device reads, seven time windows and controlled protocol.")
 
 if len(sys.argv) > 1:
     assert len(sys.argv) == 3 and sys.argv[1] == "--raw-root", "Usage: verify.py [--raw-root ATTEMPT_DIRECTORY]"

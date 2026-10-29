@@ -8,7 +8,23 @@
     "evidence/control-comparison.json": "0b607e36b887aedf02566de512fd223a21ad5e46a18f60d1adb8a117b67c372d",
     "evidence/reproduction-analysis.json": "66bae8213f101cd0084230699716204219fa55ec425394dcb68a8c53b8e5367f",
     "heavy/acceptance.json": "2a635d2ec56115f1daa2b6acf47d103ab34c57f50855aa6210e567066a03c33b",
-    "evidence/preflight.json": "06ed9dc5695af442a45901eb67e8a3687aba07c938ff9d5f8e1fc6b2ad5c5b02"
+    "evidence/preflight.json": "06ed9dc5695af442a45901eb67e8a3687aba07c938ff9d5f8e1fc6b2ad5c5b02",
+    "evidence/tpcc-minute-progression.json": "4112e2eabee6b76eb5735d752a9d3c47444a7fa1aef3d8eafda0ddcab3d3a88c",
+    "heavy/capacity-1-A/load/manifest.json": "ca5f466f7f071416719751443e0d7fc771ab2b66254df89840fd34526259f754",
+    "heavy/capacity-1-A/cubrid.conf.effective": "2a109013049bf38bff01437d7c3453835158747041c88f9f89efc2383521319a",
+    "heavy/capacity-1-B/load/manifest.json": "003ffe59266a185d161fa6a8ec6c2e22b74bf925ef8d48f263d2be84b366b0f6",
+    "heavy/capacity-1-B/cubrid.conf.effective": "3643c6a63ad8090050c96f9fc6dcd4e3fccbca0ccb560184cf9bbff86a19b01d",
+    "heavy/scan-1-A/load/manifest.json": "a9043ff54651aa7ab9e96ded05e2e20d576135c4cc8d63e58dac625f477ec1bd",
+    "heavy/scan-1-A/cubrid.conf.effective": "6e94a62d80b8e38315f9ddf2798e1f80961c336d62259460de529d003895a978",
+    "heavy/scan-1-B/load/manifest.json": "8948c330c837a6be6b130f6acf4cd5aa989bf087c1be32f83f080d71fbc68e31",
+    "heavy/scan-1-B/cubrid.conf.effective": "6e94a62d80b8e38315f9ddf2798e1f80961c336d62259460de529d003895a978",
+    "heavy/tpcc-1-A/load/manifest.json": "8bd45fd0507a8554c5cbabc667eea128c4c82f0e72ea3d5e8e02eb8d91d50b8e",
+    "heavy/tpcc-1-A/cubrid.conf.effective": "2490416a1ea0b1245c455d2e7eb3878021aea19e882d2bd1a0ce633c33273db3",
+    "heavy/tpcc-1-B/load/manifest.json": "d6a94b5a793471c1c11b7a8e5a06235210f20656b7c137bdb1e78b6e7938f804",
+    "heavy/tpcc-1-B/cubrid.conf.effective": "2490416a1ea0b1245c455d2e7eb3878021aea19e882d2bd1a0ce633c33273db3",
+    "heavy/placement.json": "4a47478b483cd1f46b598c7300d0c2eec642a2ca84194537600a19c02cd0aca8",
+    "tools/benchmarksql-reporting/src/client/jTPCCTData.java": "fd2d0e12b801ac687911edabb8dccd73244685016aee264fbc861b65a8cc454e",
+    "tools/benchmarksql-reporting/src/client/jTPCCTerminal.java": "25786026c9e880d92253a6764cd68c9ffd00d98304ed5cd5f2bad5696a67c0b3"
   },
   "acceptance": {
     "status": "complete",
@@ -869,6 +885,360 @@
         "perf_monitor.h": "a2f2f3334911c3b2b5afb446545a7c313bdc6090c5fcb71f81d502d127c7ab34",
         "page_buffer.c": "b3901969dfa22194977c7b596df91138ad594f11e681a46168bc480fa94f4dda",
         "pgbuf_benchmark_observer.hpp": "2e61f5f4f8109ca7f04f571b7d6a8f414313cb6601adb6443c89392760a28def"
+      }
+    }
+  },
+  "explanatory_evidence": {
+    "capacity_io": {
+      "capacity-1-A": {
+        "owned_process_read_bytes_all_devices_estimate": 0.0,
+        "shared_physical_device_read_bytes": 0.0,
+        "io_full_psi_avg10": 0.0
+      },
+      "capacity-1-B": {
+        "owned_process_read_bytes_all_devices_estimate": 0.0,
+        "shared_physical_device_read_bytes": 2080768.0188340556,
+        "io_full_psi_avg10": 0.0
+      },
+      "capacity-2-A": {
+        "owned_process_read_bytes_all_devices_estimate": 0.0,
+        "shared_physical_device_read_bytes": 0.0,
+        "io_full_psi_avg10": 0.0
+      },
+      "capacity-2-B": {
+        "owned_process_read_bytes_all_devices_estimate": 0.0,
+        "shared_physical_device_read_bytes": 0.0,
+        "io_full_psi_avg10": 0.0
+      },
+      "capacity-3-A": {
+        "owned_process_read_bytes_all_devices_estimate": 4095.9999522411576,
+        "shared_physical_device_read_bytes": 4095.9999522411576,
+        "io_full_psi_avg10": 0.0
+      },
+      "capacity-3-B": {
+        "owned_process_read_bytes_all_devices_estimate": 0.0,
+        "shared_physical_device_read_bytes": 58267.10648503001,
+        "io_full_psi_avg10": 0.0
+      }
+    },
+    "diagnostic_residency": {
+      "profiles/capacity-8G": {
+        "actual_hit_pct": 99.99208483385156,
+        "counts": {
+          "requests": 19127836,
+          "ordinary_hit": 19126322,
+          "ordinary_miss": 1514,
+          "simple_hit": 0,
+          "simple_miss": 0,
+          "new_success": 0,
+          "new_failure": 0,
+          "demand_failure": 0,
+          "probe_hit": 0,
+          "probe_miss": 0,
+          "probe_failure": 0,
+          "unclassified_success": 0
+        }
+      },
+      "profiles/capacity-512M": {
+        "actual_hit_pct": 78.59442621676847,
+        "counts": {
+          "requests": 18169562,
+          "ordinary_hit": 14280263,
+          "ordinary_miss": 3889299,
+          "simple_hit": 0,
+          "simple_miss": 0,
+          "new_success": 0,
+          "new_failure": 0,
+          "demand_failure": 0,
+          "probe_hit": 0,
+          "probe_miss": 0,
+          "probe_failure": 0,
+          "unclassified_success": 0
+        }
+      },
+      "profiles/scan-alone": {
+        "actual_hit_pct": 99.99999381734763,
+        "counts": {
+          "requests": 16174288,
+          "ordinary_hit": 16174287,
+          "ordinary_miss": 1,
+          "simple_hit": 0,
+          "simple_miss": 0,
+          "new_success": 0,
+          "new_failure": 0,
+          "demand_failure": 0,
+          "probe_hit": 0,
+          "probe_miss": 0,
+          "probe_failure": 0,
+          "unclassified_success": 0
+        }
+      },
+      "profiles/scan-interference": {
+        "actual_hit_pct": 73.6547416101778,
+        "counts": {
+          "requests": 19447040,
+          "ordinary_hit": 14323561,
+          "ordinary_miss": 5123335,
+          "simple_hit": 0,
+          "simple_miss": 0,
+          "new_success": 48,
+          "new_failure": 0,
+          "demand_failure": 0,
+          "probe_hit": 96,
+          "probe_miss": 0,
+          "probe_failure": 0,
+          "unclassified_success": 0
+        }
+      }
+    },
+    "tpcc_baseline_minutes": {
+      "tpcc-1-B": [
+        {
+          "start_elapsed_seconds": 0,
+          "neworder_nonrollback_per_s": 854.4833333333333,
+          "neworder_p99_ms": 50.0,
+          "aborts": 23
+        },
+        {
+          "start_elapsed_seconds": 60,
+          "neworder_nonrollback_per_s": 795.6166666666667,
+          "neworder_p99_ms": 54.0,
+          "aborts": 36
+        },
+        {
+          "start_elapsed_seconds": 120,
+          "neworder_nonrollback_per_s": 770.8,
+          "neworder_p99_ms": 54.0,
+          "aborts": 36
+        },
+        {
+          "start_elapsed_seconds": 180,
+          "neworder_nonrollback_per_s": 379.18333333333334,
+          "neworder_p99_ms": 714.0,
+          "aborts": 68
+        },
+        {
+          "start_elapsed_seconds": 240,
+          "neworder_nonrollback_per_s": 174.0,
+          "neworder_p99_ms": 1737.0,
+          "aborts": 92
+        },
+        {
+          "start_elapsed_seconds": 300,
+          "neworder_nonrollback_per_s": 220.21666666666667,
+          "neworder_p99_ms": 1323.0,
+          "aborts": 89
+        },
+        {
+          "start_elapsed_seconds": 360,
+          "neworder_nonrollback_per_s": 205.1,
+          "neworder_p99_ms": 1543.0,
+          "aborts": 96
+        }
+      ],
+      "tpcc-2-B": [
+        {
+          "start_elapsed_seconds": 0,
+          "neworder_nonrollback_per_s": 859.0666666666667,
+          "neworder_p99_ms": 51.0,
+          "aborts": 23
+        },
+        {
+          "start_elapsed_seconds": 60,
+          "neworder_nonrollback_per_s": 844.5833333333334,
+          "neworder_p99_ms": 52.0,
+          "aborts": 21
+        },
+        {
+          "start_elapsed_seconds": 120,
+          "neworder_nonrollback_per_s": 826.6666666666666,
+          "neworder_p99_ms": 52.0,
+          "aborts": 20
+        },
+        {
+          "start_elapsed_seconds": 180,
+          "neworder_nonrollback_per_s": 323.95,
+          "neworder_p99_ms": 881.0,
+          "aborts": 84
+        },
+        {
+          "start_elapsed_seconds": 240,
+          "neworder_nonrollback_per_s": 188.35,
+          "neworder_p99_ms": 1692.0,
+          "aborts": 90
+        },
+        {
+          "start_elapsed_seconds": 300,
+          "neworder_nonrollback_per_s": 204.48333333333332,
+          "neworder_p99_ms": 1339.0,
+          "aborts": 93
+        },
+        {
+          "start_elapsed_seconds": 360,
+          "neworder_nonrollback_per_s": 208.05,
+          "neworder_p99_ms": 1408.0,
+          "aborts": 97
+        }
+      ],
+      "tpcc-3-B": [
+        {
+          "start_elapsed_seconds": 0,
+          "neworder_nonrollback_per_s": 856.4166666666666,
+          "neworder_p99_ms": 51.0,
+          "aborts": 26
+        },
+        {
+          "start_elapsed_seconds": 60,
+          "neworder_nonrollback_per_s": 754.6833333333333,
+          "neworder_p99_ms": 55.0,
+          "aborts": 34
+        },
+        {
+          "start_elapsed_seconds": 120,
+          "neworder_nonrollback_per_s": 759.3,
+          "neworder_p99_ms": 53.0,
+          "aborts": 23
+        },
+        {
+          "start_elapsed_seconds": 180,
+          "neworder_nonrollback_per_s": 419.75,
+          "neworder_p99_ms": 759.0,
+          "aborts": 65
+        },
+        {
+          "start_elapsed_seconds": 240,
+          "neworder_nonrollback_per_s": 200.1,
+          "neworder_p99_ms": 1001.0,
+          "aborts": 111
+        },
+        {
+          "start_elapsed_seconds": 300,
+          "neworder_nonrollback_per_s": 202.43333333333334,
+          "neworder_p99_ms": 981.0,
+          "aborts": 92
+        },
+        {
+          "start_elapsed_seconds": 360,
+          "neworder_nonrollback_per_s": 182.76666666666668,
+          "neworder_p99_ms": 1415.0,
+          "aborts": 101
+        }
+      ]
+    },
+    "tpcc_control_minutes": [
+      {
+        "start_elapsed_seconds": 0,
+        "new_order_nonrollback_per_second": 972.35,
+        "new_order_p99_ms": 48.0,
+        "all_type_aborts": 37
+      },
+      {
+        "start_elapsed_seconds": 60,
+        "new_order_nonrollback_per_second": 950.3166666666667,
+        "new_order_p99_ms": 49.0,
+        "all_type_aborts": 37
+      },
+      {
+        "start_elapsed_seconds": 120,
+        "new_order_nonrollback_per_second": 921.6833333333333,
+        "new_order_p99_ms": 51.0,
+        "all_type_aborts": 130
+      },
+      {
+        "start_elapsed_seconds": 180,
+        "new_order_nonrollback_per_second": 842.2333333333333,
+        "new_order_p99_ms": 87.0,
+        "all_type_aborts": 416
+      },
+      {
+        "start_elapsed_seconds": 240,
+        "new_order_nonrollback_per_second": 834.5,
+        "new_order_p99_ms": 83.0,
+        "all_type_aborts": 415
+      },
+      {
+        "start_elapsed_seconds": 300,
+        "new_order_nonrollback_per_second": 858.4,
+        "new_order_p99_ms": 89.0,
+        "all_type_aborts": 491
+      },
+      {
+        "start_elapsed_seconds": 360,
+        "new_order_nonrollback_per_second": 854.3333333333334,
+        "new_order_p99_ms": 85.0,
+        "all_type_aborts": 448
+      }
+    ],
+    "protocol": {
+      "node": 1,
+      "server_cpus": [
+        20,
+        21,
+        22,
+        25,
+        26,
+        27,
+        28,
+        31,
+        32,
+        33,
+        34,
+        35,
+        39,
+        29,
+        30,
+        76
+      ],
+      "client_cpus": [
+        78,
+        23,
+        77,
+        64
+      ],
+      "reserved": false,
+      "conditions": {
+        "capacity-1-A": {
+          "clients": 8,
+          "data_buffer_size": "8G",
+          "workload": "90% point SUBSTR + 10% SUM range of 16 rows"
+        },
+        "capacity-1-B": {
+          "clients": 8,
+          "data_buffer_size": "512M",
+          "workload": "90% point SUBSTR + 10% SUM range of 16 rows"
+        },
+        "scan-1-A": {
+          "clients": 8,
+          "data_buffer_size": "1G",
+          "workload": "90% point SUBSTR + 10% SUM range of 16 rows"
+        },
+        "scan-1-B": {
+          "clients": 8,
+          "data_buffer_size": "1G",
+          "workload": "90% point SUBSTR + 10% SUM range of 16 rows"
+        },
+        "tpcc-1-A": {
+          "clients": 8,
+          "data_buffer_size": "1G",
+          "mix_weights": [
+            45,
+            43,
+            4,
+            4,
+            4
+          ]
+        },
+        "tpcc-1-B": {
+          "clients": 32,
+          "data_buffer_size": "1G",
+          "mix_weights": [
+            45,
+            43,
+            4,
+            4,
+            4
+          ]
+        }
       }
     }
   }

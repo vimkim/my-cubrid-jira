@@ -15,6 +15,7 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 - [CBRD-27724 페이지 버퍼 부하 실험의 설계·해석과 결론, 2026-10-29](issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md):
   처음 읽는 독자를 위한 논문형 실험 보고서이다. 세 부하를 선택한 이유, 실제 SQL과 통제 조건, 시간별 감속, 객체 잠금 대기 증폭 가설과 단회 개입을 연결한다.
+  New Order의 주문 접수 예시, 다섯 업무와 창고·단말 용어, TPC-C 선정 이유와 대안별 적합성도 설명한다.
   OS 파일 캐시 해석, 스캔 전체 적중률의 한계와 미확인 감속 시작 원인을 구분한다.
   [측정값과 검산 스크립트](reviews/CBRD-27724-benchmark/)를 함께 보존한다. JIRA 본문에 반영하고 재조회로 확인했다.
 - [CBRD-27816 일반 UPDATE 잔여 비용 후속, 2026-10-28](issues/CBRD-27816-ordinary-update-residual-cost_02df4d9_codex.md):

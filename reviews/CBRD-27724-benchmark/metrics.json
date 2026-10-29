@@ -1,0 +1,875 @@
+{
+  "engine_commit": "17b50f29760eab9017dcfdb2b47571878463380e",
+  "diagnostic_commit": "1a9805db9aaeb7a143644932f3db8ad001c72656",
+  "report": "issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md",
+  "attempt": "20261023-1830-UTC",
+  "source_sha256": {
+    "evidence/matrix-quality.json": "904f2daf42541559e45a69eafd3845613262f2c6a1a507d043484cb50e0e83d9",
+    "evidence/control-comparison.json": "0b607e36b887aedf02566de512fd223a21ad5e46a18f60d1adb8a117b67c372d",
+    "evidence/reproduction-analysis.json": "66bae8213f101cd0084230699716204219fa55ec425394dcb68a8c53b8e5367f",
+    "heavy/acceptance.json": "2a635d2ec56115f1daa2b6acf47d103ab34c57f50855aa6210e567066a03c33b",
+    "evidence/preflight.json": "06ed9dc5695af442a45901eb67e8a3687aba07c938ff9d5f8e1fc6b2ad5c5b02"
+  },
+  "acceptance": {
+    "status": "complete",
+    "criteria": {
+      "page_buffer_load_in_all_three_families": true,
+      "ordinary_temporary_accounting_and_real_path_coverage": true,
+      "three_primary_pairs_each_family": true,
+      "consistent_material_slowdown": true,
+      "counter_function_resource_and_single_variable_causal_contribution": true,
+      "errors_and_equivalent_image_overhead_disclosed": true,
+      "raw_source_binary_tool_data_command_and_window_evidence_preserved": true,
+      "cleanup_preservation_and_resource_limits": true
+    },
+    "primary_cases": 18,
+    "additional_cases": 11,
+    "diagnostic_cases": 8,
+    "profiled_cases": 6,
+    "completed_kst": "2026-10-24T07:42:40.170203+09:00"
+  },
+  "primary_cases": [
+    {
+      "name": "capacity-1-A",
+      "family": "capacity",
+      "pair": 1,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 33842.93,
+        "events": 10153000.0,
+        "p99_ms": 0.29,
+        "average_ms": 0.24,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 7
+    },
+    {
+      "name": "capacity-1-B",
+      "family": "capacity",
+      "pair": 1,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 32637.31,
+        "events": 9791301.0,
+        "p99_ms": 0.32,
+        "average_ms": 0.24,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 2
+    },
+    {
+      "name": "capacity-2-A",
+      "family": "capacity",
+      "pair": 2,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 33931.47,
+        "events": 10179551.0,
+        "p99_ms": 0.29,
+        "average_ms": 0.24,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "capacity-2-B",
+      "family": "capacity",
+      "pair": 2,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 32566.4,
+        "events": 9770026.0,
+        "p99_ms": 0.32,
+        "average_ms": 0.25,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "capacity-3-A",
+      "family": "capacity",
+      "pair": 3,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 33963.23,
+        "events": 10189082.0,
+        "p99_ms": 0.29,
+        "average_ms": 0.24,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "capacity-3-B",
+      "family": "capacity",
+      "pair": 3,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 32589.36,
+        "events": 9776915.0,
+        "p99_ms": 0.32,
+        "average_ms": 0.25,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "tpcc-1-A",
+      "family": "tpcc",
+      "pair": 1,
+      "condition": "A",
+      "measurement": {
+        "per_type": {
+          "ORDER_STATUS": {
+            "attempted": 11736,
+            "completed": 11736,
+            "per_second": 39.12,
+            "committed": 11736,
+            "committed_per_second": 39.12,
+            "p99_ms": 1.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "PAYMENT": {
+            "attempted": 126826,
+            "completed": 126826,
+            "per_second": 422.75333333333333,
+            "committed": 126826,
+            "committed_per_second": 422.75333333333333,
+            "p99_ms": 15.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "NEW_ORDER": {
+            "attempted": 133158,
+            "completed": 133095,
+            "per_second": 443.65,
+            "committed": 131728,
+            "committed_per_second": 439.0933333333333,
+            "p99_ms": 21.0,
+            "rollbacks": 1367,
+            "errors": 63,
+            "expected_aborts": 63,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 11821,
+            "completed": 11821,
+            "per_second": 39.403333333333336,
+            "committed": 11821,
+            "committed_per_second": 39.403333333333336,
+            "p99_ms": 4.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 11771,
+            "completed": 11771,
+            "per_second": 39.236666666666665,
+            "committed": 11771,
+            "committed_per_second": 39.236666666666665,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 11769,
+            "completed": 11769,
+            "per_second": 39.23,
+            "committed": 11769,
+            "committed_per_second": 39.23,
+            "p99_ms": 48.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 63,
+        "expected_aborts": 63,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "tpcc-1-B",
+      "family": "tpcc",
+      "pair": 1,
+      "condition": "B",
+      "measurement": {
+        "per_type": {
+          "PAYMENT": {
+            "attempted": 101656,
+            "completed": 101653,
+            "per_second": 338.8433333333333,
+            "committed": 101653,
+            "committed_per_second": 338.8433333333333,
+            "p99_ms": 939.0,
+            "rollbacks": 0,
+            "errors": 3,
+            "expected_aborts": 3,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 9320,
+            "completed": 9320,
+            "per_second": 31.066666666666666,
+            "committed": 9320,
+            "committed_per_second": 31.066666666666666,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "NEW_ORDER": {
+            "attempted": 106414,
+            "completed": 106036,
+            "per_second": 353.4533333333333,
+            "committed": 104958,
+            "committed_per_second": 349.86,
+            "p99_ms": 868.0,
+            "rollbacks": 1078,
+            "errors": 378,
+            "expected_aborts": 378,
+            "delivery_districts_skipped": 0
+          },
+          "ORDER_STATUS": {
+            "attempted": 9270,
+            "completed": 9270,
+            "per_second": 30.9,
+            "committed": 9270,
+            "committed_per_second": 30.9,
+            "p99_ms": 4.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 9326,
+            "completed": 9326,
+            "per_second": 31.086666666666666,
+            "committed": 9326,
+            "committed_per_second": 31.086666666666666,
+            "p99_ms": 1917.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 9403,
+            "completed": 9403,
+            "per_second": 31.343333333333334,
+            "committed": 9403,
+            "committed_per_second": 31.343333333333334,
+            "p99_ms": 6.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 381,
+        "expected_aborts": 381,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 8
+    },
+    {
+      "name": "tpcc-2-A",
+      "family": "tpcc",
+      "pair": 2,
+      "condition": "A",
+      "measurement": {
+        "per_type": {
+          "NEW_ORDER": {
+            "attempted": 130133,
+            "completed": 130067,
+            "per_second": 433.5566666666667,
+            "committed": 128771,
+            "committed_per_second": 429.2366666666667,
+            "p99_ms": 21.0,
+            "rollbacks": 1296,
+            "errors": 66,
+            "expected_aborts": 66,
+            "delivery_districts_skipped": 0
+          },
+          "PAYMENT": {
+            "attempted": 123227,
+            "completed": 123226,
+            "per_second": 410.75333333333333,
+            "committed": 123226,
+            "committed_per_second": 410.75333333333333,
+            "p99_ms": 15.0,
+            "rollbacks": 0,
+            "errors": 1,
+            "expected_aborts": 1,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 11372,
+            "completed": 11372,
+            "per_second": 37.906666666666666,
+            "committed": 11372,
+            "committed_per_second": 37.906666666666666,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 11372,
+            "completed": 11372,
+            "per_second": 37.906666666666666,
+            "committed": 11372,
+            "committed_per_second": 37.906666666666666,
+            "p99_ms": 48.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "ORDER_STATUS": {
+            "attempted": 11551,
+            "completed": 11551,
+            "per_second": 38.50333333333333,
+            "committed": 11551,
+            "committed_per_second": 38.50333333333333,
+            "p99_ms": 1.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 11638,
+            "completed": 11638,
+            "per_second": 38.79333333333334,
+            "committed": 11638,
+            "committed_per_second": 38.79333333333334,
+            "p99_ms": 4.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 67,
+        "expected_aborts": 67,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "tpcc-2-B",
+      "family": "tpcc",
+      "pair": 2,
+      "condition": "B",
+      "measurement": {
+        "per_type": {
+          "NEW_ORDER": {
+            "attempted": 106474,
+            "completed": 106096,
+            "per_second": 353.6533333333333,
+            "committed": 105090,
+            "committed_per_second": 350.3,
+            "p99_ms": 858.0,
+            "rollbacks": 1006,
+            "errors": 378,
+            "expected_aborts": 378,
+            "delivery_districts_skipped": 0
+          },
+          "PAYMENT": {
+            "attempted": 102599,
+            "completed": 102594,
+            "per_second": 341.98,
+            "committed": 102594,
+            "committed_per_second": 341.98,
+            "p99_ms": 922.0,
+            "rollbacks": 0,
+            "errors": 5,
+            "expected_aborts": 5,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 9384,
+            "completed": 9384,
+            "per_second": 31.28,
+            "committed": 9384,
+            "committed_per_second": 31.28,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 9573,
+            "completed": 9573,
+            "per_second": 31.91,
+            "committed": 9573,
+            "committed_per_second": 31.91,
+            "p99_ms": 6.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "ORDER_STATUS": {
+            "attempted": 9479,
+            "completed": 9479,
+            "per_second": 31.596666666666668,
+            "committed": 9479,
+            "committed_per_second": 31.596666666666668,
+            "p99_ms": 4.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 9383,
+            "completed": 9382,
+            "per_second": 31.273333333333333,
+            "committed": 9382,
+            "committed_per_second": 31.273333333333333,
+            "p99_ms": 1968.0,
+            "rollbacks": 0,
+            "errors": 1,
+            "expected_aborts": 1,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 384,
+        "expected_aborts": 384,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "tpcc-3-A",
+      "family": "tpcc",
+      "pair": 3,
+      "condition": "A",
+      "measurement": {
+        "per_type": {
+          "NEW_ORDER": {
+            "attempted": 127261,
+            "completed": 127192,
+            "per_second": 423.97333333333336,
+            "committed": 125865,
+            "committed_per_second": 419.55,
+            "p99_ms": 22.0,
+            "rollbacks": 1327,
+            "errors": 69,
+            "expected_aborts": 69,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 11295,
+            "completed": 11295,
+            "per_second": 37.65,
+            "committed": 11295,
+            "committed_per_second": 37.65,
+            "p99_ms": 51.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "PAYMENT": {
+            "attempted": 121472,
+            "completed": 121472,
+            "per_second": 404.9066666666667,
+            "committed": 121472,
+            "committed_per_second": 404.9066666666667,
+            "p99_ms": 15.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 11293,
+            "completed": 11293,
+            "per_second": 37.64333333333333,
+            "committed": 11293,
+            "committed_per_second": 37.64333333333333,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 11445,
+            "completed": 11445,
+            "per_second": 38.15,
+            "committed": 11445,
+            "committed_per_second": 38.15,
+            "p99_ms": 4.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "ORDER_STATUS": {
+            "attempted": 11532,
+            "completed": 11532,
+            "per_second": 38.44,
+            "committed": 11532,
+            "committed_per_second": 38.44,
+            "p99_ms": 1.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 69,
+        "expected_aborts": 69,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "tpcc-3-B",
+      "family": "tpcc",
+      "pair": 3,
+      "condition": "B",
+      "measurement": {
+        "per_type": {
+          "PAYMENT": {
+            "attempted": 101785,
+            "completed": 101771,
+            "per_second": 339.2366666666667,
+            "committed": 101771,
+            "committed_per_second": 339.2366666666667,
+            "p99_ms": 901.0,
+            "rollbacks": 0,
+            "errors": 14,
+            "expected_aborts": 14,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY": {
+            "attempted": 9430,
+            "completed": 9430,
+            "per_second": 31.433333333333334,
+            "committed": 9430,
+            "committed_per_second": 31.433333333333334,
+            "p99_ms": 0.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "ORDER_STATUS": {
+            "attempted": 9477,
+            "completed": 9477,
+            "per_second": 31.59,
+            "committed": 9477,
+            "committed_per_second": 31.59,
+            "p99_ms": 5.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "NEW_ORDER": {
+            "attempted": 107314,
+            "completed": 106936,
+            "per_second": 356.4533333333333,
+            "committed": 105861,
+            "committed_per_second": 352.87,
+            "p99_ms": 843.0,
+            "rollbacks": 1075,
+            "errors": 378,
+            "expected_aborts": 378,
+            "delivery_districts_skipped": 0
+          },
+          "STOCK_LEVEL": {
+            "attempted": 9634,
+            "completed": 9634,
+            "per_second": 32.11333333333334,
+            "committed": 9634,
+            "committed_per_second": 32.11333333333334,
+            "p99_ms": 7.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          },
+          "DELIVERY_BG": {
+            "attempted": 9425,
+            "completed": 9425,
+            "per_second": 31.416666666666668,
+            "committed": 9425,
+            "committed_per_second": 31.416666666666668,
+            "p99_ms": 1948.0,
+            "rollbacks": 0,
+            "errors": 0,
+            "expected_aborts": 0,
+            "delivery_districts_skipped": 0
+          }
+        },
+        "errors": 392,
+        "expected_aborts": 392,
+        "unexpected_errors": 0,
+        "window_seconds": 300,
+        "warmup_seconds": 120,
+        "note": "Successful completions exclude SQL errors; committed counts also exclude intentional rollbacks. DELIVERY_BG is background execution; do not add it to foreground TPS"
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "scan-1-A",
+      "family": "scan",
+      "pair": 1,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 33511.09,
+        "events": 10053440.0,
+        "p99_ms": 0.3,
+        "average_ms": 0.24,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 4
+    },
+    {
+      "name": "scan-1-B",
+      "family": "scan",
+      "pair": 1,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 30986.76,
+        "events": 9296131.0,
+        "p99_ms": 0.34,
+        "average_ms": 0.26,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 2
+    },
+    {
+      "name": "scan-2-A",
+      "family": "scan",
+      "pair": 2,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 34101.62,
+        "events": 10230616.0,
+        "p99_ms": 0.29,
+        "average_ms": 0.23,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    },
+    {
+      "name": "scan-2-B",
+      "family": "scan",
+      "pair": 2,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 30941.49,
+        "events": 9282550.0,
+        "p99_ms": 0.34,
+        "average_ms": 0.26,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 4
+    },
+    {
+      "name": "scan-3-A",
+      "family": "scan",
+      "pair": 3,
+      "condition": "A",
+      "measurement": {
+        "events_per_second": 34210.04,
+        "events": 10263126.0,
+        "p99_ms": 0.29,
+        "average_ms": 0.23,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 6
+    },
+    {
+      "name": "scan-3-B",
+      "family": "scan",
+      "pair": 3,
+      "condition": "B",
+      "measurement": {
+        "events_per_second": 30899.72,
+        "events": 9270020.0,
+        "p99_ms": 0.34,
+        "average_ms": 0.26,
+        "ignored_errors": 0.0,
+        "reconnects": 0.0
+      },
+      "global_swap_pages": 0
+    }
+  ],
+  "control": {
+    "baseline_B_metrics": [
+      {
+        "new_order_nonrollback_per_second": 349.86,
+        "new_order_p99_ms": 868.0,
+        "payment_p99_ms": 939.0,
+        "new_order_aborts": 378,
+        "new_order_abort_pct_of_attempts": 0.35521641889225103,
+        "new_order_intentional_rollbacks": 1078,
+        "all_type_sql_aborts": 381,
+        "unknown_sql_errors": 0,
+        "object_lock_wait_seconds": 6891.195707,
+        "object_lock_wait_events": 66151,
+        "mean_object_lock_wait_ms": 104.17371932397091,
+        "counter_seconds": 302
+      },
+      {
+        "new_order_nonrollback_per_second": 350.3,
+        "new_order_p99_ms": 858.0,
+        "payment_p99_ms": 922.0,
+        "new_order_aborts": 378,
+        "new_order_abort_pct_of_attempts": 0.35501624809812726,
+        "new_order_intentional_rollbacks": 1006,
+        "all_type_sql_aborts": 384,
+        "unknown_sql_errors": 0,
+        "object_lock_wait_seconds": 6956.470266,
+        "object_lock_wait_events": 66727,
+        "mean_object_lock_wait_ms": 104.252705291711,
+        "counter_seconds": 304
+      },
+      {
+        "new_order_nonrollback_per_second": 352.87,
+        "new_order_p99_ms": 843.0,
+        "payment_p99_ms": 901.0,
+        "new_order_aborts": 378,
+        "new_order_abort_pct_of_attempts": 0.3522373595243864,
+        "new_order_intentional_rollbacks": 1075,
+        "all_type_sql_aborts": 392,
+        "unknown_sql_errors": 0,
+        "object_lock_wait_seconds": 6913.215055,
+        "object_lock_wait_events": 68183,
+        "mean_object_lock_wait_ms": 101.39206334423537,
+        "counter_seconds": 303
+      }
+    ],
+    "control_metrics": {
+      "new_order_nonrollback_per_second": 862.23,
+      "new_order_p99_ms": 77.0,
+      "payment_p99_ms": 80.0,
+      "new_order_aborts": 1879,
+      "new_order_abort_pct_of_attempts": 0.7142015500340186,
+      "new_order_intentional_rollbacks": 2543,
+      "all_type_sql_aborts": 1900,
+      "unknown_sql_errors": 0,
+      "object_lock_wait_seconds": 2506.38194,
+      "object_lock_wait_events": 178339,
+      "mean_object_lock_wait_ms": 14.054031591519522,
+      "counter_seconds": 302
+    },
+    "applied_parameter": 0.1,
+    "configuration_checks": [
+      {
+        "primary_pair": 1,
+        "same_other_server_settings": true,
+        "same_other_broker_settings": true,
+        "same_load_properties_except_output_paths": true
+      },
+      {
+        "primary_pair": 2,
+        "same_other_server_settings": true,
+        "same_other_broker_settings": true,
+        "same_load_properties_except_output_paths": true
+      },
+      {
+        "primary_pair": 3,
+        "same_other_server_settings": true,
+        "same_other_broker_settings": true,
+        "same_load_properties_except_output_paths": true
+      }
+    ]
+  },
+  "diagnostic_tpcc32": {
+    "counts": {
+      "requests": 103079738,
+      "ordinary_hit": 102527640,
+      "ordinary_miss": 484753,
+      "simple_hit": 0,
+      "simple_miss": 0,
+      "new_success": 23900,
+      "new_failure": 0,
+      "demand_failure": 43445,
+      "probe_hit": 0,
+      "probe_miss": 0,
+      "probe_failure": 0,
+      "unclassified_success": 0
+    },
+    "actual_hit_pct": 99.52942263946824,
+    "counter_seconds": 303,
+    "coverage_verified": true,
+    "accounting_reconciled": true
+  },
+  "builds": {
+    "baseline": {
+      "preset_mode": "release_gcc",
+      "sha256": {
+        "cub_server": "f75f2c7059107b1b4d0308c437297fe54ea593d4acf78ff34b607889fcb58781",
+        "libcubrid.so.11.5": "1df37befe88e9bef5c32f18d19964e74bedca6c5be4912a2b062fcf03f76c614",
+        "libcubridcs.so.11.5": "8cbe1af1da5f2aaff47735f641c4329654b7e3dcb8e039a221535a7f6e4a2515",
+        "libcascci.so.11.3": "d208b21fc01342422d70b7067b50d7ff38d6d9e0642058afe23fd79cfaf08495"
+      }
+    },
+    "diagnostic": {
+      "preset_mode": "release_gcc",
+      "sha256": {
+        "cub_server": "eb96661b962f5c3f727d08c870b376a1f6f3be2fc3636d086d15ab68646dacc0",
+        "libcubrid.so.11.5": "3f692ffe722a3a4683ec2f432f8bd3f4461568fcaae702c8faeeeb22fc8e2879",
+        "libcubridcs.so.11.5": "4b514fb9d63d2a29133d9cd5433486a8858733e00b87c302c1541ab69d6e9e05",
+        "libcascci.so.11.3": "46f5f6a182782569d3cca3f920912106b1154c3ecf539149d6861a9dcdcae798",
+        "cub_admin": "423a2abb24bb8e186ec6d6373ffe789c04ee6a21de86f903a1ee387246aee70e",
+        "cubrid": "2389ff4655b456d7eb34e4d8511775edf3904bc9b69acbb7ee21ace144ef6875",
+        "csql": "a0528d723e5aceebd9cfd97aa28ebbf8d5c5ecce9ab9e7517a23b54358c46f97",
+        "perf_monitor.c": "e27f0e336569f724d84789049e289082af382e5b9be99d15ffe9ec81e3243abe",
+        "perf_monitor.h": "a2f2f3334911c3b2b5afb446545a7c313bdc6090c5fcb71f81d502d127c7ab34",
+        "page_buffer.c": "b3901969dfa22194977c7b596df91138ad594f11e681a46168bc480fa94f4dda",
+        "pgbuf_benchmark_observer.hpp": "2e61f5f4f8109ca7f04f571b7d6a8f414313cb6601adb6443c89392760a28def"
+      }
+    }
+  }
+}

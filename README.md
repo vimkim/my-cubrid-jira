@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27827 OOS 동시 INSERT 중 파일 헤더 경합 실패, 2026-10-29](issues/CBRD-27827-oos-concurrent-insert-header-wait_dcbf09e_codex.md):
+  PR 7990의 hornetmj 리뷰 R1을 Correct Error로 발급했다. debug 재현, 7줄 삭제 후보의 10회 검증, 원본 재현 스크립트와 release·혼합 부하의 미검증 범위를 보존한다.
 - [CBRD-27724 페이지 버퍼 부하 실험의 설계·해석과 결론, 2026-10-29](issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md):
   처음 읽는 독자를 위한 논문형 실험 보고서이다. 세 부하를 선택한 이유, 실제 SQL과 통제 조건, 시간별 감속, 객체 잠금 대기 증폭 가설과 단회 개입을 연결한다.
   New Order의 주문 접수 예시, 다섯 업무와 창고·단말 용어, TPC-C 선정 이유와 대안별 적합성도 설명한다.

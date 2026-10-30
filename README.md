@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27858 relocation 행 vacuum 취소의 forward 슬롯 덮어쓰기, 2026-10-30](issues/CBRD-27858-oos-relocation-forward-slot-undo_dcbf09e_claude.md):
+  PR 7990의 hornetmj 리뷰 R5를 중복 검색 뒤 CBRD-26583의 Sub-task로 발급했다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 본문이 변환 결과와 같으며 계측과 드라이버 코드 블록이 온전함을 확인했다. 수정 전 debug·release의 abort·crash 재현, 재현 전용 계측과 드라이버 원문, 로컬 후보의 검증과 미검증 범위를 보존한다.
 - [CBRD-27841 OOS 미사용 복구 인덱스 제거, 2026-10-30](issues/CBRD-27841-oos-recovery-index-cleanup_eac70c7_codex.md):
   PR 7990 R6을 OOS M2의 Sub-task로 발급했다. 번호 정리, 저장 형식 2, 수정 전후 집중 CTest와 데이터 보존 검증, HA·MVCC 경로의 미검증 범위를 기록한다.
 - [CBRD-27827 OOS 동시 INSERT 중 파일 헤더 경합 실패, 2026-10-29](issues/CBRD-27827-oos-concurrent-insert-header-wait_dcbf09e_codex.md):

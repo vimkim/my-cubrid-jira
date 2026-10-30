@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27841 OOS 미사용 복구 인덱스 제거, 2026-10-30](issues/CBRD-27841-oos-recovery-index-cleanup_eac70c7_codex.md):
+  PR 7990 R6을 OOS M2의 Sub-task로 발급했다. 번호 정리, 저장 형식 2, 수정 전후 집중 CTest와 데이터 보존 검증, HA·MVCC 경로의 미검증 범위를 기록한다.
 - [CBRD-27827 OOS 동시 INSERT 중 파일 헤더 경합 실패, 2026-10-29](issues/CBRD-27827-oos-concurrent-insert-header-wait_dcbf09e_codex.md):
   PR 7990의 hornetmj 리뷰 R1을 Correct Error로 발급했다. debug 재현, 7줄 삭제 후보의 10회 검증, 원본 재현 스크립트와 release·혼합 부하의 미검증 범위를 보존한다.
 - [CBRD-27724 페이지 버퍼 부하 실험의 설계·해석과 결론, 2026-10-29](issues/CBRD-27724-pgbuf-benchmark-conclusion_17b50f2_codex.md):

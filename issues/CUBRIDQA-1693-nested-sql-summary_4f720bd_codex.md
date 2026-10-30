@@ -115,11 +115,11 @@ ant -f CTP/build.xml -Dbuild="$CTP_BUILD_DIR" compile
 | `7a3acee9a0356a92386a68108302eec01f9fe57d` | 독립 검토가 찾은 보고서 호환성 회귀 테스트 |
 | `4f720bd2edb9bf8020760f30d4a6a9088dff02b1` | 범주 정규화, root metadata와 직접 소유 경로 보존 |
 
-로컬 source checkout은 `/home/vimkim/gh/ctp/fix-sql-nested-summary-20261030`이다. 기존 `develop` checkout `/home/vimkim/gh/ctp/run-sql`의 다른 작업은 보존했다. 회사 반영은 `CUBRID/cubrid-testtools:develop`을 대상으로 별도 리뷰를 받아야 한다. [준비한 PR 본문](CTP-nested-summary-pr-body_4f720bd_codex.md)을 함께 보존한다.
+로컬 source checkout은 `/home/vimkim/gh/ctp/fix-sql-nested-summary-20261030`이다. 기존 `develop` checkout `/home/vimkim/gh/ctp/run-sql`의 다른 작업은 보존했다. 회사 반영은 `CUBRID/cubrid-testtools:develop`을 대상으로 별도 리뷰를 받아야 한다. [준비한 PR 본문](https://github.com/vimkim/my-cubrid-docs/blob/cb836700a46b6f859e82377b0fe087ba22f490b9/cbrd-27841/CTP-nested-summary-pr-body_4f720bd_codex.md)을 함께 보존한다.
 
 추적된 CTP JAR는 수정하지 않았다. 회사 runtime에 적용하려면 소스 리뷰·반영과 배포용 JAR 재생성이 필요하다. 이번 작업에서 회사 PR 생성, JIRA 변경, 배포, CI 재실행은 하지 않았다. Windows와 실제 SQL 실행을 포함한 전체 회귀는 검증하지 않았다.
 
-기존 [CI 수집 경고](ci_analysis_report_eac70c7_codex.md)는 유효하다. 결과 파일을 직접 고치거나 collector 검사를 완화해 과거 자료를 통과시키지 않는다. 새 runtime의 새 결과가 검증된 뒤 정확한 기준 비교와 shell 두 실패의 이력·원인 분석을 재개한다. 이번 생성기 수정이 shell 실패의 원인을 설명하지는 않는다.
+기존 [CI 수집 경고](https://github.com/vimkim/my-cubrid-docs/blob/cb836700a46b6f859e82377b0fe087ba22f490b9/cbrd-27841/ci_analysis_report_eac70c7_codex.md)는 유효하다. 결과 파일을 직접 고치거나 collector 검사를 완화해 과거 자료를 통과시키지 않는다. 새 runtime의 새 결과가 검증된 뒤 정확한 기준 비교와 shell 두 실패의 이력·원인 분석을 재개한다. 이번 생성기 수정이 shell 실패의 원인을 설명하지는 않는다.
 
 ## 진행 체크리스트와 근거 위치
 

@@ -14,7 +14,7 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 ## Reviewed issue updates
 
 - [CUBRIDQA-1693 CTP 중첩 SQL 범주의 결과 집계 누락, 2026-10-31](issues/CUBRIDQA-1693-nested-sql-summary_4f720bd_codex.md):
-  독립 Task로 발급하고 CBRD-27841과 Relates로 연결했다. 승인한 생성 본문을 그대로 보존하며 재조회로 일치를 확인했다. 수정 전후 보고서 재생과 호환성 검증을 마치고 [회사 draft PR 793](https://github.com/CUBRID/cubrid-testtools/pull/793)을 게시했다. 런타임 반영과 새 회사 CI 검증은 남아 있다.
+  독립 Task로 발급하고 CBRD-27841과 Relates로 연결했다. 생성 본문의 문서 링크 두 개를 공개 고정 URL로 보정하고 JIRA 본문과의 일치를 확인했다. 수정 전후 보고서 재생과 호환성 검증을 마치고 [회사 draft PR 793](https://github.com/CUBRID/cubrid-testtools/pull/793)을 게시했다. 런타임 반영과 새 회사 CI 검증은 남아 있다.
 - [CBRD-27858 relocation 행 vacuum 취소의 forward 슬롯 덮어쓰기, 2026-10-30](issues/CBRD-27858-oos-relocation-forward-slot-undo_dcbf09e_claude.md):
   PR 7990의 hornetmj 리뷰 R5를 중복 검색 뒤 CBRD-26583의 Sub-task로 발급했다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 본문이 변환 결과와 같으며 계측과 드라이버 코드 블록이 온전함을 확인했다. 수정 전 debug·release의 abort·crash 재현, 재현 전용 계측과 드라이버 원문, 로컬 후보의 검증과 미검증 범위를 보존한다.
 - [CBRD-27841 OOS 미사용 복구 인덱스 제거, 2026-10-30](issues/CBRD-27841-oos-recovery-index-cleanup_eac70c7_codex.md):

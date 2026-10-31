@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-XXXXX OOS vacuum과 새 힙 페이지 할당의 래치 순환, 2026-10-31](issues/CBRD-XXXXX-oos-vacuum-heap-header-wait_dcbf09e_claude.md):
+  PR 7990의 hornetmj 리뷰 R2 초안이다. 티켓 발급 전이며 CBRD-26583의 Sub-task로 제안한다. 실제 vacuum worker를 쓰는 단위 테스트의 수정 전 실패, 약 316초의 할당 대기, 로컬 후보의 검증과 미검증 범위를 보존한다.
 - [CUBRIDQA-1693 CTP 중첩 SQL 범주의 결과 집계 누락, 2026-10-31](issues/CUBRIDQA-1693-nested-sql-summary_4f720bd_codex.md):
   독립 Task로 발급하고 CBRD-27841과 Relates로 연결했다. 생성 본문의 문서 링크 두 개를 공개 고정 URL로 보정하고 JIRA 본문과의 일치를 확인했다. 수정 전후 보고서 재생과 호환성 검증을 마치고 [회사 draft PR 793](https://github.com/CUBRID/cubrid-testtools/pull/793)을 게시했다. 런타임 반영과 새 회사 CI 검증은 남아 있다.
 - [CBRD-27858 relocation 행 vacuum 취소의 forward 슬롯 덮어쓰기, 2026-10-30](issues/CBRD-27858-oos-relocation-forward-slot-undo_dcbf09e_claude.md):

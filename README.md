@@ -37,8 +37,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 - [CBRD-27785 PR7990 성능 수락 기준 반영, 2026-10-28](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md):
   1·3번 우선·잠정 약 +2% 목표, PR8299 선반영과 현재 버전의 이득·손해 공유를 AC로 기록한다. 2번은 threshold를 기존 overflow와 맞춘 뒤 후속 재측정한다.
   기존 두 SELECT의 +2% 검증 완료는 보존하고 현재 판정과 구분한다. 사용자 승인 후 JIRA 설명에 반영하고 재조회로 검증했다.
-- [CBRD-26659 관련 PR 목록 초안, 2026-11-03](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
-  Engine 1건과 TC 4건의 역할·대상 브랜치·실제 Draft 상태를 표로 추가한 로컬 초안이다. 기존 본문은 2026-10-28까지의 기록으로 보존하며, JIRA 반영은 아직 하지 않았다.
+- [CBRD-26659 관련 PR 목록, 2026-11-03](issues/CBRD-26659-oos-testcase-category-update_e3589ae_codex.md):
+  Engine 1건과 TC 4건의 역할·대상 브랜치·실제 Draft 상태를 표로 정리한다. 기존 본문은 2026-10-28까지의 기록으로 보존한다.
 - CBRD-27785·CBRD-27788·CBRD-27791 병합 전 성능 검토 배경과 관계 정리, 2026-10-28:
   [27785](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md)에 공통 배경과 역할을 기록하고,
   [27788](issues/CBRD-27788-oos-select-performance_dcbf09e_codex.md)·[27791](issues/CBRD-27791-oos-batch-read_dcbf09e_codex.md)의 수행 이유에 연결한다.

@@ -13,6 +13,10 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27872 OOS 성장 게이트 sweep의 할당당 검사 비용, 2026-11-02](issues/CBRD-27872-oos-growth-sweep-cost_dcbf09e_claude.md):
+  PR 7990의 hornetmj 리뷰 R3를 사용자가 CBRD-26583(M2)의 Sub-task로 발급했고, 비어 있던 설명을 triage 본문으로 다시 썼다. sweep 발동 조건과 할당당 검사 상한, OOS 명세 §4 불변식의 변경 필요, CBRD-27213과의 범위 경계를 기록한다. 리뷰어 수치는 재현하지 않았다. JIRA 설명에는 아직 반영하지 않았다.
+- [CBRD-27213 재시작 뒤 OOS 빈 공간 재사용과 bestspace 공통 모듈 전환, 2026-11-02](issues/CBRD-27213-oos-bestspace-shared-module_dcbf09e_claude.md):
+  PR 7990 R4를 새 이슈 없이 추적하도록 `725a32c` 판을 `dcbf09e` 기준으로 다시 썼다. 운영 경로에서 3단계 sync가 실행되지 않는 원인, CBRD-27761 기준의 재검토 표시, CBRD-26950 뒤 `owner_vfid` 위치 재검토, 재시작 재사용 완료 조건을 더했다. JIRA 설명에는 아직 반영하지 않았다.
 - [CBRD-27860 OOS vacuum과 새 힙 페이지 할당의 래치 순환, 2026-10-31](issues/CBRD-27860-oos-vacuum-heap-header-wait_dcbf09e_claude.md):
   PR 7990의 hornetmj 리뷰 R2를 중복 검색 뒤 CBRD-26583의 Sub-task로 발급했다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 본문이 변환 결과와 같으며 테스트 diff 코드 블록이 온전함을 확인했다. 실제 vacuum worker를 쓰는 단위 테스트의 수정 전 실패, 약 316초의 할당 대기, 로컬 후보의 검증과 미검증 범위를 보존한다.
 - [CUBRIDQA-1693 CTP 중첩 SQL 범주의 결과 집계 누락, 2026-10-31](issues/CUBRIDQA-1693-nested-sql-summary_4f720bd_codex.md):

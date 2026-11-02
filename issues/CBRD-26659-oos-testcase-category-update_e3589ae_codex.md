@@ -12,6 +12,28 @@
 
 > 아래는 기존 이슈, 테스트 문서와 2026-10-28(Asia/Seoul) 확인한 PR·CI 근거를 바탕으로 정리한 진행 기록이다. 과거 검증 결과와 최신 PR의 상태를 구분한다.
 
+## Related Pull Requests
+
+2026-11-03(Asia/Seoul) GitHub 조회 기준이다. Engine PR은 소스와 CI 입력을 연결하며, SQL·일반 shell·heavy·HA의 TC 검토·병합 대상은 아래 네 TC PR이다.
+
+| 구분 | 저장소·PR | 주요 내용 | 대상 브랜치 | 상태 |
+| --- | --- | --- | --- | --- |
+| Engine | [CUBRID/cubrid #8128](https://github.com/CUBRID/cubrid/pull/8128) | OOS 테스트 보완 소스와 CI 입력 연결 | `feature/oos-merge` | OPEN, Ready for review |
+| SQL TC | [CUBRID/cubrid-testcases #3688](https://github.com/CUBRID/cubrid-testcases/pull/3688) | SQL/answer 28쌍, 모두 정규 실행 경로에 복원 | `feature/oos-merge` | OPEN, Draft |
+| 일반 shell TC | [CUBRID/cubrid-testcases-private-ex #4365](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4365) | 일반 CI의 OOS 활성 31개, 실패·장시간 사례 별도 보존 | `feature/oos-merge` | OPEN, Ready for review |
+| Heavy TC | [CUBRID/cubrid-testcases-private-ex #4627](https://github.com/CUBRID/cubrid-testcases-private-ex/pull/4627) | 장시간 OOS 38개를 `shell_heavy`에서 관리 | `feature/oos-merge` | OPEN, Draft |
+| HA TC | [CUBRID/cubrid-testcases-private #1666](https://github.com/CUBRID/cubrid-testcases-private/pull/1666) | `HA/shell`의 활성 4개와 비활성 엔진 결함 재현 2개 | `develop` | OPEN, Draft |
+
+일반 shell PR #4365는 제목에 `Draft`가 남아 있지만 실제 Draft 플래그는 꺼져 있다. 위 상태는 제목 문구가 아닌 GitHub의 실제 상태를 따른다. 다섯 PR 모두 미병합이다.
+
+### 검토 범위와 남은 사항
+
+- 일반 shell PR의 heavy·HA 보존 사본과 전용 PR의 같은 TC를 중복으로 계산하지 않는다. 현재 일반 `gha-ci`의 선택은 heavy·HA 전용 실행을 포함하지 않는다.
+- OPEN·Ready for review는 전체 테스트 PASS나 리뷰 승인·병합 완료를 뜻하지 않는다. 2026-11-02 확보한 근거에서 일반 CI의 OOS shell 31개는 PASS지만, 마지막 HA 전체 native는 2 PASS·2 FAIL이다. Heavy 전체 38 PASS는 과거 입력의 결과이며 현재 head의 전체 재실행 결과로 확대하지 않는다. 최신 SQL 전체 집계는 무결성 오류로 인증 보류다.
+- 성능 비교 TC의 검토·performance 영역 편입은 [CBRD-27785](https://jira.cubrid.org/browse/CBRD-27785)의 별도 후속으로 관리하며, 위 네 기능 TC PR의 완료와 구분한다.
+
+아래 Description 이후의 기존 설명은 2026-10-28까지의 분석·검증 기록으로 보존한다. 그 부분의 "현재"는 당시 상태이며, 최신 PR 상태는 위 목록을 따른다.
+
 ## Description
 
 이 이슈는 [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357)의 개발자 회귀 테스트 하위 작업이다. OOS(Out-of-row Overflow Storage)의 전체 값 보존뿐 아니라 실제 저장 레코드의 `HAS_OOS` 설정·해제, 파일·청크 소유권, 트랜잭션·복구와 정리 동작을 검증 대상으로 삼는다.

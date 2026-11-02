@@ -14,7 +14,7 @@ CBRD-27874와 CBRD-27880은 [OOS TODO CBRD-26978](http://jira.cubrid.org/browse/
 
 ## non-OOS 항목
 
-`develop`(`d5674fe94`)에도 같은 코드가 있어 OOS 후보에서 제외했다. 생성된 항목은 독립 이슈에서 추적한다.
+`develop`(`d5674fe94`)에도 같은 코드가 있는 항목을 OOS 후보에서 제외해 별도로 추적한다. 다만 shutdown 후보는 검출 코드의 동일성만 확인했으며, 실제 실패의 OOS 관련성은 아직 미확정이다. 생성된 항목은 독립 이슈에서 추적한다.
 
 | 항목 | 위치 | 후속 이슈 | 생성 상태 |
 |---|---|---|---|
@@ -24,6 +24,6 @@ CBRD-27874와 CBRD-27880은 [OOS TODO CBRD-26978](http://jira.cubrid.org/browse/
 | ASan 보고: `xasl_header` stack-use-after-scope | `do_prepare_update()`, `do_prepare_delete()` | [CBRD-27875](http://jira.cubrid.org/browse/CBRD-27875) | 생성 |
 | ASan 보고: shutdown 중 `db_ws_free()` global-buffer-overflow | `quick_fit.c` `db_ws_free()` | 없음 | 생성 보류 |
 
-`db_ws_free()` 항목은 원본 ASan stack, 해제 대상 포인터와 호출자, 실패한 테스트 및 재현 명령을 확보하지 못했다. 같은 검출 함수를 사용하는 기존 JIRA는 있으나 이 후보와 중복인지 판단할 근거가 부족하다. 일반 이슈 생성은 보류하고, 원본 로그를 확보하거나 독립 재현한 뒤 범위와 중복 여부를 다시 판단한다.
+`db_ws_free()` 항목은 원본 ASan stack, 해제 대상 포인터와 호출자, 실패한 테스트 및 재현 명령을 확보하지 못했다. 같은 검출 함수를 사용하는 기존 JIRA는 있으나 이 후보와 중복인지 판단할 근거가 부족하다. 일반 이슈 생성은 보류하고, 원본 로그를 확보하거나 독립 재현한 뒤 OOS 관련성, 범위 및 중복 여부를 다시 판단한다.
 
 상세 근거는 [OOS 후보](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27785/CBRD-27785-pr8299-adversarial-review_f8114e432_claude.md#oos-existing)와 [OOS 무관 기존 문제](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27785/CBRD-27785-pr8299-adversarial-review_f8114e432_claude.md#non-oos-existing) 절에 있다.

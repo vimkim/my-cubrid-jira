@@ -44,6 +44,8 @@ CBRD-27880은 [OOS TODO CBRD-26978](http://jira.cubrid.org/browse/CBRD-26978)의
 
 quick_fit.c의 allocation header 검사 코드는 검토한 head, base 및 develop에서 같았다. 이 사실은 검출 코드의 동일성을 보여 주며, 같은 실패가 모든 revision에서 발생함을 증명하지 않는다. 현재 정보로는 엔진, fixture 및 instrumentation 중 어느 쪽이 부적절한 포인터를 전달했는지 판단할 수 없다.
 
+기존 목록에서 non-OOS로 분류한 이 shutdown 후보의 실제 OOS 관련성도 미확정이다. 후보 목록에 이 예외를 명시했다.
+
 다음 검토에 필요한 것은 전체 ASan 보고서, binary revision과 compiler flags, DB 준비와 test filter 및 실행 명령이다. ASan이 지목한 global과 포인터의 생성 또는 대입 경로를 추적한 뒤, fixture를 분리한 최소 재현과 develop 비교를 수행한다. 이를 확보한 뒤 Correct Error 또는 조사 Task 여부와 기존 이슈 중복을 판단한다.
 
 ## Duplicate search

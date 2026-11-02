@@ -49,3 +49,7 @@
 ## Local records
 
 각 이슈의 생성에 사용한 Markdown을 같은 번호의 파일로 보관했다. 문서 저장소의 task/cbrd-27873-followup-issues 브랜치에서 로컬 커밋한다. 사용자 요청은 JIRA 생성까지를 승인하며, main 병합과 push는 별도 Git 승인 대상으로 남긴다.
+
+## Review correction
+
+독립 검토에서 원본 리뷰 harness의 공개 상태가 초기 확인 내용과 달라졌음을 확인했다. 개인 fork의 [공개 브랜치](https://github.com/vimkim/cubrid/tree/CBRD-27785-review-harness), 커밋 `7472ed577850c13be1aed915691a35b6dec23b6b`를 직접 조회했다. CBRD-27876 본문의 로컬 전용 표현을 공개 링크로 정정한다. 이 이슈만의 최소 재현 입력과 실행 명령은 검증하지 않았다는 한계는 유지한다. 정정 후 JIRA 본문도 다시 비교한다.

@@ -53,7 +53,7 @@ heap reader는 여러 행을 읽으면서 `HEAP_CACHE_ATTRINFO`를 재사용한�
 3. class representation과 각 속성 포인터의 상태 및 후속 layout 생성을 확인한다.
 4. 수정 검증에서는 다음 정상 행도 같은 캐시로 읽어 오류 뒤 재사용 결과를 확인한다.
 
-기존 리뷰의 로컬 전용 harness는 공유된 재현 자산으로 간주하지 않는다. 이슈를 재현하는 데 필요한 최소 테스트를 별도로 정리한다.
+기존 리뷰 harness는 개인 fork의 [CBRD-27785-review-harness 브랜치](https://github.com/vimkim/cubrid/tree/CBRD-27785-review-harness), 커밋 `7472ed577850c13be1aed915691a35b6dec23b6b`에 공개되어 있다. 이 자료의 접근 가능성을 확인했다. 다만 이 이슈만의 최소 실패 입력과 정확한 실행 명령을 검증하지는 않았으므로, ANALYSIS에서 별도로 정리한다.
 
 ## Expected Result
 

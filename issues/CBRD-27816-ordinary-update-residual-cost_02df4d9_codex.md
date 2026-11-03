@@ -59,7 +59,7 @@
 
 ## Analysis Result (2026-11-03)
 
-상세 근거와 명령, 원자료 위치는 [1단계 분석 보고서](https://github.com/vimkim/my-cubrid-docs/blob/fcca125a1d06fdc24bcc0072fb8ab2e65efb31bb/cbrd-27785/CBRD-27816-ordinary-update-phase1.md)에 있다.
+상세 근거와 명령, 원자료 위치는 [1단계 분석 보고서](https://github.com/vimkim/my-cubrid-docs/blob/17998cbaf76e0c97453fdaf376a32d736aa0a4ef/cbrd-27785/CBRD-27816-ordinary-update-phase1.md)에 있다.
 
 ### 측정 조건
 

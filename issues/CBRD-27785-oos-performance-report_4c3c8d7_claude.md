@@ -26,7 +26,7 @@
 - **기준.** 특별한 말이 없으면 기준은 develop `4781495f`(OOS 없음)이다. "PR #8299 내부" 표만 PR의 이전 head `f8114e432`가 기준이다.
 - **목표.** develop 대비 명령어 수의 성능 변화가 −2%보다 나쁘지 않아야 한다(작성자의 잠정 목표). 리뷰어의 기준은 "develop보다 느려지지 않을 것"이다.
 - **테이블.** 리뷰어가 쓴 테이블은 세 개다. `n`은 약 100B 행 20만 개인 일반 테이블(OOS 값 없음, 대조군)이다. `w`는 6KB 값 2만 행으로 PR에서 OOS로 저장된다. `m`은 2.5KB 값 2만 행으로 OOS 임계값 아래다.
-- **주의.** PR #7990의 리뷰어 원문과 아래 Evidence의 보고서는 반대 부호를 쓴다. 그 기록에서는 명령어가 늘면 +다.
+- **주의.** PR #7990의 리뷰어 원문은 반대 부호를 쓴다. 그 원문에서는 명령어가 늘면 +다. 아래 Evidence의 보고서는 이 문서와 같은 부호를 쓴다.
 
 ### 한눈에 보기
 
@@ -235,7 +235,7 @@ develop이 아니라 PR의 이전 head `f8114e432`가 기준이다. 리뷰 수�
 
 ## Evidence
 
-아래 보고서들은 명령어가 늘면 +로 적는다. 이 문서와 부호가 반대다.
+아래 보고서는 이 문서와 같은 부호를 쓴다. PR 댓글 원문(리뷰어 보고, 작성자 답변)은 명령어가 늘면 +로 적는다.
 
 - 리뷰어 보고: [10/27 성능 보고](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6434778190), [작성자 답변](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6441306406), [10/28 상세 보고와 재현 SQL](https://github.com/CUBRID/cubrid/pull/7990#issuecomment-6461744209)
 - 재현: [원문 SQL 4라운드·문자셋 비교](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27785/CBRD-27785-reviewer-reproduction_4408135c_20261031_codex.md), [10-27 재구성 실험과 원인 진단](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27785/CBRD-27785-oos-read-performance_bcb900d_codex.md)

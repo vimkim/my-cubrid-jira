@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27785 OOS 통합 후 CRUD 성능 저하 보고서, 2026-11-03](issues/CBRD-27785-oos-performance-report_4c3c8d7_claude.md):
+  보고·재현·원인·결과 순서의 JIRA 본문이다. 11-03에 모든 수치를 좋아지면 +, 나빠지면 −로 바꾸고, 명령어 수·cycles·실행 시간을 수치마다 표시했다. 최종 head `4c3c8d791`의 develop 대비 일반 테이블 측정(CBRD-27816)을 더했다. JIRA 설명에 반영하고 재조회로 확인했다.
 - [CBRD-27881 리팩토링 Sub-task 7개, 2026-11-03](issues/CBRD-27882-oos-dead-stats-bridge-code_3972085_claude.md):
   CBRD-27881 야간 조사에서 만든 draft PR 7개(#8367~#8373)마다 Sub-task를 하나씩 발급하고, 각 파일을 생성 시 설명으로 올렸다. 파일은 [CBRD-27882](issues/CBRD-27882-oos-dead-stats-bridge-code_3972085_claude.md), [CBRD-27883](issues/CBRD-27883-oos-test-helper-header_9f7e5c1_claude.md), [CBRD-27884](issues/CBRD-27884-oos-lob-copy-helper_02d915e_claude.md), [CBRD-27885](issues/CBRD-27885-oos-hdr-dirty-helper_0368ef0_claude.md), [CBRD-27886](issues/CBRD-27886-oos-heap-destroy-helper_7dd7b73_claude.md), [CBRD-27887](issues/CBRD-27887-oos-attr-flag-helper_eab2962_claude.md), [CBRD-27888](issues/CBRD-27888-oos-false-comments_97e538d_claude.md)이다. 조사 보고서와 결정 문서는 my-cubrid-docs의 `cbrd-27881/`에 있다.
 - [CBRD-27872 OOS 성장 게이트 sweep의 할당당 검사 비용, 2026-11-02](issues/CBRD-27872-oos-growth-sweep-cost_dcbf09e_claude.md):

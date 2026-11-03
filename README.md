@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27881 리팩토링 Sub-task 7개, 2026-11-03](issues/CBRD-27882-oos-dead-stats-bridge-code_3972085_claude.md):
+  CBRD-27881 야간 조사에서 만든 draft PR 7개(#8367~#8373)마다 Sub-task를 하나씩 발급하고, 각 파일을 생성 시 설명으로 올렸다. 파일은 [CBRD-27882](issues/CBRD-27882-oos-dead-stats-bridge-code_3972085_claude.md), [CBRD-27883](issues/CBRD-27883-oos-test-helper-header_9f7e5c1_claude.md), [CBRD-27884](issues/CBRD-27884-oos-lob-copy-helper_02d915e_claude.md), [CBRD-27885](issues/CBRD-27885-oos-hdr-dirty-helper_0368ef0_claude.md), [CBRD-27886](issues/CBRD-27886-oos-heap-destroy-helper_7dd7b73_claude.md), [CBRD-27887](issues/CBRD-27887-oos-attr-flag-helper_eab2962_claude.md), [CBRD-27888](issues/CBRD-27888-oos-false-comments_97e538d_claude.md)이다. 조사 보고서와 결정 문서는 my-cubrid-docs의 `cbrd-27881/`에 있다.
 - [CBRD-27872 OOS 성장 게이트 sweep의 할당당 검사 비용, 2026-11-02](issues/CBRD-27872-oos-growth-sweep-cost_dcbf09e_claude.md):
   PR 7990의 hornetmj 리뷰 R3를 사용자가 CBRD-26583(M2)의 Sub-task로 발급했고, 비어 있던 설명을 triage 본문으로 다시 썼다. sweep 발동 조건과 할당당 검사 상한, OOS 명세 §4 불변식의 변경 필요, CBRD-27213과의 범위 경계를 기록한다. 리뷰어 수치는 재현하지 않았다. 2026-11-02 JIRA 설명과 제목에 반영하고, 재조회한 본문의 절 순서가 같음을 확인했다. CBRD-26786, CBRD-27213과 Relates로 연결했다.
 - [CBRD-27213 재시작 뒤 OOS 빈 공간 재사용과 bestspace 공통 모듈 전환, 2026-11-02](issues/CBRD-27213-oos-bestspace-shared-module_dcbf09e_claude.md):

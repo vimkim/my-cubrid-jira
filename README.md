@@ -34,8 +34,9 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
   New Order의 주문 접수 예시, 다섯 업무와 창고·단말 용어, TPC-C 선정 이유와 대안별 적합성도 설명한다.
   OS 파일 캐시 해석, 스캔 전체 적중률의 한계와 미확인 감속 시작 원인을 구분한다.
   [측정값과 검산 스크립트](reviews/CBRD-27724-benchmark/)를 함께 보존한다. JIRA 본문에 반영하고 재조회로 확인했다.
-- [CBRD-27816 일반 UPDATE 잔여 비용 후속, 2026-10-28](issues/CBRD-27816-ordinary-update-residual-cost_02df4d9_codex.md):
+- [CBRD-27816 일반 UPDATE 잔여 비용 후속, 2026-10-28, 수정 2026-11-03](issues/CBRD-27816-ordinary-update-residual-cost_02df4d9_codex.md):
   CBRD-26978의 Sub-task로 생성하고 CBRD-27785와 relates to로 연결했다. 이번 편입에서 관측된 약 +5%를 수용한다는 작성자 결정과 기존 +2% 미달 결과를 구분한다. 후속 로컬 추적은 Work 571이다.
+  11-03에 PR #8299 head `4c3c8d7`의 분석 결과(정상 상태 +1.34%, 비동기 vacuum에 의한 spike, 코드 변경 없음 결정, 남은 연속 UPDATE 측정)를 더했다.
 - [CBRD-27785 PR7990 성능 수락 기준 반영, 2026-10-28](issues/CBRD-27785-oos-performance-regression_dcbf09e_codex.md):
   1·3번 우선·잠정 약 +2% 목표, PR8299 선반영과 현재 버전의 이득·손해 공유를 AC로 기록한다. 2번은 threshold를 기존 overflow와 맞춘 뒤 후속 재측정한다.
   기존 두 SELECT의 +2% 검증 완료는 보존하고 현재 판정과 구분한다. 사용자 승인 후 JIRA 설명에 반영하고 재조회로 검증했다.

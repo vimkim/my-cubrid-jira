@@ -351,6 +351,4 @@ TPC-C 32클라이언트에서는 큰 지연과 객체 잠금 대기가 반복되
 | 실행에 사용한 `jTPCCTData.java`, `jTPCCTerminal.java` | stock 잠금 순서, -72 이후 rollback·다음 트랜잭션 진행, Delivery 기록 방식 |
 | 기본 엔진의 `src/transaction/lock_manager.c` | 객체 대기 시간 계측과 교착 탐지 주기 검사 경로 |
 
-수치 검산 자료는 `vimkim/my-cubrid-jira`의 `reviews/CBRD-27724-benchmark/metrics.json`과 `verify.py`에 둔다. 기본 측정값과 해석에 사용한 I/O·residency·시간별 자료, 원본 JSON의 SHA-256을 포함한다. 저장소에서 `python3 reviews/CBRD-27724-benchmark/verify.py`로 대표 수치를 다시 계산한다. 원본 실행 경로를 가진 환경에서는 같은 명령에 `--raw-root <원본 실행 디렉터리>`를 추가해 원본 JSON 해시와 기본 TPC-C 6개·개입 1개의 CSV 집계를 대조한다.
-
-CSV 검산은 예열을 제외한 `120000 <= elapsed < 420000` 구간의 시도·오류·의도한 rollback·완료·비rollback·p99를 직접 재집계한다. 이는 새 벤치마크를 실행한 결과가 아니다. 핵심 수치와 추론·한계는 접근 제한 링크 없이 이 본문에 포함했다.
+CSV 검산에서는 예열을 제외한 `120000 <= elapsed < 420000` 구간의 시도·오류·의도한 rollback·완료·비rollback·p99를 직접 재집계했다. 이는 새 벤치마크를 실행한 결과가 아니다. 핵심 수치와 추론·한계는 접근 제한 링크 없이 이 본문에 포함했다.

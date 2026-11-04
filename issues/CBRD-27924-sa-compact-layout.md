@@ -70,8 +70,6 @@ SA debugger 관측에서 `desc_obj_to_disk`의 반환 길이와 `heap_update_log
 
 검사는 같은 Engine·TC 기준의 optdebug 빌드와 16KB DB page에서 별도 진단 fixture로 수행했다. Native 진단 1건은 PASS했고 소유 프로세스·관측 namespace 잔여는 0이다. 앞선 두 시도는 debugger 실행 대상과 도구 인자 설정 실패로 보존했다. 진단 PASS는 원래 `gap_compact_sa_cs`의 FAIL을 통과로 바꾸지 않으며, 엔진 수리는 아직 하지 않았다. 최신 feature head나 다른 page size의 결과로 일반화하지 않는다.
 
-개인 경로 없이 실행할 [입력 생성기·GDB 재현 명령과 구조화 관측 결과](https://github.com/vimkim/my-cubrid-jira/tree/25e10ceeba534033596dc57cf50b04d9d271db15/reviews/CBRD-27924-compact-20k)를 보존했다. 재현 안내는 같은 SQL 입력과 probe의 실행 방법이며, 실제 native containment 전체의 대체 검증을 뜻하지 않는다.
-
 ## Related Work
 
 [진단 보고서](https://github.com/vimkim/my-cubrid-docs/blob/0c5c05f713ca1953725743b865c7d3c14bd1272f/cbrd-26659/reclaim-compact-diagnosis.md)를 근거로 한다. Resolved 상태의 [CBRD-26948](https://jira.cubrid.org/browse/CBRD-26948)에 남은 SA rewrite gap을 이번 재현으로 구체화한 후속이다. [CBRD-27424](https://jira.cubrid.org/browse/CBRD-27424)는 standalone loader·workspace force 경로를 다루며 이번 compact 수리와 구분한다.

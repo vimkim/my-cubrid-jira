@@ -8,20 +8,18 @@ CUBRID JIRA 이슈의 초안, 분석 보고서, 재현·검증 자료를 Markdow
 | 경로 | 내용 |
 | --- | --- |
 | [issues/](issues/) | 이슈 설명 초안, 원인 분석, 성능 보고서. 이슈 번호로 찾습니다. |
-| [reviews/](reviews/) | 검토 기록, 재현 스크립트, 측정값, 게시 확인 자료. |
-| [이슈별 검토·게시 기록](reviews/README-history.md) | 2026-11-04 기준으로 기존 README에 모아 둔 기록. |
 | [CONTEXT.md](CONTEXT.md) | CUBRID 전송 보안과 TDE를 구분하는 용어. |
 | [CLAUDE.md](CLAUDE.md) | 에이전트의 문서 작성·업로드 규칙. |
 
 이슈 번호나 본문 키워드로 검색합니다.
 
 ```sh
-rg --files issues reviews | rg 'CBRD-27213'
-rg -n 'vacuum' issues reviews
+rg --files issues | rg 'CBRD-27213'
+rg -n 'vacuum' issues
 ```
 
 `just list`는 로컬 이슈 파일을 수정 시각이 최신인 순서로 보여줍니다.
-검토·게시 기록은 작성 당시의 상태입니다. 현재 JIRA 상태는 `just fetch <이슈 키>`로 확인합니다.
+현재 JIRA 상태는 `just fetch <이슈 키>`로 확인합니다.
 
 ## 이슈 문서 작성하기
 

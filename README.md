@@ -13,6 +13,9 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27937 vacuum의 relocation 행 undo 로그 TDE 평문 누출, 2026-11-04](issues/CBRD-27937-tde-vacuum-relocation-undo-plaintext.md):
+  OOS 대체 설계 검토 중 develop `e64a04a79` 에서 찾은 결함을 Correct Error로 발급하고 vimkim에게 배정했다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 본문의 절 구성과 재현 스크립트가 온전함을 확인했다.
+  인덱스 없는 TDE 테이블에서 vacuum 뒤에만 평문 마커가 나타나는 재현을 두 번 확인했다. PRIMARY KEY가 있으면 같은 로그 페이지의 암호화된 B-tree 로그가 평문을 가릴 수 있다는 관측도 기록한다.
 - [CBRD-27936 commit이 commit 로그보다 먼저 saved space를 풀어 재시작 복구 undo가 실패할 수 있는 결함, 2026-11-04](issues/CBRD-27936-commit-frees-saved-space-before-commit-record.md):
   Sidecar 설계 중 TLA+ 모델 검사(`commit-window-saved-space`)와 develop `e64a04a79` 코드 읽기로 찾은 결함을 Correct Error로 발급했다. 서버 재현은 하지 않았으며 ANALYSIS 질문으로 남겼다. 노출되는 삭제 경로와 노출되지 않는 경로(postpone이 있는 경우)를 구분한다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 유형·담당자·본문을 확인했다.
 - [CBRD-27935 develop의 relocation 행 vacuum forward 페이지 조기 해제, 2026-11-04](issues/CBRD-27935-vacuum-relocation-forward-page-early-release.md):

@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [PR #8350 OOS 파일 조회 실패 후속 초안, 2026-11-04](issues/vacuum-oos-vfid-lookup-error.md):
+  실제 조회 실패를 성공으로 처리하여 OOS 회수를 생략할 수 있는 기존 결함을 별도로 다룬다. 번호 없는 로컬 초안이며 JIRA 등록과 GitHub 답글 게시 전이다. [중복 확인·등록 준비](reviews/pr8350-vfid-lookup/README.md)와 [원댓글 답글 초안](reviews/pr8350-vfid-lookup/reply-draft.md)을 함께 보존한다. PR #8350은 open으로 유지한다.
 - [CBRD-26659 세션 인계와 후속 TODO, 2026-11-04](reviews/CBRD-26659-session-wrapup.md):
   OOS TODO CBRD-26978 아래에 [CBRD-27924 SA compact 수리](issues/CBRD-27924-sa-compact-layout.md)와 [CBRD-27925 유예 빈 페이지 회수 후속](issues/CBRD-27925-deferred-empty-page-reclaim.md)을 생성했다. 생성 본문·부모·유형·관련 링크를 live 재조회로 확인했다. 원래 FAIL·TIMEOUT, 기존 수리 이슈, runner·커버리지·QA·TC 리뷰 잔여 범위와 다음 재개 순서를 보존한다.
   CBRD-27924의 20KB 초과 추가 검사에서 SA compact의 24052B 직렬화 입력과 heap overflow 저장을 관측했다. 같은 논리 값의 일반 UPDATE·CS compact는 OOS를 사용했으며 전체 값은 보존됐다. [재현 자료와 관측 결과](reviews/CBRD-27924-compact-20k/README.md)를 함께 보존한다.

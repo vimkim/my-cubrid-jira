@@ -1,0 +1,42 @@
+{
+  "dry_run": true,
+  "requests": [
+    {
+      "method": "POST",
+      "url": "https://jira.cubrid.org/rest/api/2/issue",
+      "body": {
+        "fields": {
+          "project": {
+            "key": "CBRD"
+          },
+          "summary": "[OOS] vacuum이 OOS 파일 조회 실패를 삼켜 삭제된 행의 OOS 값을 남긴다",
+          "issuetype": {
+            "name": "Sub-task"
+          },
+          "parent": {
+            "key": "CBRD-26978"
+          },
+          "description": "h1. {anchor:oos-vacuum이-oos-파일-조회-실패를-삼켜-삭제된-행의-oos-값을-남긴다}\\[OOS\\] vacuum이 OOS 파일 조회 실패를 삼켜 삭제된 행의 OOS 값을 남긴다\n*한 줄 요약*: [PR #8350 리뷰 댓글|https://github.com/CUBRID/cubrid/pull/8350#discussion_r4452180248]이 지적한 기존 결함을 별도로 추적하여, 일시적인 OOS 파일 조회 실패가 삭제된 행의 OOS 값 누수로 이어지지 않게 한다.\n\nh2. {anchor:issue-triage}Issue Triage\n*이슈 수행 목적*: OOS 파일 조회가 실패하면 정리를 생략한 채 heap 슬롯 제거를 확정하지 않고, 오류 해소 또는 서버 재기동 뒤 재처리하여 OOS 값을 회수하게 한다.\n\n*이슈 수행 이유*: PR #8350 리뷰에서 {{vacuum_oos_find_vfid_for_heap_record}} 가 실제 조회 실패를 지우고 성공을 반환하는 기존 결함을 별도 등록하도록 요청했다. 고정 소스에서도 오류를 {{NULL VFID + NO_ERROR}} 로 바꾸는 처리와 OOS 삭제를 건너뛰는 후속 분기를 확인했다.\n\n*영향*: 리뷰어는 DELETE된 행의 OOS 값이 영구 누수될 수 있다고 보고했다. 운영자는 삭제 뒤 재사용할 OOS 공간을 회수하지 못할 위험이 있다. 발생 빈도와 누수량은 확인하지 않았으며, 이번 작성에서는 장애 주입이나 런타임 재현을 실행하지 않았다.\n\n*이슈 수행 방안*: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.\n\n----\nh2. {anchor:ai-generated-context}AI-Generated Context\nh2. {anchor:description}Description\nOOS는 큰 컬럼 값을 행 밖의 전용 파일에 저장하는 방식이다. heap 행에는 해당 값의 참조가 남는다. vacuum은 MVCC상 더 이상 필요 없는 삭제 행을 제거할 때, heap 헤더에서 OOS 파일 식별자(VFID)를 읽고 행이 참조하던 OOS 값도 정리해야 한다.\n\n일반 조회 함수 {{heap_oos_find_vfid(..., false)}} 는 조회 성공과 실패를 구분한다. 헤더를 정상적으로 읽었지만 연결된 OOS 파일이 없으면 {{true + NULL VFID}} 를 반환한다. 헤더 페이지 확보나 헤더 레코드 읽기가 실패하면 {{false}} 를 반환한다. [조회 계약과 오류 분기|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/storage/heap_file.c#L13244-L13364]\n\n그런데 {{vacuum_oos_find_vfid_for_heap_record}} 는 이 {{false}} 를 받으면 로그와 assertion을 거친 뒤 {{er_clear()}} 로 오류를 지운다. 이어 VFID를 비우고 {{NO_ERROR}} 를 반환한다. 정상 {{true + NULL VFID}} 는 그 앞에서 이미 반환하므로, 이 오류 분기를 단순히 \"연결된 OOS 파일 없음\"으로 취급할 수 없다. [오류를 성공으로 바꾸는 helper|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum_oos.cpp#L389-L424]\n\nPR #8350의 대기 경로는 heap 페이지를 놓은 뒤 이 helper를 호출한다. 이후 페이지를 다시 잡고 레코드를 다시 준비하지만, {{oos_header_waited}} 가 설정되어 VFID를 다시 조회하지 않는다. 따라서 실패를 흡수한 결과도 다음 단계로 이어진다. [대기 경로|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum.c#L2314-L2352], [REC_HOME의 재준비 분기|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum.c#L2266-L2277]\n\n삭제 대상 행을 처리하는 {{vacuum_heap_record}} 의 {{has_oos}} 조건에는 유효한 VFID가 필요하다. VFID가 NULL이면 heap 슬롯 제거는 진행하면서 OOS 삭제 호출은 건너뛸 수 있다. 리뷰어는 이때 DELETE된 행의 참조를 잃어 OOS 값이 영구히 회수되지 않는다고 설명했다. 이번 조사는 이 분기 연결을 소스로 확인했으며, 실제 잔존 chain이나 영구 누수를 측정하지 않았다. [슬롯 제거와 조건|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum.c#L2565-L2585], [REC_HOME의 OOS 삭제 조건|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum.c#L2681-L2705]\n\nh2. {anchor:evidence}Evidence\n* 소스 확인 기준은 PR #8350 head {{1ef6ed6125eb6028c06b0e05282dc0041bde3f48}} 이다. base {{dcbf09e4f7fd02ff9c8fc6493ec8887fc2919d67}} 에도 [같은 오류 삼킴|https://github.com/CUBRID/cubrid/blob/dcbf09e4f7fd02ff9c8fc6493ec8887fc2919d67/src/query/vacuum_oos.cpp#L389-L424]이 있다. PR #8350이 새로 도입한 결함으로 분류하지 않는다.\n* 헤더 래치 대기 타임아웃과 헤더 페이지 읽기 오류는 원댓글이 제시한 실패 조건이다. 실제 장애 주입 방법과 재현 조건은 후속 검증에서 확정한다.\n* {{assert_release(false)}} 는 {{NDEBUG}} 빌드에서 notification을 설정하고 계속 진행한다. assertion이 활성화된 debug에서는 일반 {{assert}} 로 중단한다. 위의 오류 삭제·성공 반환 설명은 전자에 해당하며, 이번 작성에서 두 바이너리를 실행한 결과는 아니다. [매크로 정의|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/base/error_manager.h#L184-L198]\n\nh2. {anchor:expected-result}Expected Result\n* 실제 조회 실패를 \"정상 조회 결과에 OOS 파일이 없음\"과 구분한다. OOS 정리를 생략한 채 heap 슬롯 제거를 확정하지 않는다.\n* 일시적 오류가 해소되면 vacuum이 해당 페이지를 다시 처리하여 heap 행과 OOS 값을 정리한다.\n* 셧다운으로 처리를 마치지 못하면 블록을 완료로 표시하지 않는다. 재기동 후 미완료 작업을 다시 처리하여 값을 회수한다.\n* PR #8350이 해소하는 heap 페이지와 헤더 사이의 래치 대기 순환을 다시 만들지 않는다.\n\nh2. {anchor:analysis-questions}Analysis Questions\n원댓글은 실패를 오류로 반환해 재처리하도록 하고, \"기다린 조회의 답을 최종으로 쓰는\" 처리와 현재 helper의 성공 반환 때문에 실행되지 않는 오류 검사도 함께 정리할 것을 요청한다. 이 요구를 기준으로 오류 전파와 재준비 상태를 검토한다.\n\n현재 release의 {{vacuum_heap}} 는 일반 페이지 오류에서 셧다운이 아니면 같은 페이지를 재시도한다. 따라서 오류 반환만 바꾸면 지속 오류에서 진행이 멈출 수 있다. 일시 오류 재처리, 지속 오류의 진단과 진행 정책, 셧다운 시 미완료 블록 보존을 함께 분석해야 한다. [현재 반복 처리|https://github.com/CUBRID/cubrid/blob/1ef6ed6125eb6028c06b0e05282dc0041bde3f48/src/query/vacuum.c#L1593-L1621]\n\nh2. {anchor:verification-plan}Verification Plan\n아래는 후속 검증 제안이며 실행 결과가 아니다.\n\n# OOS 값을 가진 DELETE 행의 VFID 조회에 타임아웃 또는 읽기 오류를 주입한다. 실패 직후 heap 슬롯을 확정 제거하지 않는지 확인한다.\n# 오류를 해제하고 같은 작업이 재처리되어 OOS chunk record가 회수되는지 확인한다. {{REC_HOME}} 과 {{REC_RELOCATION}} 을 각각 검증한다.\n# 실패와 셧다운을 겹치게 하여 블록이 미완료로 남고, 재기동 뒤 정리가 끝나는지 확인한다.\n# debug와 release의 오류 동작, 지속 오류에서의 진행 정책, PR #8350의 래치 순환 방지 동작을 확인한다.\n\nh2. {anchor:related-issues}Related Issues\n[CBRD-27860|https://jira.cubrid.org/browse/CBRD-27860]은 PR #8350의 래치 순환 수정이다. 이번 이슈는 기존 조회 오류의 처리와 OOS 회수를 별도로 다룬다.\n\n[CBRD-27089|https://jira.cubrid.org/browse/CBRD-27089]는 파티션 행과 OOS 값의 소유 heap 불일치다. [CBRD-26715|https://jira.cubrid.org/browse/CBRD-26715]는 과거 OOS 플래그 오류에 따른 반복 처리이며, [CBRD-26792|https://jira.cubrid.org/browse/CBRD-26792]는 release 오류 진단 정리다. 같은 함수가 등장하더라도 이번 일시적 조회 실패와 원인을 동일시하지 않는다. 과거 진단용 fatal-stop 방침을 이번 오류의 처리 정책으로 그대로 적용하지 않는다.\n",
+          "customfield_210565": {
+            "value": "Required"
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://jira.cubrid.org/rest/api/2/issueLink",
+      "body": {
+        "type": {
+          "name": "Relates"
+        },
+        "inwardIssue": {
+          "key": "<new-issue-key>"
+        },
+        "outwardIssue": {
+          "key": "CBRD-27860"
+        }
+      }
+    }
+  ]
+}

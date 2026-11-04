@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27936 commit이 commit 로그보다 먼저 saved space를 풀어 재시작 복구 undo가 실패할 수 있는 결함, 2026-11-04](issues/CBRD-27936-commit-frees-saved-space-before-commit-record.md):
+  Sidecar 설계 중 TLA+ 모델 검사(`commit-window-saved-space`)와 develop `e64a04a79` 코드 읽기로 찾은 결함을 Correct Error로 발급했다. 서버 재현은 하지 않았으며 ANALYSIS 질문으로 남겼다. 노출되는 삭제 경로와 노출되지 않는 경로(postpone이 있는 경우)를 구분한다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 유형·담당자·본문을 확인했다.
 - [CBRD-27935 develop의 relocation 행 vacuum forward 페이지 조기 해제, 2026-11-04](issues/CBRD-27935-vacuum-relocation-forward-page-early-release.md):
   Sidecar 설계 중 찾은 develop `e64a04a79` 결함을 Correct Error로 발급하고 CBRD-27858과 Relates로 연결했다. CBRD-27858의 수정 PR #8348은 `feature/oos-merge` 만 대상으로 하므로, develop에 남은 서버 중단 경로를 따로 추적한다. 근거는 TLA+ 모델 검사의 반례 세 개와 소스 읽기이며 서버 재현은 ANALYSIS 질문으로 남겼다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 원문이 변환 결과와 같음을 확인했다.
 - [CBRD-27933 PR #8350 OOS 파일 조회 실패 후속, 2026-11-04](issues/CBRD-27933-vacuum-oos-vfid-lookup-error.md):

@@ -13,6 +13,8 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 ## Reviewed issue updates
 
+- [CBRD-27935 develop의 relocation 행 vacuum forward 페이지 조기 해제, 2026-11-04](issues/CBRD-27935-vacuum-relocation-forward-page-early-release.md):
+  Sidecar 설계 중 찾은 develop `e64a04a79` 결함을 Correct Error로 발급하고 CBRD-27858과 Relates로 연결했다. CBRD-27858의 수정 PR #8348은 `feature/oos-merge` 만 대상으로 하므로, develop에 남은 서버 중단 경로를 따로 추적한다. 근거는 TLA+ 모델 검사의 반례 세 개와 소스 읽기이며 서버 재현은 ANALYSIS 질문으로 남겼다. 이 파일을 생성 시 설명으로 올렸고, 재조회한 원문이 변환 결과와 같음을 확인했다.
 - [CBRD-27933 PR #8350 OOS 파일 조회 실패 후속, 2026-11-04](issues/CBRD-27933-vacuum-oos-vfid-lookup-error.md):
   실제 조회 실패를 성공으로 처리하여 OOS 회수를 생략할 수 있는 기존 결함을 별도로 등록했다. CBRD-26978의 Sub-task이며 CBRD-27860과 Relates로 연결했다. [중복 확인·발급 검증](reviews/pr8350-vfid-lookup/README.md)과 [원댓글에 게시한 답글](reviews/pr8350-vfid-lookup/reply.md)을 함께 보존한다. live 본문과 답글을 재조회했고 PR #8350은 open으로 유지했다.
 - [CBRD-26659 세션 인계와 후속 TODO, 2026-11-04](reviews/CBRD-26659-session-wrapup.md):

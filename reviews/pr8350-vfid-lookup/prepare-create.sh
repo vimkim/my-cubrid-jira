@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(git -C "$script_dir" rev-parse --show-toplevel)"
-issue_file="$repo_dir/issues/vacuum-oos-vfid-lookup-error.md"
+issue_file="$repo_dir/issues/CBRD-27933-vacuum-oos-vfid-lookup-error.md"
 summary="$(sed -n '1s/^# //p' "$issue_file")"
 test -n "$summary"
 

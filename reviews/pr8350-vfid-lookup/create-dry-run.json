@@ -3,7 +3,7 @@
   "requests": [
     {
       "method": "POST",
-      "url": "https://jira.cubrid.org/rest/api/2/issue",
+      "url": "http://jira.cubrid.org/rest/api/2/issue",
       "body": {
         "fields": {
           "project": {
@@ -25,7 +25,7 @@
     },
     {
       "method": "POST",
-      "url": "https://jira.cubrid.org/rest/api/2/issueLink",
+      "url": "http://jira.cubrid.org/rest/api/2/issueLink",
       "body": {
         "type": {
           "name": "Relates"

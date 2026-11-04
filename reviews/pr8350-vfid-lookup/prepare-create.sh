@@ -16,6 +16,6 @@ cubrid-jira create \
   --from markdown \
   --field 'customfield_210565={"value":"Required"}' \
   --link-relates CBRD-27860 \
-  --server https://jira.cubrid.org \
+  --server http://jira.cubrid.org \
   --dry-run \
   --output json

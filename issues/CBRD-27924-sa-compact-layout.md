@@ -48,7 +48,29 @@ SA에서는 같은 OID의 representation과 길이가 바뀌어 실제 재작성
 - [ ] SA compact의 실제 representation 재작성에 정상 OOS 배치 정책을 적용한다.
 - [ ] 원래 `gap_compact_sa_cs`를 기대값 완화 없이 실행하고 전체 값·물리 행·OOS owner를 검증한다. SA·CS·일반 UPDATE 대조를 남긴다.
 - [ ] 기존 OOS stub에서 시작하는 rewrite와 필요한 Expand·소유권 처리를 별도로 검증한다. 현재 lazy-default fixture만으로 이 범위를 통과 처리하지 않는다.
+- [ ] 아래 3000B payload와 21000B lazy default fixture에서도 정상 OOS 배치를 적용한다. 20KB를 넘는 재작성 입력을 기존 heap overflow로 우회 저장하지 않으며 전체 값과 owner를 검증한다.
 - [ ] 수정 commit·검증 결과·잔여 제한을 CBRD-26659에 연결한다.
+
+## Additional verification
+
+2026-11-04에 20KB를 넘는 실제 RECDES의 저장 경로를 추가 검사했다. **이 고정 revision의 SA compact는 OOS로 분리하지 않고 heap overflow에 저장한다.** 입력은 3000B `BIT VARYING` payload와 lazy ADD한 21000B `BIT VARYING` default다. SQL 문자열이나 선언 길이 대신 실제 직렬화 결과와 저장 형태를 관측했다.
+
+| 관측 | SA compact | 같은 행의 일반 UPDATE | 별도 동일 fixture의 CS compact |
+| --- | --- | --- | --- |
+| 현재 representation | 2 | 2 | 2 |
+| heap home slot 유형 | `REC_BIGONE`, 5 | `REC_HOME`, 2 | `REC_HOME`, 2 |
+| home slot 저장 길이 | 8B, overflow 참조 | 3076B | 3076B |
+| record flags | 7, HAS_OOS 없음 | 13, HAS_OOS 있음 | 13, HAS_OOS 있음 |
+| OOS file·chunk | 없음, 0개 | 있음, 2개 | 있음, 2개 |
+| 전체 값 대조 | 3000B·21000B 일치 | 3000B·21000B 일치 | 3000B·21000B 일치 |
+
+SA debugger 관측에서 `desc_obj_to_disk`의 반환 길이와 `heap_update_logical` 입력은 모두 **24052B**였다. 당시 최대 slotted record 길이는 16236B였다. 이후 `overflow_insert`에 24068B가 전달됐고 `file_type`은 `FILE_MULTIPAGE_OBJECT_HEAP`이었다. 호출 stack에는 `heap_update_home` → `heap_ovf_insert` → `overflow_insert`가 있었다. Home slot의 8B는 전체 행 길이가 아니라 overflow 참조 크기다. OOS file 부재도 SHOW로 확인했다.
+
+이 결과는 [SA writer](https://github.com/CUBRID/cubrid/blob/e3589ae42d42b04eb020e1ae43e165b01d31b12a/src/executables/compactdb.c#L656)의 직접 heap 갱신과 [큰 home record의 overflow 전환](https://github.com/CUBRID/cubrid/blob/e3589ae42d42b04eb020e1ae43e165b01d31b12a/src/storage/heap_file.c#L25061) 경로를 실제 관측으로 연결한다. 일반 UPDATE의 [OOS·bigone 공존 거부](https://github.com/CUBRID/cubrid/blob/e3589ae42d42b04eb020e1ae43e165b01d31b12a/src/storage/heap_file.c#L14230)는 attribute 변환 단계에 있다. 이번 SA 행에는 HAS_OOS가 없으므로, 이번 결과를 OOS와 bigone의 동시 저장이나 해당 거부 조건의 실패로 해석하지 않는다.
+
+검사는 같은 Engine·TC 기준의 optdebug 빌드와 16KB DB page에서 별도 진단 fixture로 수행했다. Native 진단 1건은 PASS했고 소유 프로세스·관측 namespace 잔여는 0이다. 앞선 두 시도는 debugger 실행 대상과 도구 인자 설정 실패로 보존했다. 진단 PASS는 원래 `gap_compact_sa_cs`의 FAIL을 통과로 바꾸지 않으며, 엔진 수리는 아직 하지 않았다. 최신 feature head나 다른 page size의 결과로 일반화하지 않는다.
+
+개인 경로 없이 실행할 [입력 생성기·GDB 재현 명령과 구조화 관측 결과](https://github.com/vimkim/my-cubrid-jira/tree/25e10ceeba534033596dc57cf50b04d9d271db15/reviews/CBRD-27924-compact-20k)를 보존했다. 재현 안내는 같은 SQL 입력과 probe의 실행 방법이며, 실제 native containment 전체의 대체 검증을 뜻하지 않는다.
 
 ## Related Work
 

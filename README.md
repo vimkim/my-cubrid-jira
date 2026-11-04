@@ -15,6 +15,7 @@ Issue files live in the `issues/` directory, one file per Jira issue, named
 
 - [CBRD-26659 세션 인계와 후속 TODO, 2026-11-04](reviews/CBRD-26659-session-wrapup.md):
   OOS TODO CBRD-26978 아래에 [CBRD-27924 SA compact 수리](issues/CBRD-27924-sa-compact-layout.md)와 [CBRD-27925 유예 빈 페이지 회수 후속](issues/CBRD-27925-deferred-empty-page-reclaim.md)을 생성했다. 생성 본문·부모·유형·관련 링크를 live 재조회로 확인했다. 원래 FAIL·TIMEOUT, 기존 수리 이슈, runner·커버리지·QA·TC 리뷰 잔여 범위와 다음 재개 순서를 보존한다.
+  CBRD-27924의 20KB 초과 추가 검사에서 SA compact의 24052B 직렬화 입력과 heap overflow 저장을 관측했다. 같은 논리 값의 일반 UPDATE·CS compact는 OOS를 사용했으며 전체 값은 보존됐다. [재현 자료와 관측 결과](reviews/CBRD-27924-compact-20k/README.md)를 함께 보존한다.
 - [CBRD-27785 OOS 통합 후 CRUD 성능 저하 보고서, 2026-11-03](issues/CBRD-27785-oos-performance-report_4c3c8d7_claude.md):
   보고·재현·원인·결과 순서의 JIRA 본문이다. 11-03에 모든 수치를 좋아지면 +, 나빠지면 −로 바꾸고, 명령어 수·cycles·실행 시간을 수치마다 표시했다. 최종 head `4c3c8d791`의 develop 대비 일반 테이블 측정(CBRD-27816)을 더했다. JIRA 설명에 반영하고 재조회로 확인했다.
 - [CBRD-27881 리팩토링 Sub-task 7개, 2026-11-03](issues/CBRD-27882-oos-dead-stats-bridge-code_3972085_claude.md):

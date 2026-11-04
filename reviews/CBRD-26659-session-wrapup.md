@@ -38,3 +38,5 @@ SA compact는 엔진 수리 대상으로 처리한다는 담당자 결정을 반
 [회수·compact 진단](https://github.com/vimkim/my-cubrid-docs/blob/0c5c05f713ca1953725743b865c7d3c14bd1272f/cbrd-26659/reclaim-compact-diagnosis.md), [이전 수리·14 FAIL 분석](https://github.com/vimkim/my-cubrid-docs/blob/0c5c05f713ca1953725743b865c7d3c14bd1272f/cbrd-26659/follow-up-results.md), [상세 TODO](https://github.com/vimkim/my-cubrid-docs/blob/0c5c05f713ca1953725743b865c7d3c14bd1272f/cbrd-26659/CBRD-26659-todo-checklist_20261029_codex.md)를 보존한다.
 
 다음 세션은 CBRD-27924의 최신 수정 대상 revision 확인과 SA compact 재현부터 시작한다. 이어 CBRD-27925의 미확정 관측을 진행한다. 기존 문서에 남은 정책 선택 문구보다 이번 세션의 수리 결정을 우선한다. 이번 정리에서는 엔진·TC 수리나 새 CI 실행을 시작하지 않는다.
+
+이후 담당자 요청으로 [CBRD-27924의 20KB 초과 검사](../issues/CBRD-27924-sa-compact-layout.md#additional-verification)를 추가했다. 같은 고정 revision에서 SA compact는 24052B를 직렬화하고 heap overflow의 `REC_BIGONE`으로 저장했다. 일반 UPDATE·CS compact는 OOS를 사용했다. 엔진 수리와 원래 FAIL의 재검증은 계속 남아 있다.

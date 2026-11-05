@@ -9,14 +9,14 @@ Investigation playbook steps.
 - [x] Route through the **how** skill. For motivation questions, also route through the **why** skill. Skip why because this request asks source attribution and tracking scope, not historical design motivation.
 - [x] Throughput checkpoint stays one line: `throughput checkpoint: n/a, read-only investigation`.
 - [x] Produce the `how`-shaped output (Overview / Key Concepts / How It Works / Where Things Live / Gotchas), or a recommendation with a tradeoffs table if the request is a decision between alternatives. The report uses the recommendation table.
-- [ ] Apply the **unslop** skill to the reply.
+- [x] Apply the **unslop** skill to the reply.
 
 Swarm steps.
 
 - [x] Frame.
 - [x] Fan out.
 - [x] Aggregate.
-- [ ] Report.
+- [x] Report.
 
 The scope is a source-and-issue investigation plus explicitly authorized comments. No engine code change, database reproduction, issue deletion or workflow transition is included. Actual DB reproduction remains behind team-lead approval.
 

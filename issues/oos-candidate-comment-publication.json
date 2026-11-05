@@ -1,0 +1,38 @@
+{
+  "prepared_commit": "1414b81bb43cbd1611923418f010a52204b3ce17",
+  "comments": [
+    {
+      "issue": "CBRD-27944",
+      "comment_id": "4777946",
+      "issue_url": "https://jira.cubrid.org/browse/CBRD-27944",
+      "created": "2026-11-05T14:26:08.000+0900",
+      "readback_at": "2026-11-05T05:26:08.388519+00:00",
+      "body_sha256": "24608c8fedaf2521b22194c4fdf302a751c3ead13bbf53a0c49b207abb8ecf8a",
+      "exact_body_match": true,
+      "source_markdown_sha256": "c9a6d2231f4ad371f57ff0c0f25481c9c64be703e4add6cfb0e5d721bed8b311"
+    },
+    {
+      "issue": "CBRD-27945",
+      "comment_id": "4777947",
+      "issue_url": "https://jira.cubrid.org/browse/CBRD-27945",
+      "created": "2026-11-05T14:26:09.000+0900",
+      "readback_at": "2026-11-05T05:26:09.174733+00:00",
+      "body_sha256": "ef593bd7b45d273f60ec650ed506aa6cc0799ee67adfcb09f5c7839490ba80f4",
+      "exact_body_match": true,
+      "source_markdown_sha256": "06624dc1b04146adfea290c29e9a40df05bd1a007cef1736294b014dcc4e53f3"
+    }
+  ],
+  "issue_fields_unchanged": {
+    "CBRD-27945": {
+      "status": "Open",
+      "description_unchanged": true
+    },
+    "CBRD-27944": {
+      "status": "Open",
+      "description_unchanged": true
+    }
+  },
+  "finished_at": "2026-11-05T05:26:09.689638+00:00",
+  "raw_evidence_archive": "/home/vimkim/.local/state/oos-candidate-review-791",
+  "archive_manifest_sha256": "b227e50576e7dc319681e8bc9cdc3c61364ca7347efa6b84f85bee535fe87d1f"
+}

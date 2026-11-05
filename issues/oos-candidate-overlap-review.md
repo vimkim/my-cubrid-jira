@@ -4,6 +4,17 @@
 
 검토일은 2026-11-05다. 실제 DB 재현은 수행하지 않았다. 사용자가 승인한 외부 작업은 27944·27945의 댓글 게시다. 본문·담당자·상태 변경이나 삭제는 이번 범위에 없다.
 
+## 게시 결과
+
+두 댓글을 게시하고 실제 댓글 ID로 재조회했다. 서버가 반환한 본문은 각각 검토한 dry-run의 Jira 본문과 정확히 일치했다. 두 이슈는 Open이며 기존 description도 바뀌지 않았다.
+
+| 대상 | 게시한 댓글 ID | 원문 |
+| --- | --- | --- |
+| [CBRD-27944](https://jira.cubrid.org/browse/CBRD-27944) | `4777946` | [검토 댓글](CBRD-27944-overlap-branch-comment.md) |
+| [CBRD-27945](https://jira.cubrid.org/browse/CBRD-27945) | `4777947` | [검토 댓글](CBRD-27945-overlap-branch-comment.md) |
+
+검토한 문서는 `docs/oos-tla-candidates-20261105`의 `1414b81bb43cbd1611923418f010a52204b3ce17`에 먼저 커밋했다. 게시·읽기 검증의 ID·시각·본문 SHA-256은 [publication record](oos-candidate-comment-publication.json)에 있다. 로컬 문서 작업 checkout은 `/home/vimkim/gh/my-cubrid-jira-oos-tla-candidates`다. main 통합·push·엔진 변경은 하지 않았다.
+
 ## 판단
 
 | 이슈 | 기존 이슈와의 관계 | develop 비교 | 권고 |
@@ -71,6 +82,21 @@ project = CBRD AND (text ~ "reclaim" OR text ~ "sweep" OR text ~ "metadata") ORD
 
 Prove It Works 원칙은 고정 소스와 실제 게시 댓글을 직접 확인하는 선택에 적용했다. Separate Before Serializing Shared State 원칙은 각 작업자의 출력 경로를 나누고 root만 영구 문서·JIRA 댓글을 쓰는 선택에 적용했다.
 
+규범 명세 `/home/vimkim/gh/cubrid-oos-context/OOS-CONTEXT.md`를 전체 재독했다. 문서의 Last updated는 2026-10-27이며 전후 SHA-256은 `6300aa1fa6ffb54033b9c7f7ea959466e9d88f0530e1ab0d7178b4459d4fcf63`으로 일치했다. §4의 예약 순간 회수 요구를 확인했다. 연결된 과거 구현 관측은 현재 통합 상태로 취급하지 않았다.
+
+검증 worktree의 환경 점검은 Git·OOS 소스를 확인했지만 빌드 디렉터리와 compile_commands.json이 없고 PRESET_MODE가 설정되지 않았다고 보고했다. 따라서 빌드·LSP 결과를 근거로 쓰지 않았다. 이 조사는 고정 Git 객체 읽기로 수행했다. 향후 해당 개발 도구가 필요하면 승인된 작업 환경에서 `just build`로 빌드 자료를 만든 뒤 `ln -sf build_preset_${PRESET_MODE}/compile_commands.json .`으로 연결할 수 있다. 이번 확인에 필요하지 않아 빌드를 시작하지 않았다.
+
 검토 모델은 GPT-6.1 Terra와 GPT-6 Astra다. 사용 가능한 모델이 모두 GPT-6 계열이므로 서로 다른 모델 계열의 검토는 확보하지 못했다. 이는 독립 작업을 했다는 사실과 구분한다.
 
-원본 작업 자료는 `/tmp/oos-candidate-review-20261105/`에 있다. 영구 기록은 이 문서, 두 댓글 원문, `oos-candidate-review-decisions.tsv`다. 게시 결과와 읽기 검증은 게시 후 별도 기록한다.
+게시 전 독립 검토는 `1414b81`의 소스 링크 7개, 함수 해시 18개, 두 댓글 payload, 결정 기록 7개 행을 대조해 PASS로 판정했다. 코드 댓글 점검은 문서만 있는 범위임을 확인했고 삭제·수정은 없었다. root는 게시 후 실제 본문 일치와 이슈 필드 유지를 별도로 확인했다.
+
+원본 작업 자료는 `/tmp/oos-candidate-review-20261105/`에서 `/home/vimkim/.local/state/oos-candidate-review-791/`로 보관했고 51개 파일의 SHA-256을 대조했다. 보관 manifest는 그 디렉터리의 `archive-manifest.json`이다. 기존 결정 행의 `/tmp` 포인터는 보관본에서 같은 상대 경로로 찾을 수 있다. 영구 요약은 이 문서, 두 댓글 원문, branch evidence·publication JSON과 `oos-candidate-review-decisions.tsv`다.
+
+## Attention
+
+reviewed by gpt-6-astra
+
+- 실제 DB의 도달 가능성·빈도·공간 영향과 팀장 재현 승인은 미확인이다.
+- 27944의 근거 이관과 Duplicate 종료는 권고 상태다. 이번 댓글 게시가 이를 완료하지 않는다.
+- 서로 다른 모델 계열의 검토는 확보하지 못했다.
+- 원본 임시 자료의 보관 문제와 댓글 게시 후 읽기 검증 항목은 root의 보관 해시·실제 댓글 대조로 해소했다.

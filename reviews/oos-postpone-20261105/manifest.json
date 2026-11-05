@@ -1,0 +1,37 @@
+[
+  {
+    "issue": "CBRD-27237",
+    "file": "CBRD-27237.md",
+    "sha256": "b190ffeb64c536887be875b678dcb7097291adefdb2fc13accb60e9f00a38a26"
+  },
+  {
+    "issue": "CBRD-27781",
+    "file": "CBRD-27781.md",
+    "sha256": "d3c5fbccc0cb2fa5fa958e8558b706d6a26bccd51d9833d4ad2dcf5ecbbc4cc5"
+  },
+  {
+    "issue": "CBRD-27230",
+    "file": "CBRD-27230.md",
+    "sha256": "a6a757f7e81b21323de6fa3bf304ca83018e6fdf4ae4e7b3c403edb006a9d804"
+  },
+  {
+    "issue": "CBRD-27881",
+    "file": "CBRD-27881.md",
+    "sha256": "4aebbd581bb951aa49a1cfd030dc4c9b09ec2d3a14bbcd97bac3cbe79815ab71"
+  },
+  {
+    "issue": "CBRD-27925",
+    "file": "CBRD-27925.md",
+    "sha256": "d8edfb29b08ff05e4ceb46553a077e9009dfd898218b04d0963e9e4c786f64d3"
+  },
+  {
+    "issue": "CBRD-27841",
+    "file": "CBRD-27841.md",
+    "sha256": "253c101b0a0ff0d8d7f91c6cc39635395b24c8f73303a87e86f682590413457f"
+  },
+  {
+    "issue": "CBRD-27953",
+    "file": "CBRD-27953.md",
+    "sha256": "7200073f13b9a1390afc60f5999779cfc9d1a8f9f9f229308b40945edca504e7"
+  }
+]

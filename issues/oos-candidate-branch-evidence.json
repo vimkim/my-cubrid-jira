@@ -1,0 +1,106 @@
+{
+  "refs": {
+    "develop": "be0a9ab1fd83daa509f5ca53dcc03f6c3cbea16d",
+    "baseline": "f67f2f692a7ad9f9efada2178759ca713e596b9d",
+    "feature": "d52b1889e907abcf84190ec504dde3bc93de260d"
+  },
+  "extraction": "function name at column zero through column-zero closing brace plus newline",
+  "functions": {
+    "develop": {
+      "file_header_alloc": {
+        "line": 1069,
+        "sha256": "12384c275c167d133c5be305e1ee2bc19816c95baf00b1259ef6058b1b4974cb",
+        "bytes": 609
+      },
+      "file_perm_expand": {
+        "line": 4632,
+        "sha256": "d56662e5a2efa1b52fbc5c44506133fc1b3f231c3fc8316f615c33b50671a6f9",
+        "bytes": 4521
+      },
+      "file_table_add_full_sector": {
+        "line": 5014,
+        "sha256": "98e30bdc9960ca1d6bca5357fe8306669e4e7ff253951beb93b5c24999bb2835",
+        "bytes": 3355
+      },
+      "file_perm_alloc": {
+        "line": 5154,
+        "sha256": "af1f796e922bd6947d94d0e7b9f7f33526788dc3522db25248913baf2a3bb4bf",
+        "bytes": 6490
+      },
+      "file_alloc": {
+        "line": 5393,
+        "sha256": "0720aa64135f3f684a67310d1783276fe20a346773256929c9fe607c46ea3230",
+        "bytes": 4591
+      },
+      "file_perm_dealloc": {
+        "line": 6290,
+        "sha256": "c7a0ca828a915ab5412843485911bfdd8b98fa1248c005ab912ed90964b6e26c",
+        "bytes": 10893
+      }
+    },
+    "baseline": {
+      "file_header_alloc": {
+        "line": 1069,
+        "sha256": "12384c275c167d133c5be305e1ee2bc19816c95baf00b1259ef6058b1b4974cb",
+        "bytes": 609
+      },
+      "file_perm_expand": {
+        "line": 4639,
+        "sha256": "d56662e5a2efa1b52fbc5c44506133fc1b3f231c3fc8316f615c33b50671a6f9",
+        "bytes": 4521
+      },
+      "file_table_add_full_sector": {
+        "line": 5021,
+        "sha256": "98e30bdc9960ca1d6bca5357fe8306669e4e7ff253951beb93b5c24999bb2835",
+        "bytes": 3355
+      },
+      "file_perm_alloc": {
+        "line": 5161,
+        "sha256": "af1f796e922bd6947d94d0e7b9f7f33526788dc3522db25248913baf2a3bb4bf",
+        "bytes": 6490
+      },
+      "file_alloc": {
+        "line": 5400,
+        "sha256": "0720aa64135f3f684a67310d1783276fe20a346773256929c9fe607c46ea3230",
+        "bytes": 4591
+      },
+      "file_perm_dealloc": {
+        "line": 6297,
+        "sha256": "c7a0ca828a915ab5412843485911bfdd8b98fa1248c005ab912ed90964b6e26c",
+        "bytes": 10893
+      }
+    },
+    "feature": {
+      "file_header_alloc": {
+        "line": 1069,
+        "sha256": "12384c275c167d133c5be305e1ee2bc19816c95baf00b1259ef6058b1b4974cb",
+        "bytes": 609
+      },
+      "file_perm_expand": {
+        "line": 4639,
+        "sha256": "d56662e5a2efa1b52fbc5c44506133fc1b3f231c3fc8316f615c33b50671a6f9",
+        "bytes": 4521
+      },
+      "file_table_add_full_sector": {
+        "line": 5021,
+        "sha256": "98e30bdc9960ca1d6bca5357fe8306669e4e7ff253951beb93b5c24999bb2835",
+        "bytes": 3355
+      },
+      "file_perm_alloc": {
+        "line": 5161,
+        "sha256": "af1f796e922bd6947d94d0e7b9f7f33526788dc3522db25248913baf2a3bb4bf",
+        "bytes": 6490
+      },
+      "file_alloc": {
+        "line": 5400,
+        "sha256": "0720aa64135f3f684a67310d1783276fe20a346773256929c9fe607c46ea3230",
+        "bytes": 4591
+      },
+      "file_perm_dealloc": {
+        "line": 6297,
+        "sha256": "c7a0ca828a915ab5412843485911bfdd8b98fa1248c005ab912ed90964b6e26c",
+        "bytes": 10893
+      }
+    }
+  }
+}

@@ -62,12 +62,12 @@ parse tree printer(`parser_print_tree`, `pt_print_bytes` 계열)는 파싱한 �
 
 | 항목 | 제안 | 근거 |
 |---|---|---|
-| JIRA 유형 | Correct Error | printer 출력이 원래 문장의 의미를 보존한다는 기대와 다르다. |
+| JIRA 유형 | Sub-task, parent [CBRD-26978](http://jira.cubrid.org/browse/CBRD-26978) | CBRD-27259와 같은 OOS 후속 작업 묶음에 속한다. 문제 성격은 오류 수정(Correct Error)이다. printer 출력이 원래 문장의 의미를 보존한다는 기대와 다르다. |
 | 문제 범주 | Correctness (잠재), Maintainability | 현재 확인된 소비 경로에서는 의미가 바뀌지 않는다. 앞으로 printer 출력을 다시 실행하는 경로가 생기면 의미가 바뀐다. |
 | 컴포넌트 | parser (`parse_tree_cl.c`) | 수정 범위는 printer 하나로 예상한다. |
 | 우선순위 | 낮음 (minor) | 위 조사에서 의미가 바뀌는 소비 경로를 찾지 못했다. |
 
-이 이슈는 CBRD-27259의 결과물(`PT_ATTR_STORAGE_PREFER_OUTLINE` 분리, `FORCE_INLINE` 추가)과 관련된다. CBRD-27259가 병합되기 전에 수정하면 기준 revision에는 없는 enum 값을 다루어야 한다. 따라서 CBRD-27259 병합 이후에 수정하거나, CBRD-27259와 같은 상위 이슈 아래에 둘 수 있다. 어느 쪽으로 할지는 triage에서 정한다.
+이 이슈는 CBRD-27259의 결과물(`PT_ATTR_STORAGE_PREFER_OUTLINE` 분리, `FORCE_INLINE` 추가)에 의존한다. CBRD-27259가 병합되기 전에 수정하면 기준 revision에는 없는 enum 값을 다루어야 한다. 따라서 CBRD-27259가 병합된 뒤에 수정한다.
 
 ## Test Build
 
@@ -108,5 +108,6 @@ ALTER TABLE t4 MODIFY c VARCHAR(100) STORAGE DEFAULT;
 
 ## Additional Information
 
+- 상위 이슈: [CBRD-26978](http://jira.cubrid.org/browse/CBRD-26978) (OOS TODO epic). 선행 조건: CBRD-27259 병합.
 - 관련 이슈: [CBRD-27259](http://jira.cubrid.org/browse/CBRD-27259) (`STORAGE FORCE_INLINE` 지원, 이 결함을 발견한 작업), [CBRD-26979](http://jira.cubrid.org/browse/CBRD-26979) (고정 길이 컬럼의 `STORAGE` 옵션 거부, [PR #7611](https://github.com/CUBRID/cubrid/pull/7611)), [CBRD-26835](http://jira.cubrid.org/browse/CBRD-26835) (OOS develop 병합 준비 epic, [PR #7803](https://github.com/CUBRID/cubrid/pull/7803)에서 `pt_print_attr_def` 의 `STORAGE` 출력 추가).
 - 확인하지 못한 것: 실행 재현, 기준 revision의 ALTER 정책 변경 처리, 정적 조사로 찾지 못한 간접 소비 경로.

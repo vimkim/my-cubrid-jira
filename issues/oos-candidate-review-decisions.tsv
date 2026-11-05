@@ -10,3 +10,4 @@ ts	phase	decision	why	evidence	result
 2026-11-05T05:26:39Z	publication	27944와27945에 검토 댓글을 게시하고 정확한 본문을 재조회했다	사용자가 두 이슈 댓글을 요청했으며 실제 게시 결과를 확인해야 한다	issues/oos-candidate-comment-publication.json	4777946·4777947 본문 일치; Open과 본문 유지
 2026-11-05T05:26:39Z	retention	임시 원본을 영구 상태 디렉터리에 보관하고 해시를 대조했다	임시 디렉터리 정리 뒤에도 판단 근거를 찾아야 한다	/home/vimkim/.local/state/oos-candidate-review-791/archive-manifest.json	51개 파일 해시 일치
 2026-11-05T05:26:39Z	scope	팀장 승인 전 서버·DB 재현을 계속 대기한다	댓글 게시와 이슈의 Open 상태는 재현 승인이 아니다	/home/vimkim/gh/cb/oos-tlaplus-20261104/formal/oos/NATIVE-REPRO-APPROVAL.md	native 미실행; Work790 승인 대기 유지
+2026-11-05T05:28:44Z	audit	게시 이후 결정 기록과 읽기 검증을 점검하고 Work791을 완료했다	보고서와 실제 JIRA 결과를 대조한 뒤 완료로 기록해야 한다	/home/vimkim/.local/state/oos-candidate-review-791/root-final-audit.json	기존 행 보존·11행 근거 해소·본문 일치 PASS; Work790 승인 대기

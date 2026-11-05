@@ -39,7 +39,7 @@ parse tree printer(`parser_print_tree`, `pt_print_bytes` 계열)는 파싱한 �
 1. **ALTER에서 정책 해제가 정책 유지로 바뀐다.** CBRD-27259 commit의 `build_attr_change_map` 은 절을 생략한 경우에만 기존 정책을 유지한다 (`src/query/execute_schema.c:12644`, `keeps_current_policy`). 예를 들어 `ALTER TABLE t MODIFY c VARCHAR(10) STORAGE DEFAULT` 는 `c` 의 기존 `PREFER_INLINE` 정책을 해제한다. 그런데 printer는 이 문장을 `STORAGE` 절이 없는 문장으로 출력하므로, 출력된 문장을 실행하면 `PREFER_INLINE` 이 유지된다. 기준 revision의 ALTER 정책 변경 처리는 이번에 따로 확인하지 않았다.
 2. **고정 길이 컬럼에서 거부되어야 할 문장이 허용되는 문장으로 바뀐다.** CBRD-27259 commit에서 고정 길이 컬럼은 `DEFAULT` 와 `FORCE_INLINE` 만 허용하고 `PREFER_OUTLINE` 은 거부한다 (`src/query/execute_schema.c:8242`, `do_resolve_oos_storage_flag`). printer는 `c INT STORAGE PREFER_OUTLINE` 을 절이 없는 `c INT` 로 출력하므로, 출력된 문장은 오류 없이 실행된다.
 
-같은 printer에서 `INVISIBLE` 도 `PT_ATTR_INVISIBLE` 만 출력하고 명시적 `VISIBLE` 은 출력하지 않는다 (`src/parser/parse_tree_cl.c:7265`, 기준 revision). `STORAGE` 와 같은 형태의 누락이다. 이 이슈의 범위에 포함할지는 ANALYSIS에서 정한다.
+같은 printer는 명시적 `VISIBLE` 도 출력하지 않는다. `INVISIBLE` 만 출력한다 (`src/parser/parse_tree_cl.c:7265`, 기준 revision). 이 누락은 OOS와 관계없이 `origin/develop` (`e98bdd885`, `parse_tree_cl.c:7254`)에도 있으며, PR #6903에서 들어왔다. ALTER에서 `VISIBLE` 은 숨긴 컬럼을 다시 보이게 하고 생략은 현재 상태를 유지하므로, 출력에서 빠지면 의미가 달라진다 (`origin/develop` 의 `execute_schema.c:12243-12262`). 그러나 아래 조사와 같이 출력을 다시 실행하는 경로가 없어 피해가 없다. 따라서 이 이슈의 범위에서 제외하고 별도 이슈도 만들지 않는다. 출력을 다시 실행하는 경로가 생기면 이 기록을 근거로 다시 검토한다.
 
 ### 출력 결과의 소비 경로 조사
 
@@ -103,8 +103,7 @@ ALTER TABLE t4 MODIFY c VARCHAR(100) STORAGE DEFAULT;
 
 1. 명시적으로 지정한 모든 `STORAGE` 값(`DEFAULT`, `PREFER_OUTLINE`, `PREFER_INLINE`, `FORCE_OUTLINE`, 그리고 병합된 경우 `FORCE_INLINE`)이 출력과 재파싱 후에 같은 `attr_storage` 값으로 보존된다.
 2. `STORAGE` 절을 생략한 컬럼 정의의 출력에는 `STORAGE` 절이 없다.
-3. 같은 형태의 누락인 `VISIBLE` 을 이 이슈에서 함께 고칠지 ANALYSIS에서 정하고, 그 결정을 이슈에 기록한다.
-4. 출력과 재파싱을 비교하는 단위 테스트가 위 경우를 검증한다.
+3. 출력과 재파싱을 비교하는 단위 테스트가 위 경우를 검증한다.
 
 ## Additional Information
 

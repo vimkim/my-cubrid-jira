@@ -1,0 +1,76 @@
+{
+  "source_commit": "2d19683881c18de7d37c448010a33dde0f4123bd",
+  "issues": {
+    "CBRD-27237": {
+      "description_verified": true,
+      "description_sha256": "ed15c889ebffa7e43d02c56cdc50d3527cbfd18a12ec3954fb0e18d7026b1ef0",
+      "description_file": "issues/CBRD-27237-oos-rollback-value-preservation_dcbf09e_codex.md",
+      "comment_id": "4777965",
+      "comment_verified": true,
+      "comment_sha256": "12863c1d4343b78d2ef05dd70615c1068420b0193037600da95339ac27f519fc",
+      "url": "https://jira.cubrid.org/browse/CBRD-27237?focusedCommentId=4777965#comment-4777965",
+      "verified_at": "2026-11-05T09:23:54.461558+00:00"
+    },
+    "CBRD-27781": {
+      "description_verified": true,
+      "description_sha256": "94f35877a12ae3aa9434683e4a7658597352784e6a084f933489b4aef795ba27",
+      "description_file": "issues/CBRD-27781-oos-delete-undo-space-conflict_dcbf09e_codex.md",
+      "comment_id": "4777966",
+      "comment_verified": true,
+      "comment_sha256": "f52e529a67bcccf5cdfb0933c5125262f41c7aec58af40be16551424979a6da7",
+      "url": "https://jira.cubrid.org/browse/CBRD-27781?focusedCommentId=4777966#comment-4777966",
+      "verified_at": "2026-11-05T09:23:57.285619+00:00"
+    },
+    "CBRD-27230": {
+      "description_verified": true,
+      "description_sha256": "8ad6a637849bd36c4bb8c4dd7378926c00bccce4f220e82e5c313c920e11906e",
+      "description_file": "issues/CBRD-27230-oos-update-dedup_725a32c_claude.md",
+      "comment_id": "4777967",
+      "comment_verified": true,
+      "comment_sha256": "42430e3975c524183df3d82738a82399e493612b5cec3498f9de630ee869cd5f",
+      "url": "https://jira.cubrid.org/browse/CBRD-27230?focusedCommentId=4777967#comment-4777967",
+      "verified_at": "2026-11-05T09:24:00.591535+00:00"
+    },
+    "CBRD-27881": {
+      "description_verified": true,
+      "description_sha256": "68dcece4c2944b239f973c3862e5983de9806752a9224e20ee12a92030cd932c",
+      "description_file": "issues/CBRD-27881-oos-refactor-todo.md",
+      "comment_id": "4777968",
+      "comment_verified": true,
+      "comment_sha256": "b166c9432c565be5b0f4860d5dc370c57db57a656d22a1414ffa3b2d3ea6c4d5",
+      "url": "https://jira.cubrid.org/browse/CBRD-27881?focusedCommentId=4777968#comment-4777968",
+      "verified_at": "2026-11-05T09:24:03.688880+00:00"
+    },
+    "CBRD-27925": {
+      "description_verified": true,
+      "description_sha256": "e2fe4966104c8b1b3899402986621beebfe99ff92d2980d0f27bad5b19c00f76",
+      "description_file": "issues/CBRD-27925-deferred-empty-page-reclaim.md",
+      "comment_id": "4777969",
+      "comment_verified": true,
+      "comment_sha256": "cce56a76304c9942431a5459e34f7dcdb04d42601869598ef699249b303362e0",
+      "url": "https://jira.cubrid.org/browse/CBRD-27925?focusedCommentId=4777969#comment-4777969",
+      "verified_at": "2026-11-05T09:24:06.226182+00:00"
+    },
+    "CBRD-27841": {
+      "description_verified": true,
+      "description_sha256": "8556dac3968c86a247530707c3904f90eb133a582247dc5c6976d1ae296f10f2",
+      "description_file": "issues/CBRD-27841-oos-recovery-index-cleanup_eac70c7_codex.md",
+      "comment_id": "4777970",
+      "comment_verified": true,
+      "comment_sha256": "c494b70c11413aed952337437ac268f97b3bb705f7f8ab3c5101cb9ebc23fcec",
+      "url": "https://jira.cubrid.org/browse/CBRD-27841?focusedCommentId=4777970#comment-4777970",
+      "verified_at": "2026-11-05T09:24:09.287612+00:00"
+    },
+    "CBRD-27953": {
+      "description_verified": true,
+      "description_sha256": "ae4652fa7fa41b67828503a9addf782192ae00bd7201c89a1dc39a781c7a830e",
+      "description_file": "issues/CBRD-27953-oos-forward-walk-vfid-lookup-error.md",
+      "comment_id": "4777971",
+      "comment_verified": true,
+      "comment_sha256": "666b8b9e1d6d6a9fc7a28eaddad07072d3945b9a7575f5ea20b39528592de5be",
+      "url": "https://jira.cubrid.org/browse/CBRD-27953?focusedCommentId=4777971#comment-4777971",
+      "verified_at": "2026-11-05T09:24:17.191301+00:00"
+    }
+  },
+  "complete": true
+}

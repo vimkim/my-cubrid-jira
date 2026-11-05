@@ -1,6 +1,6 @@
 # OOS postpone commit 미팅 결정 댓글 검토
 
-2026-11-05 사용자가 미팅에서 팀장님에게 postpone commit 방식으로 진행하는 승인을 받았다고 공유했다. 아래는 그 결정을 JIRA에 남길 댓글이다. 사용자는 후속 답변으로 댓글 7건 게시와 본문 반영, 기록 문서의 main 통합·push를 승인했다. **본문·댓글 게시 결과는 별도 게시 기록에서 확인한다.**
+2026-11-05 사용자가 미팅에서 팀장님에게 postpone commit 방식으로 진행하는 승인을 받았다고 공유했다. 아래는 그 결정을 JIRA에 남길 댓글이다. 사용자는 후속 답변으로 댓글 7건 게시와 본문 반영, 기록 문서의 main 통합·push를 승인했다. **본문·댓글 7건 모두 게시·검증 완료.** [게시 결과와 이슈별 댓글 링크](PUBLICATION.md)에 원문 및 검증 기록을 정리했다.
 
 UPDATE 알림은 A'로 선택됐다. 관련 OOS 회수는 결정 단위의 확정 뒤 postpone 실행과 redo-only 삭제로 진행한다. 이 기록은 엔진 구현·회귀 검증·PR 병합 완료를 뜻하지 않는다. 기준 ADR은 `cubrid-oos-context`의 `docs/adr-0008-reclaim-after-finality`, `d5e81a7`이며 아직 `proposed` 상태다.
 

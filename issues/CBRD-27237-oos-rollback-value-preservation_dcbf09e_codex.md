@@ -1,5 +1,7 @@
 # [OOS] UPDATE를 취소한 뒤에도 vacuum이 원래 값을 지워 조회가 실패한다
 
+**한 줄 요약**: rollback한 UPDATE의 원래 OOS 값을 vacuum이 삭제하는 결함을 commit 후 postpone 알림 방식으로 수정한다. 미팅에서 팀장 승인을 받았고 구현·검증이 남아 있다.
+
 ## Issue Triage
 
 **이슈 수행 목적**: UPDATE를 취소하면 이전에 저장을 확정한 값이 계속 남아 있어야 한다. 큰 컬럼 값을 행 밖에 저장하는 OOS에서도 이 원칙을 지키도록 한다.
@@ -8,9 +10,20 @@
 
 **영향**: 이미 저장이 확정된 값을 잃고, 그 값을 읽는 질의가 `-1389` 오류로 실패한다. 큰 컬럼 자체를 바꾸지 않고 같은 행의 작은 컬럼만 바꿨다가 취소해도 발생한다. 운영 부하에서의 발생 빈도는 측정하지 않았다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: 팀장 승인을 받은 commit 후 postpone 알림(A')을 구현한다. UPDATE가 버린 chain을 postpone으로 기록하고 commit 확정 뒤 알림을 발행한다. vacuum은 오래된 snapshot이 끝난 뒤 회수하며, undo image 기반 forward-walk 삭제는 제거한다. 문장·savepoint·트랜잭션 rollback과 장애 복구를 검증한다.
 
 ---
+
+## Meeting Decision (2026-11-05)
+
+미팅 결과, 팀장 승인하에 commit 후 postpone 알림(A')으로 진행하기로 했다. 2026-11-05에 담당자가 승인 결과를 공유했다. 기존 commit 레코드 이전의 단순 hook 알림과 head 삭제 표시(B3)는 이번 구현 방식으로 선택하지 않았다.
+
+- UPDATE가 버린 chain만 postpone에 기록한다. 문장 취소·savepoint rollback·트랜잭션 rollback으로 취소된 변경의 알림은 실행하지 않는다.
+- commit이 확정된 뒤 `RVOOS_NOTIFY_VACUUM`을 발행한다. 오래된 snapshot의 가시성 조건을 만족한 뒤 [CBRD-27781](https://jira.cubrid.org/browse/CBRD-27781)의 redo-only 회수기로 정리한다.
+- 현재 postpone 실행 전에 MVCC 정보가 완료되는 순서에 맞춰, 명시적 MVCCID 전달·vacuum 입력과 복구 중 재실행을 구현·검증한다. 단순히 기존 `log_append_postpone`을 호출하는 것만으로 완료하지 않는다.
+- [CBRD-27230](https://jira.cubrid.org/browse/CBRD-27230)의 chain 재사용 전체는 PR #7990의 develop 병합 이후 진행한다. 이 결함의 수명·회수 수정과 그 전체 기능의 일정을 구분한다.
+
+방식 승인은 구현·테스트 통과·PR 병합 완료를 뜻하지 않는다. ADR-0008과 정규 사양의 승인 기록·문안 정합화도 후속 작업이다.
 
 ## AI-Generated Context
 
@@ -111,10 +124,10 @@ select length(big) from t; -- 보고된 결과: ERROR -1389
 - **CBRD-26668과 차이**: 기존 rollback 검토는 취소가 진행되는 동안 vacuum이 끼어들지 못함을 다뤘다. 여기서는 취소가 끝난 뒤 남아 있는 UPDATE 로그를 vacuum이 처리한다.
 - **CBRD-27230과 관계**: 작은 컬럼만 바꿀 때 OOS 값을 다시 쓰지 않도록 하는 개선이다. 같은 체인을 재사용하게 되면 commit된 UPDATE에서도 그 체인을 잘못 지우지 않도록 정합성을 검토해야 한다. 이 결함이 그 개선으로 자동 해결된다고 가정하지 않는다.
 - **CBRD-27781과 차이**: CBRD-27237은 아직 쓰는 값을 삭제 대상으로 잘못 판단한다. CBRD-27781은 삭제 자체는 정당하지만, 그 삭제를 되돌릴 공간을 다른 트랜잭션이 먼저 써서 복원에 실패한다.
-- **상세 근거와 설계 후보**: [원본 분석 문서](https://github.com/vimkim/my-cubrid-jira/blob/b89dc2bd34c15c312bddf9ee91e10a3b3738858c/issues/CBRD-27237-oos-forward-walk-rollback-delete_dcbf09e_claude.md)에 함수별 근거, 이전 실험, 미확정 설계 후보를 보존한다. 후보의 선택은 ANALYSIS에서 결정한다.
+- **상세 근거와 설계 후보**: [원본 분석 문서](https://github.com/vimkim/my-cubrid-jira/blob/b89dc2bd34c15c312bddf9ee91e10a3b3738858c/issues/CBRD-27237-oos-forward-walk-rollback-delete_dcbf09e_claude.md)에 함수별 근거, 이전 실험, 미확정 설계 후보를 보존한다. 과거 후보 비교는 근거로 보존하며, 현재 선택은 위 Meeting Decision의 A'다.
 
 ## Triage Request
 
-이 결함을 확인하고 OOS 담당인 작성자 측에 ANALYSIS 배정을 요청한다. 분석에서는 삭제해도 되는 값의 판단 기준을 정하고, 두 로그 경로와 아직 실행하지 않은 취소 경로를 검증한다. 부분 rollback의 영향과 CBRD-27230과의 정합성도 확인한다.
+이 결함을 확인하고 OOS 담당인 작성자 측에 ANALYSIS 배정을 요청한다. 분석·구현에서는 승인된 A'의 알림 발행·소비와 두 로그 경로, 아직 실행하지 않은 취소 경로를 검증한다. 부분 rollback의 영향과 CBRD-27230과의 정합성도 확인한다.
 
 회귀 테스트는 서버 모드에서 **rollback 직후와 vacuum이 실제로 진행된 뒤**를 모두 확인해야 한다. 이미 보고된 세 UPDATE 시나리오와 서버 장애 복구를 포함하고, 단일 사용자 모드(SA_MODE)의 rollback 직후 검사만으로 완료를 판단하지 않는다. commit된 UPDATE의 불필요한 옛 값은 계속 회수되는지도 함께 검증한다.

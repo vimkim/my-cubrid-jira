@@ -1,6 +1,6 @@
 # OOS postpone commit 미팅 결정 댓글 검토
 
-2026-11-05 사용자가 미팅에서 팀장님에게 postpone commit 방식으로 진행하는 승인을 받았다고 공유했다. 아래는 그 결정을 JIRA에 남길 댓글 초안이다. **아직 게시하지 않았다.**
+2026-11-05 사용자가 미팅에서 팀장님에게 postpone commit 방식으로 진행하는 승인을 받았다고 공유했다. 아래는 그 결정을 JIRA에 남길 댓글이다. 사용자는 후속 답변으로 댓글 7건 게시와 본문 반영, 기록 문서의 main 통합·push를 승인했다. **본문·댓글 게시 결과는 별도 게시 기록에서 확인한다.**
 
 UPDATE 알림은 A'로 선택됐다. 관련 OOS 회수는 결정 단위의 확정 뒤 postpone 실행과 redo-only 삭제로 진행한다. 이 기록은 엔진 구현·회귀 검증·PR 병합 완료를 뜻하지 않는다. 기준 ADR은 `cubrid-oos-context`의 `docs/adr-0008-reclaim-after-finality`, `d5e81a7`이며 아직 `proposed` 상태다.
 
@@ -16,7 +16,7 @@ UPDATE 알림은 A'로 선택됐다. 관련 OOS 회수는 결정 단위의 확�
 | [CBRD-27841](https://jira.cubrid.org/browse/CBRD-27841) | 실제 복구 인덱스와 형식 처리 정합성 |
 | [CBRD-27953](https://jira.cubrid.org/browse/CBRD-27953) | 제거할 forward-walk 경로와 누수 조사 연결 |
 
-댓글은 이 문서의 각 절에 대응하는 동일 이름의 `.md` 파일을 사용한다. `manifest.json`은 파일의 SHA-256을 고정한다. `cubrid-jira comment --dry-run`으로 일곱 요청의 이슈 키와 변환 본문을 확인했고, 개인 열람용 주소가 댓글에 없음을 검사했다. 이슈 workflow·본문·담당자는 이번 댓글 게시의 변경 대상이 아니다.
+댓글은 이 문서의 각 절에 대응하는 동일 이름의 `.md` 파일을 사용한다. `manifest.json`은 파일의 SHA-256을 고정한다. `cubrid-jira comment --dry-run`으로 일곱 요청의 이슈 키와 변환 본문을 확인했고, 개인 열람용 주소가 댓글에 없음을 검사했다. 추가 승인에 따라 본문도 `descriptions.json`의 issue별 원문으로 개정한다. 이슈 summary·workflow·담당자는 변경하지 않는다.
 
 ## work-tracker 반영
 
@@ -32,7 +32,7 @@ UPDATE 알림은 A'로 선택됐다. 관련 OOS 회수는 결정 단위의 확�
 
 ## 구현 세션과 남은 작업
 
-구현용 checkout은 `/home/vimkim/gh/cb/CBRD-27781-postpone-commit`, branch는 `CBRD-27781-postpone-commit`이다. 2026-11-05에 fetch한 `origin/feature/oos-merge`의 `d52b1889e907abcf84190ec504dde3bc93de260d`에서 만들었다. 로컬 통합 대상은 `feature/oos-merge`이며 아직 merge하지 않았다. 엔진 파일 수정·빌드·DB 실행은 하지 않았다.
+구현용 checkout은 `/home/vimkim/gh/cb/CBRD-27781-postpone-commit`, branch는 `CBRD-27781-postpone-commit`이다. 2026-11-05에 fetch한 `origin/feature/oos-merge`의 `d52b1889e907abcf84190ec504dde3bc93de260d`에서 만들었다. 엔진의 로컬 통합 대상은 `feature/oos-merge`이며 아직 merge하지 않았다. 엔진 파일 수정·빌드·DB 실행은 하지 않았다.
 
 1. Work747에서 ADR의 승인 사실과 A' 선택을 기록하고 B3 권고·미정 문구, 정규 사양과 확인 요청서의 충돌을 정리한다. 저장소 통합은 별도 승인 후 진행한다.
 2. Work742에서 postpone 시 MVCCID 전달, 복구 중 알림 재발행·재실행 및 snapshot horizon을 구체화한다. 형식과 recovery index 변경은 CBRD-27841 및 최종 병합 시점에 맞춘다.

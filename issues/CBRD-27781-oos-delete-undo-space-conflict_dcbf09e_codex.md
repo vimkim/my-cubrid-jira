@@ -1,5 +1,7 @@
 # [OOS] 삭제를 취소해 데이터를 복원할 자리를 다른 트랜잭션이 먼저 사용함
 
+**한 줄 요약**: OOS 삭제 undo가 다른 트랜잭션의 슬롯을 침범하는 결함을 확정 뒤 postpone·redo-only 회수로 수정한다. 기존 재현 근거는 보존하고 구현·검증을 진행한다.
+
 ## Issue Triage
 
 **이슈 수행 목적**: OOS(큰 컬럼 값을 행 밖에 저장하는 기능)의 삭제를 취소하더라도, 삭제했던 값과 다른 트랜잭션이 저장한 값이 모두 보존되도록 한다.
@@ -8,9 +10,20 @@
 
 **영향**: debug 테스트에서는 재시작 복구 중 내부 검사 실패로 DB를 열지 못했다. release 빌드에서는 다른 트랜잭션이 commit한 값이 손상될 수 있다고 소스 분석으로 판단한다. release 실행 결과와 실제 발생 빈도는 확인하지 않았다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: 팀장 승인을 받아 삭제를 결정한 transaction 또는 sysop에 회수 의도를 postpone으로 기록한다. 해당 단위의 commit 뒤 chunk를 redo-only로 회수하여 삭제 undo의 복원 충돌을 없앤다. tail-first 회수·링크별 identity 검사와 오류·crash 뒤 재실행을 함께 구현·검증한다.
 
 ---
+
+## Meeting Decision (2026-11-05)
+
+미팅에서 팀장 승인하에 확정 뒤 postpone 실행·redo-only OOS chain 회수로 진행하기로 했다. 2026-11-05에 담당자가 승인 결과를 공유했다.
+
+1. 삭제를 결정하는 transaction 또는 sysop이 `(OOS VFID, head OOS OID, head identity stamp)` 회수 의도를 postpone으로 남긴다. 그 단위가 abort되면 회수하지 않는다.
+2. REMOVE는 heap 레코드 제거와 회수 의도를 같은 sysop에 남긴다. SA/non-MVCC eager 정리도 transaction commit 뒤 회수하도록 맞춘다.
+3. 회수기는 head부터 체인을 확인하되 tail부터 지우고 head를 마지막에 지운다. 각 next link에 다음 chunk의 identity stamp를 두고, 삭제와 같은 latch 아래 identity를 검사한다. 오류·crash 뒤에는 남은 chunk를 다시 회수하며 다른 레코드로 재사용된 슬롯은 보존한다.
+4. [CBRD-27237](https://jira.cubrid.org/browse/CBRD-27237)의 UPDATE 알림은 commit 후 postpone(A')으로 남긴다. 오래된 snapshot이 끝나기 전에는 알림이 있어도 chain을 회수하지 않는다.
+
+heap forward-slot의 물리 undo 보호([CBRD-27858](https://jira.cubrid.org/browse/CBRD-27858))와 기존 INSERT undo는 별도 의무로 유지한다. LSA reclaim gate 제거는 관련 undo 목적지가 남지 않는 새 회수 경로를 확인한 뒤 적용한다. 아래 재현은 기존 코드의 결함 증거이며, 선택한 수정이 이미 통과했다는 결과가 아니다.
 
 ## AI-Generated Context
 
@@ -52,7 +65,7 @@ vacuum 삭제의 실패 또는 서버 장애가 다른 트랜잭션의 저장과
 
 삭제를 복구하려다 이미 commit된 다른 데이터를 잃는 상태는 허용할 수 없다. 사용자는 vacuum의 오류 시점이나 동시 저장 시점을 통제하기 어려워 응용에서 피할 수 있는 우회책도 확인되지 않았다.
 
-빈 페이지의 해제를 늦추는 기존 보호만으로는 충분하지 않다. 페이지가 남아 있어도 그 안의 슬롯과 공간을 다른 트랜잭션이 먼저 쓸 수 있기 때문이다. 해결 시에는 슬롯 번호와 데이터 공간을 함께 고려해야 한다.
+빈 페이지의 해제를 늦추는 기존 보호만으로는 충분하지 않다. 페이지가 남아 있어도 그 안의 슬롯과 공간을 다른 트랜잭션이 먼저 쓸 수 있기 때문이다. 기존 undo 가능한 삭제를 유지한다면 슬롯 번호와 데이터 공간을 함께 보호해야 한다. 이번 선택은 삭제를 확정 뒤로 옮겨 chunk 삭제 undo 자체가 필요 없게 하는 것이다.
 
 PR #7990 작성자는 이 문제를 별도 이슈로 분리했으나, 2026-10-27 리뷰어는 머지 차단 사유로 지적했다. 분리 여부와 별개로 안전성을 확인할 필요가 있다.
 
@@ -82,7 +95,7 @@ ctest --test-dir build_preset_debug -R '^test_oos_delete_server$' --output-on-fa
 
 ## Expected Result
 
-A의 삭제를 취소하면 X가 원래 주소와 식별 정보로 복원되고, B가 commit한 Y도 그대로 읽혀야 한다. 이를 위해 복원에 필요한 슬롯과 공간이 다른 트랜잭션의 저장에 빼앗기지 않아야 한다. A 자신이 빈자리를 재사용한 뒤 취소하는 대조군도 계속 정상 동작해야 한다.
+삭제를 결정한 단위가 abort되면 postpone은 실행되지 않고 X가 원래 주소와 식별 정보로 남아야 한다. commit된 뒤의 회수는 chunk 삭제 undo 없이 끝나며, B가 commit한 Y는 오류·재시작과 무관하게 보존되어야 한다. 부분 회수 뒤 재실행은 다른 레코드의 슬롯을 건드리지 않고 남은 chunk를 정리해야 한다. 아래 기존 테스트는 조기 재사용 결함의 증거로 보존하고, 새 회수 시점과 동작을 검증하도록 회귀 검사를 맞춘다.
 
 ## Actual Result
 
@@ -110,7 +123,7 @@ Assertion `slot_p->offset_to_record == SPAGE_EMPTY_OFFSET' failed.
 - [Greptile 최초 지적](https://github.com/CUBRID/cubrid/pull/7990#discussion_r4380243533), [리뷰어의 머지 차단 지적](https://github.com/CUBRID/cubrid/pull/7990#discussion_r4385247875). 리뷰어는 코드로 확인했으며 실행 재현은 하지 않았다고 적었다.
 - SA_MODE(단독 실행 모드)는 트랜잭션이 하나라 위 A/B 충돌 조건에 해당하지 않는다. 자신의 뒤이은 저장은 삭제보다 먼저 취소된다.
 - 사용자 행을 제자리에서 바꾸는 in-place UPDATE도 기존 소스 분석에서는 이 충돌에 해당하지 않는다고 판단했다. 컬럼 타입 변경이 테이블 잠금을 트랜잭션 끝까지 유지해 다른 트랜잭션의 저장을 막는다는 전제이다. 이 경로는 실행하지 않았으며, 경로가 추가되거나 잠금 조건이 달라지면 재검토해야 한다.
-- `db_ha_apply_info` 등 일부 시스템 테이블의 즉시 삭제 경로가 실제로 OOS를 사용할 수 있는지는 남은 확인 사항이다. 세부 호출 경로와 해결 후보 비교는 [기존 상세 분석](https://github.com/vimkim/my-cubrid-jira/blob/b89dc2bd34c15c312bddf9ee91e10a3b3738858c/issues/CBRD-27781-oos-slot-reuse-rollback-undo_dcbf09e_claude.md)에 보존한다. 후보는 확정된 설계가 아니다.
+- `db_ha_apply_info` 등 일부 시스템 테이블의 즉시 삭제 경로가 실제로 OOS를 사용할 수 있는지는 남은 확인 사항이다. 세부 호출 경로와 해결 후보 비교는 [기존 상세 분석](https://github.com/vimkim/my-cubrid-jira/blob/b89dc2bd34c15c312bddf9ee91e10a3b3738858c/issues/CBRD-27781-oos-slot-reuse-rollback-undo_dcbf09e_claude.md)에 보존한다. 그 문서의 과거 후보 비교는 보존하며, 이번 선택은 위 Meeting Decision의 확정 뒤 redo-only 회수다.
 
 ## Triage Request
 
@@ -119,4 +132,4 @@ Assertion `slot_p->offset_to_record == SPAGE_EMPTY_OFFSET' failed.
 - 실제 vacuum의 중간 오류와 서버 장애 후 복구에서도 충돌하는지, 오류 주입으로 결정적으로 재현할 수 있는지 확인한다.
 - release 빌드의 손상 결과와 발생 조건을 확인한다. 실제 발생 빈도는 미상이다.
 - in-place UPDATE를 제외한 근거와 시스템 테이블의 즉시 삭제 경로를 최종 확인한다.
-- 삭제 취소의 안전성을 보장할 방안을 비교하고 선택한다. 기존 공간 예약 기능만 적용하면 슬롯 보호와 vacuum 작업 보호가 충분한지도 함께 검증한다.
+- 승인된 postpone·redo-only 회수를 구현하고, commit 전 abort의 원래 값 보존과 commit 뒤 회수·동시 재사용·오류·재시작의 안전성을 검증한다.

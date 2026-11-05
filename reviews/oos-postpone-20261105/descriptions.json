@@ -1,0 +1,44 @@
+[
+  {
+    "issue": "CBRD-27237",
+    "file": "issues/CBRD-27237-oos-rollback-value-preservation_dcbf09e_codex.md",
+    "sha256": "ad15ee0b4cd3317c0b2195b40c4e2c630877eee8f374f812b56592851d0c66b8",
+    "payload_sha256": "ed15c889ebffa7e43d02c56cdc50d3527cbfd18a12ec3954fb0e18d7026b1ef0"
+  },
+  {
+    "issue": "CBRD-27781",
+    "file": "issues/CBRD-27781-oos-delete-undo-space-conflict_dcbf09e_codex.md",
+    "sha256": "5785d60a727d995057f6ebeea2f6ba2d32e254fcf616283e232cedcc50ca2dbe",
+    "payload_sha256": "94f35877a12ae3aa9434683e4a7658597352784e6a084f933489b4aef795ba27"
+  },
+  {
+    "issue": "CBRD-27230",
+    "file": "issues/CBRD-27230-oos-update-dedup_725a32c_claude.md",
+    "sha256": "7d81f10dc527319efd80786dd0e28f2527132e8ee7a7917fe381f0e51ff48c7f",
+    "payload_sha256": "8ad6a637849bd36c4bb8c4dd7378926c00bccce4f220e82e5c313c920e11906e"
+  },
+  {
+    "issue": "CBRD-27881",
+    "file": "issues/CBRD-27881-oos-refactor-todo.md",
+    "sha256": "c6b6f6a7d5cee60b38170ea4aee66b4e9863e2db64467f2ea56121f47f78c8de",
+    "payload_sha256": "68dcece4c2944b239f973c3862e5983de9806752a9224e20ee12a92030cd932c"
+  },
+  {
+    "issue": "CBRD-27925",
+    "file": "issues/CBRD-27925-deferred-empty-page-reclaim.md",
+    "sha256": "5cfd14ef2d3b7875e8b2450b4088c0377ae0792cc02b756c061bad7300656edf",
+    "payload_sha256": "e2fe4966104c8b1b3899402986621beebfe99ff92d2980d0f27bad5b19c00f76"
+  },
+  {
+    "issue": "CBRD-27841",
+    "file": "issues/CBRD-27841-oos-recovery-index-cleanup_eac70c7_codex.md",
+    "sha256": "b2f2c6ad62ad7cbf5066792b8cc1a0360a46e234471daec83722a9b97e62e773",
+    "payload_sha256": "8556dac3968c86a247530707c3904f90eb133a582247dc5c6976d1ae296f10f2"
+  },
+  {
+    "issue": "CBRD-27953",
+    "file": "issues/CBRD-27953-oos-forward-walk-vfid-lookup-error.md",
+    "sha256": "8320ab84178e955bc1de0ce3563ac96f91d6201ff4852d180bc4f81afa22a3c6",
+    "payload_sha256": "ae4652fa7fa41b67828503a9addf782192ae00bd7201c89a1dc39a781c7a830e"
+  }
+]

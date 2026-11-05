@@ -10,9 +10,15 @@
 
 **영향**: 조회가 실패한 로그 레코드마다 그 이전 이미지가 참조하던 OOS chain이 OOS 파일에 남는다. 테이블 삭제로 OOS 파일 자체가 제거되기 전까지 그 공간은 회수되지 않는다(소스 추론). 런타임 재현은 하지 않았다. 발생 빈도와 누수량도 측정하지 않았다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: 미팅에서 승인된 commit 후 postpone 알림(A')과 forward-walk 제거에 연계해 처리한다. 원인이 되는 경로의 실제 제거 범위를 확인하고, 대체 알림 소비·회수 경로에서도 조회 실패를 정상 완료로 삼켜 영구 누수를 남기지 않는지 검증한다. 구현·검증 전에는 해결 완료로 처리하지 않는다.
 
 ---
+
+## Meeting Decision (2026-11-05)
+
+2026-11-05 공유된 미팅 결과로 [CBRD-27237](https://jira.cubrid.org/browse/CBRD-27237)의 UPDATE 알림은 commit 후 postpone(A')으로 진행하며, undo image 기반 `vacuum_forward_walk_reclaim_oos`는 제거한다. 실제 chain 회수는 [CBRD-27781](https://jira.cubrid.org/browse/CBRD-27781)의 확정 뒤 redo-only 회수와 연결한다.
+
+본 이슈의 오류 무시 분기도 제거 대상 경로에 있으므로, 우선 같은 구현에서 남은 호출자와 대체 소비·회수 경로를 대조한다. 새 경로는 조회·회수 실패 후 지속 재시도와 진단을 갖춰야 한다. 아래 현행 소스의 조사와 별개로, 경로 제거·오류 후 회수·재실행 안전성을 실제 검증한 뒤 처리 범위를 정리한다. 설계 결정만으로 이슈를 해결 완료나 중복으로 종료하지 않는다.
 
 ## AI-Generated Context
 
@@ -78,6 +84,8 @@ CBRD-27933은 같은 유형의 결함을 heap 레코드 삭제 경로에서 다�
 - 계속 실패하는 오류가 vacuum 진행을 무한히 막지 않는다. 회수를 포기하는 경우에는 그 사실이 운영자가 볼 수 있는 형태로 남는다.
 
 ## Analysis Questions
+
+다음은 기존 forward-walk를 유지할 때의 조사 질문이다. 승인된 제거 구현에서는 해당 분기가 실제로 없어지는지 확인하고, 대체 알림 소비·회수 경로에 필요한 재시도 안전성·진행성·오류 분류 검증으로 이어간다.
 
 1. **재실행 안전성.** 오류를 전달해 블록을 중단 상태로 남기면, vacuum은 블록을 처음부터 다시 실행한다. 앞선 레코드의 forward walk 삭제는 레코드별 sysop으로 이미 commit되어 있다. 같은 chain에 대한 반복 삭제는 소스상 감지되고 무해하다. `oos_delete` 는 head chunk를 write latch로 잡은 상태에서 identity stamp를 비교한다. 페이지가 해제되었거나, 슬롯이 비었거나, stamp가 다르면 아무것도 바꾸지 않고 `NO_ERROR` 를 반환한다(CBRD-26950). forward walk 삭제 함수의 주석도 블록 재실행을 전제한다. [oos_delete 계약](https://github.com/CUBRID/cubrid/blob/d52b1889e907abcf84190ec504dde3bc93de260d/src/storage/oos_file.cpp#L3456-L3519) 남은 확인 사항은 두 가지다.
    - `oos_delete` 주석은 stamp 구분이 로깅을 켠 상태로 쓴 chain에서만 성립한다고 적는다. forward walk가 만나는 chain 중 로깅 없이 쓴 chain이 있을 수 있는가?

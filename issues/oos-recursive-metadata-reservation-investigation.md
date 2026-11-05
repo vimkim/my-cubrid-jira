@@ -43,4 +43,4 @@ TLA+ 모델의 `NoMetadataReservationWithSafeEmpty` 위반은 16개 전이의 �
 
 ## Related Work
 
-[CBRD-27925](https://jira.cubrid.org/browse/CBRD-27925)의 빈 OOS 페이지 회수 과제와 연관되며, [CBRD-26786](https://jira.cubrid.org/browse/CBRD-26786)의 성장 전 회수 요구를 점검한다. [CBRD-27872](https://jira.cubrid.org/browse/CBRD-27872)의 검사 비용 문제와 구분한다. 회수 힌트 소실 후보와는 연결하되, 힌트를 보존하는 것만으로 이 재귀 할당 경로를 해결했다고 판단하지 않는다.
+[CBRD-27925](https://jira.cubrid.org/browse/CBRD-27925)의 빈 OOS 페이지 회수 과제와 연관되며, [CBRD-26786](https://jira.cubrid.org/browse/CBRD-26786)의 성장 전 회수 요구를 점검한다. [CBRD-27872](https://jira.cubrid.org/browse/CBRD-27872)의 검사 비용 문제와 구분한다. [회수 힌트 소실 후보 CBRD-27944](https://jira.cubrid.org/browse/CBRD-27944)와 연결하되, 힌트를 보존하는 것만으로 이 재귀 할당 경로를 해결했다고 판단하지 않는다.

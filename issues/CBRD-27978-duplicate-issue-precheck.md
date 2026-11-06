@@ -22,16 +22,18 @@ CBRD 이슈는 JIRA 웹 화면이나 JIRA REST API로 등록된다. 에이전트
 
 필요한 것은 이슈를 등록하기 직전에 초안을 넣으면 관련된 기존 이슈 후보와 판정을 돌려주는 검사다. 사람이 쓰는 경로와 에이전트가 쓰는 경로가 같은 검사를 써야 하고, 검사가 얼마나 맞는지 숫자로 보여 줄 수 있어야 한다. 아래 수치는 모두 2026-11-06에 공개 REST API(`http://jira.cubrid.org/rest/api/2/search`)를 로그인 없이 조회해 얻었다. 다시 조회하면 값이 조금 달라질 수 있다.
 
-### 이슈 생성 수와 Duplicate로 닫힌 이슈 수
+### 이슈 생성 수와 중복 이슈 수
 
-| 생성 연도 | 생성 이슈 | Duplicate로 닫힌 이슈 |
-|---|---:|---:|
-| 2023 | 531 | 17 |
-| 2024 | 616 | 21 |
-| 2025 | 660 | 19 |
-| 2026 (11월 6일까지) | 1,483 | 59 |
+| 생성 연도 | 생성 이슈 | Duplicate로 닫힌 이슈 | 중복으로 표시되었지만 닫히지 않은 쌍 |
+|---|---:|---:|---:|
+| 2023 | 531 | 17 | 0 |
+| 2024 | 616 | 21 | 0 |
+| 2025 | 660 | 19 | 1 |
+| 2026 (11월 6일까지) | 1,483 | 59 | 2 |
 
-- 연도별 값은 `project = CBRD AND created >= 2026-01-01 AND created < 2027-01-01` 형식의 JQL로 세고, 오른쪽 열은 같은 JQL에 `AND resolution = Duplicate`를 더해 센다.
+- 연도별 값은 `project = CBRD AND created >= 2026-01-01 AND created < 2027-01-01` 형식의 JQL로 세고, 세 번째 열은 같은 JQL에 `AND resolution = Duplicate`를 더해 센다.
+- 네 번째 열은 Duplicate 링크로 연결되었거나 댓글에 같은 이슈라고 적혀 있는 두 이슈의 쌍을 센다. 그중 어느 쪽도 Duplicate로 닫히지 않았고 적어도 한쪽이 열려 있는 쌍만 넣는다. 연도는 쌍 중 나중에 생성된 이슈를 따른다. 링크 유형으로 찾는 JQL(`issueLinkType`)은 로그인 없이 쓸 수 없어서, CBRD 전체를 받아 `issuelinks`와 열린 이슈의 댓글을 직접 확인했다. 2016-2022년 생성분까지 합하면 이런 쌍은 8개이고, 6개는 링크로, 2개는 댓글로 찾았다.
+- 네 번째 열도 누군가 중복이라고 표시한 경우만 센다. 아무도 알아채지 못해 표시 없이 열려 있는 중복은 셀 수 없다.
 - 최근 30일에 399건, 최근 90일에 774건이 생성되었다(`project = CBRD AND created >= -30d`).
 - Duplicate 수는 사람이 알아채고 Duplicate로 닫은 중복만 센다. 2026년 생성 이슈 중 551건은 아직 resolution이 없으므로(`project = CBRD AND created >= 2026-01-01 AND resolution is EMPTY`) 2026년 값은 더 늘 수 있다.
 - 로그인 없이 보이는 CBRD 이슈는 7,960건이다. 최신 키는 CBRD-27977이지만 2016-02에 키 번호가 CBRD-20002로 건너뛰었고, 2016년 이전 이슈는 169건이다. 따라서 키 번호가 이슈 수를 뜻하지 않는다.
@@ -47,6 +49,16 @@ CBRD 이슈는 JIRA 웹 화면이나 JIRA REST API로 등록된다. 에이전트
 | CBRD-27722 (2026-10-21 생성, 2026-11-05 닫힘). "선행 OUTER JOIN의 null-supplying 쪽을 참조하지만 자기 on_node는 참조하지 않는 조건이 scan-sarg로 잘못 분류되어 결과가 달라짐" | CBRD-27341 (2026-08-31). "최외곽 LEFT JOIN 컬럼에 HAVING 을 걸면 GROUP BY 그룹이 단일 NULL 그룹으로 붕괴" | 같은 언어지만 한쪽은 내부 원인, 한쪽은 질의 결과로 썼다. 닫히기까지 15일 걸렸다. |
 
 이 예들은 같은 결함이 다른 언어, 다른 증상, 다른 추상 수준으로 쓰이면 제목의 단어가 거의 겹치지 않는다는 점을 보여 준다.
+
+### 중복으로 표시되었지만 닫히지 않은 예
+
+다음은 중복이라는 표시가 남아 있는데도 어느 쪽도 Duplicate로 닫히지 않은 쌍의 예다. 상태는 2026-11-06에 확인했다.
+
+| 나중에 생성된 이슈 | 먼저 생성된 이슈 | 표시와 상태 |
+|---|---|---|
+| CBRD-27323 (2026-08-27, Analysis). "[Regression] Core dumped in pgbuf_timed_sleep at src/storage/page_buffer.c:6712" | CBRD-26325 (2025-10-01, Analysis). "[Regression] Core dumped in pgbuf_timed_sleep at src/storage/page_buffer.c:6850" | Duplicate 링크로 연결되어 있지만 두 이슈 모두 Analysis 상태다. 같은 함수의 core dump가 약 11개월 간격으로 따로 등록되었다. |
+| CBRD-27264 (2026-08-18, Open). "[PGBUF] direct victim 긴급 배정 경로가 실행되지 않는 오류를 처리한다" | CBRD-24029 (2021-08-23, 2026-10-28에 Fixed). "pgbuf_page_maintenance daemon doesn't handle direct victims" | CBRD-27264는 Duplicate 링크로 CBRD-24029를 가리키지만 열려 있다. 먼저 생성된 이슈는 이미 Fixed로 닫혔다. |
+| CBRD-21027 (2017-03-01, Open). "create table [CHAR] ( [CHAR] CHAR ); expected return error, but successfully processed." | CBRD-21012 (2017-02-24, Open). "create class with basic type name, expected error but successfully processed." | 링크는 없다. 보고자가 CBRD-21027 댓글에 CBRD-21012와 같은 이슈이고 먼저 등록한 것을 잊었다고 적었지만, 두 이슈 모두 2017년부터 열려 있다. |
 
 ### 원본을 가리키는 흔적과 생성 순서
 
@@ -86,7 +98,7 @@ Duplicate로 닫힌 이슈 249건(`project = CBRD AND resolution = Duplicate`)�
 curl -s 'http://jira.cubrid.org/rest/api/2/search?jql=project%20%3D%20CBRD%20AND%20resolution%20%3D%20Duplicate&fields=issuelinks,comment,created,resolutiondate,issuetype&maxResults=1000'
 ```
 
-응답의 `total`이 전체 건수다. 연도별 생성 수처럼 개수만 필요하면 `maxResults=0`으로 `total`만 받는다.
+응답의 `total`이 전체 건수다. 연도별 생성 수처럼 개수만 필요하면 `maxResults=0`으로 `total`만 받는다. CBRD 전체의 링크를 보려면 `jql=project%20%3D%20CBRD&fields=issuelinks,created,resolution`에 `startAt=0`, `1000`, `2000`, ...을 붙여 8번 요청한다.
 
 ## Acceptance Criteria
 

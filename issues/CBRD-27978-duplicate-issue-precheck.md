@@ -24,19 +24,21 @@ CBRD 이슈는 JIRA 웹 화면이나 JIRA REST API로 등록된다. 에이전트
 
 ### 이슈 생성 수와 중복 이슈 수
 
-| 생성 연도 | 생성 이슈 | Duplicate로 닫힌 이슈 | 중복으로 표시되었지만 닫히지 않은 쌍 |
-|---|---:|---:|---:|
-| 2023 | 531 | 17 | 0 |
-| 2024 | 616 | 21 | 0 |
-| 2025 | 660 | 19 | 1 |
-| 2026 (11월 6일까지) | 1,483 | 59 | 2 |
+| 생성 연도 | 생성 이슈 | Duplicate로 닫힌 이슈 | 중복으로 표시되었지만 닫히지 않은 쌍 | Duplicate 링크 기준 중복 건수 |
+|---|---:|---:|---:|---:|
+| 2023 | 531 | 17 | 0 | 6 |
+| 2024 | 616 | 21 | 0 | 10 |
+| 2025 | 660 | 19 | 1 | 15 |
+| 2026 (11월 6일까지) | 1,483 | 59 | 2 | 42 |
 
 - 연도별 값은 `project = CBRD AND created >= 2026-01-01 AND created < 2027-01-01` 형식의 JQL로 세고, 세 번째 열은 같은 JQL에 `AND resolution = Duplicate`를 더해 센다.
 - 네 번째 열은 Duplicate 링크로 연결되었거나 댓글에 같은 이슈라고 적혀 있는 두 이슈의 쌍을 센다. 그중 어느 쪽도 Duplicate로 닫히지 않았고 적어도 한쪽이 열려 있는 쌍만 넣는다. 연도는 쌍 중 나중에 생성된 이슈를 따른다. 링크 유형으로 찾는 JQL(`issueLinkType`)은 로그인 없이 쓸 수 없어서, CBRD 전체를 받아 `issuelinks`와 열린 이슈의 댓글을 직접 확인했다. 2016-2022년 생성분까지 합하면 이런 쌍은 8개이고, 6개는 링크로, 2개는 댓글로 찾았다.
 - 네 번째 열도 누군가 중복이라고 표시한 경우만 센다. 아무도 알아채지 못해 표시 없이 열려 있는 중복은 셀 수 없다.
+- 다섯 번째 열은 상태와 resolution에 관계없이 CBRD끼리 Duplicate 링크로 이어진 묶음마다 이슈 수에서 1을 뺀 값을 센다. 두 이슈가 연결되면 1건, 세 이슈가 한 묶음이면 2건이다. 같은 연결이 양쪽 이슈에 보이거나 묶음 안에 링크가 더 있어도 중복해서 세지 않는다. 연도별로는 각 묶음에서 가장 먼저 생성된 이슈를 제외한 나머지 이슈의 생성 연도에 1건씩 더한다. 생성 시각이 같으면 키 번호가 작은 이슈를 먼저 둔다.
+- 다섯 번째 열은 CBRD-27978 등록 후 공개 이슈 7,961건의 링크를 다시 조회해 계산했다. 전체 기간에는 237개 이슈가 110개 묶음으로 연결되어 있어 중복은 **127건**이다(237 - 110). 댓글로만 중복이라고 한 경우와 Relates 링크는 포함하지 않으며, 다른 프로젝트와의 Duplicate 연결 2개도 제외했다. 세 번째 열은 이슈 수, 네 번째 열은 조건에 맞는 쌍 수, 다섯 번째 열은 묶음별 중복 건수이므로 세 열을 합산하지 않는다.
 - 최근 30일에 399건, 최근 90일에 774건이 생성되었다(`project = CBRD AND created >= -30d`).
-- Duplicate 수는 사람이 알아채고 Duplicate로 닫은 중복만 센다. 2026년 생성 이슈 중 551건은 아직 resolution이 없으므로(`project = CBRD AND created >= 2026-01-01 AND resolution is EMPTY`) 2026년 값은 더 늘 수 있다.
-- 로그인 없이 보이는 CBRD 이슈는 7,960건이다. 최신 키는 CBRD-27977이지만 2016-02에 키 번호가 CBRD-20002로 건너뛰었고, 2016년 이전 이슈는 169건이다. 따라서 키 번호가 이슈 수를 뜻하지 않는다.
+- 세 번째 열은 사람이 알아채고 Duplicate로 닫은 이슈만 센다. 2026년 생성 이슈 중 551건은 아직 resolution이 없으므로(`project = CBRD AND created >= 2026-01-01 AND resolution is EMPTY`) 2026년 값은 더 늘 수 있다.
+- 생성 수와 resolution 집계는 CBRD-27978 등록 전 조회값이다. 당시 로그인 없이 보이는 CBRD 이슈는 7,960건이고 최신 키는 CBRD-27977이었다. 2016-02에 키 번호가 CBRD-20002로 건너뛰었고, 2016년 이전 이슈는 169건이다. 따라서 키 번호가 이슈 수를 뜻하지 않는다.
 
 ### Duplicate로 닫힌 이슈와 원본의 예
 
@@ -98,7 +100,7 @@ Duplicate로 닫힌 이슈 249건(`project = CBRD AND resolution = Duplicate`)�
 curl -s 'http://jira.cubrid.org/rest/api/2/search?jql=project%20%3D%20CBRD%20AND%20resolution%20%3D%20Duplicate&fields=issuelinks,comment,created,resolutiondate,issuetype&maxResults=1000'
 ```
 
-응답의 `total`이 전체 건수다. 연도별 생성 수처럼 개수만 필요하면 `maxResults=0`으로 `total`만 받는다. CBRD 전체의 링크를 보려면 `jql=project%20%3D%20CBRD&fields=issuelinks,created,resolution`에 `startAt=0`, `1000`, `2000`, ...을 붙여 8번 요청한다.
+응답의 `total`이 전체 건수다. 연도별 생성 수처럼 개수만 필요하면 `maxResults=0`으로 `total`만 받는다. CBRD 전체의 링크를 보려면 같은 search API에 `jql=project%20%3D%20CBRD%20ORDER%20BY%20key%20ASC&fields=issuelinks,created,resolution&maxResults=1000`과 `startAt=0`, `1000`, `2000`, ...을 붙인다. `total`만큼 받을 때까지 요청하며, 이번에는 8번 요청했다. `issuelinks`에서 유형 이름이 `Duplicate`이고 양쪽 모두 CBRD인 연결만 모아, 링크 방향과 관계없이 이어진 이슈를 한 묶음으로 합친다. 각 묶음에서 가장 먼저 생성된 이슈 하나를 제외한 나머지를 연도별로 세면 다섯 번째 열을 재현할 수 있다.
 
 ## Acceptance Criteria
 

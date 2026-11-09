@@ -10,7 +10,7 @@
 
 **영향**: 유지보수 유틸리티가 큰 가변 컬럼을 다시 쓸 때 저장 배치가 일반 DML·CS compact와 달라지고 heap 행이 커진다. 관측 fixture의 전체 논리 값은 보존됐다. 이 관측으로 값 손실이나 모든 compact 경로의 결함을 주장하지 않는다.
 
-**이슈 수행 방안**: SA 재작성 경로에 정상 OOS 배치 변환을 적용한다. 구체적인 API와 구현 범위는 ANALYSIS 단계에서 정한다. 기존 `gap_compact_sa_cs`의 물리 기대값을 유지한다.
+**이슈 수행 방안**: SA 재작성 경로에 정상 OOS 배치 변환과 그 크기 판정을 적용한다. OOS로 옮길 값이 없어도 한 페이지를 넘는 행은 `REC_BIGONE`으로 쓰지 않는다. 구체적인 API, 거부한 행의 처리 방식과 구현 범위는 ANALYSIS 단계에서 정한다. 기존 `gap_compact_sa_cs`의 물리 기대값을 유지한다.
 
 ---
 
@@ -49,7 +49,12 @@ SA에서는 같은 OID의 representation과 길이가 바뀌어 실제 재작성
 - [ ] 원래 `gap_compact_sa_cs`를 기대값 완화 없이 실행하고 전체 값·물리 행·OOS owner를 검증한다. SA·CS·일반 UPDATE 대조를 남긴다.
 - [ ] 기존 OOS stub에서 시작하는 rewrite와 필요한 Expand·소유권 처리를 별도로 검증한다. 현재 lazy-default fixture만으로 이 범위를 통과 처리하지 않는다.
 - [ ] 아래 3000B payload와 21000B lazy default fixture에서도 정상 OOS 배치를 적용한다. 20KB를 넘는 재작성 입력을 기존 heap overflow로 우회 저장하지 않으며 전체 값과 owner를 검증한다.
+- [ ] OOS 대상 값이 없는 큰 행(예: 큰 고정 길이 컬럼이나 `FORCE_INLINE` 값만으로 한 페이지를 넘는 행)도 SA compact가 `REC_BIGONE`으로 쓰지 않는다. 그 행의 처리(compact 실패, 해당 객체 건너뛰기와 보고 등)를 정하고 검증한다.
 - [ ] 수정 commit·검증 결과·잔여 제한을 CBRD-26659에 연결한다.
+
+## 범위 추가 (2026-11-09)
+
+[CBRD-27259](https://jira.cubrid.org/browse/CBRD-27259)([PR #8416](https://github.com/CUBRID/cubrid/pull/8416))에서 명세를 바꿨다. 이전에는 OOS 값이 없는 행의 `REC_BIGONE`을 허용했지만, 이제 `heap_attrinfo_transform_to_disk_internal`을 거치는 비시스템 클래스 행은 `REC_BIGONE`이 될 크기면 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE`로 거부한다. 크기에는 MVCC 헤더 최대치가 들어간다. heap 계층에는 검사가 없어서, SA compact처럼 이 함수를 거치지 않고 `heap_update_logical`을 직접 부르는 경로는 여전히 `REC_BIGONE`을 만든다([OOS 명세](https://github.com/vimkim/cubrid-oos-context/blob/faee27e/OOS-CONTEXT.md#bigone-rejection-cbrd-26937-cbrd-27259)). 그래서 이 이슈는 OOS 분리뿐 아니라 이 크기 판정까지 SA compact에 적용해야 한다.
 
 ## Additional verification
 

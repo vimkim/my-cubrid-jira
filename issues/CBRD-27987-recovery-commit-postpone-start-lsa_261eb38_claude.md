@@ -1,4 +1,4 @@
-# [RECOVERY] commit postpone 실행 중 서버가 죽으면 debug 빌드가 재시작 복구 analysis에서 assert로 멈춘다
+# [Recovery] commit postpone 실행 중 서버가 죽으면 debug 빌드가 재시작 복구 analysis에서 assert로 멈춘다
 
 **한 줄 요약**: OOS 작업(CBRD-27781) 중 SIGKILL 뒤 DB를 열지 못하는 현상을 추적한 결과, 2022년 CBRD-24378 변경 이후 복구 analysis가 commit-with-postpone 레코드의 위치를 32바이트 뒤로 기록하는 develop 회귀로 확인되어, 그 위치를 바로잡는 이슈다.
 

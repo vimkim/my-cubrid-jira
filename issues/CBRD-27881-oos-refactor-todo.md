@@ -84,3 +84,60 @@ DF-03의 확인하지 않은 범위는 kill -9 뒤 복구, savepoint rollback, r
 완료 조건으로 다음을 제안한다. sub-task PR 7개가 병합되거나 닫히고, NEEDS-DECISION 항목마다 결정이 기록되면 이 이슈를 닫는다. DEFERRED 항목은 막고 있는 PR이 병합된 뒤 새 sub-task로 다시 본다.
 
 항목별 근거, DEFERRED와 REPORT-ONLY 전체 목록, 결함 후보 30개의 표는 담당자의 분석 문서(my-cubrid-docs의 `cbrd-27881/CBRD-27881-oos-refactoring-candidates_dcbf09e_claude.md`)에 정리했다.
+
+## 2026-11-11 추가 조사. PR #7990 기준 신규 후보와 선행조건 갱신
+
+이번 조사의 목적은 `develop` 대상 `feature/oos-merge` PR에서 동작을 보존하는 정리 후보를 찾아, 사람이 나중에 sub-task를 고를 수 있게 하는 것이다. 기존 본문과 R·DF 항목의 의미, 당시 집계와 검증 기록은 보존한다. 이번 추가분은 신규 후보 2건과 기존 항목의 선행조건 변화다. sub-task 선정이나 구현 완료를 뜻하지 않는다.
+
+고정 head는 `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base와 merge-base는 `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`이다. 별도 조사 checkout에서 `git diff BASE...HEAD`를 기준으로 storage, heap·DML, recovery·replication, schema·tests를 나누어 읽었다. 합성 단계에서 신규 후보의 본문과 호출부, 초기화, 기존 R·DF 목록을 다시 확인했다. 원래 작업 checkout의 미게시 postpone 변경은 조사 기준에 섞지 않았다.
+
+OOS는 heap의 24바이트 stub과 별도 value chain을 연결한다. 정리할 때도 저장 바이트, 참조의 수명, WAL과 latch 순서를 보존해야 한다. storage와 recovery의 눈에 띄는 중복은 이미 기존 목록에 있거나 accepted reclaim 설계가 교체할 코드였다. 따라서 이번 신규 후보는 기존 parser helper 재사용과 테스트 변환 중복 제거로 좁혔다.
+
+### 신규 후보 2건
+
+| ID | 현재 구조와 가장 작은 변경 | 이득과 비용 | 중복 판정과 선택 조건 |
+| --- | --- | --- | --- |
+| N-20261111-01 | `attr_def_one`의 CLASS·SHARED STORAGE 거부 블록이 `parser_reject_non_normal_attr_storage`와 같은 오류와 UNSET 복원을 반복한다. inline 블록을 기존 helper 호출로 바꾼다. | namespace 제한을 고칠 곳이 한 곳으로 줄어든다. 변경은 작지만 Bison 재생성과 오류 순서 비교가 필요하다. | R-09는 `execute_schema.c`의 ALTER 플래그 구성, R-60은 schema flag mask이므로 별개다. clause mask와 `attr_storage != UNSET`의 동치가 오류 복구 경로에서도 유지되는지 먼저 확인한다. |
+| N-20261111-02 | `fetch_single_int`와 `get_int_column`이 INTEGER·BIGINT·SHORT 변환을 반복한다. 기존 `get_int_column`을 SQL 공용 header로 옮기고, cursor를 위치시킨 `fetch_single_int`가 column 0에 이를 호출한다. | 변환 규칙을 한 곳에서 관리한다. 테스트 helper에만 영향을 주지만 공용 header를 쓰는 SQL 테스트를 다시 빌드해야 한다. | R-06·R-07과 #8368이 정리한 helper와 다른, 현재 남아 있는 중복이다. fixture 상속을 다루는 R-31과도 별개다. 테스트 기반 정리부터 고른다면 이 항목을 먼저 권한다. |
+
+두 후보 모두 새 계층이나 범용 framework를 추가할 필요가 없다. N-20261111-01은 parser의 조건 동치 확인을 통과한 뒤 선택할 조건부 후보다. N-20261111-02는 SQL 실행과 result 종료 책임을 기존 호출자에게 그대로 두는 범위로 제한한다.
+
+| ID | 보존할 동작과 영향 모드 | 구현 때 수행할 검증. 이번 조사에서는 미실행 |
+| --- | --- | --- |
+| N-20261111-01 | 동일한 namespace 거부, 오류 코드·문구·순서, `attr_storage`의 UNSET 복원을 보존한다. 중복 clause 검사용 `COLUMN_CONSTRAINT_STORAGE`와 ALTER의 뒤늦은 namespace 검사도 유지한다. SA와 CS의 client-side parser가 대상이다. 저장 형식이나 실행 계층의 STORAGE 허용 정책은 바꾸지 않는다. | parser를 재생성·빌드하고 grammar conflict 차이를 확인한다. `test_oos_sql_storage`를 실행한다. 현재 grammar의 PREFER_INLINE, FORCE_OUTLINE, DEFAULT, PREFER_OUTLINE 각각에 대해 일반·SHARED·CLASS 속성의 CREATE와 ALTER MODIFY·CHANGE, 생략·중복 clause·구문 오류를 원본과 비교한다. SA와 CS에서 오류 코드·문구·우선순위와 허용 결과를 확인한다. |
+| N-20261111-02 | INTEGER·BIGINT·SHORT의 기존 `int` cast, NULL·다른 타입의 `ER_FAILED`, tuple fetch 오류 반환, `out_val`을 쓰는 조건을 보존한다. 현재 `DB_VALUE` 정리 분기와 `db_query_end` 호출 책임도 유지한다. SA SQL 테스트가 대상이며 기존 compile guard를 유지한다. | 모든 OOS SQL 테스트 target을 재빌드한다. `test_oos_sql_show`, `test_oos_sql_deferred_write`, `test_oos_sql_txn`을 실행한다. 세 정수 타입, 큰 BIGINT의 기존 cast 결과, NULL·다른 타입, fetch 실패와 빈 결과의 반환값·출력값·result 종료를 원본과 비교한다. 오류 처리 개선은 같은 변경에 섞지 않는다. |
+
+### 기존 항목의 달라진 선행조건
+
+아래 포함 여부는 고정 head의 Git ancestry와 소스에 관한 확인이다. live GitHub의 merged·closed·draft 상태나 JIRA 완료 상태를 뜻하지 않는다. 이 추가분을 선정할 때는 실제 대상 revision과 live workflow를 다시 확인한다.
+
+| 기존 항목 | 고정 head에서 확인한 변화 | 남은 조건 |
+| --- | --- | --- |
+| R-18, R-21 | #8330의 `902fe1452`가 head의 ancestor다. 해당 PR과의 미통합 충돌을 전제로 한 기존 보류 사유는 해소됐다. cache 제거와 검색 복합 책임은 남아 있다. | CBRD-27213 재설계 뒤에도 helper 정리가 유효한지 먼저 판단한다. mutex 보유 시간, hash 갱신, 후보 순서와 write-latch 인계를 보존해야 한다. |
+| R-22 | 같은 #8330 ancestry는 확인했다. 이른 header-fix fallback은 아직 오류를 버리는 구조다. | DF-04를 다루는 CBRD-28017 수정이 먼저다. 기존 본문의 "다루는 이슈 없음"은 2026-11-03 기록이다. 오류 소실을 보존하는 통합이나 오류 수정을 refactor로 포장하지 않는다. |
+| R-28 | #8330 소스는 포함됐다. | R-13·R-42·R-43과 accepted reclaim 변경의 영향을 먼저 확인한다. bestspace와 reclaim은 mutex를 공유하므로 파일 분리만으로 책임이 분리되지는 않는다. |
+| R-13 | #8367의 `0f51cd24b`가 ancestor다. 공개 header의 내부 hint 타입은 남아 있다. | 모든 사용자와 저장 layout을 확인한 뒤 재선정한다. 내부 정의 이동은 field 순서·크기·정렬·기존 bytes를 보존한다. accepted ADR-0008이 바꿀 chunk header를 현재 형식으로 고정하는 일과 구분한다. |
+| R-16 | #8368의 `f3215feef`가 ancestor이고 공용 `test_oos_utils.hpp`가 존재한다. 기존 "공용 header가 생긴 뒤" 선행조건은 충족됐다. | 현재 남은 page·chunk helper 중복과 이동의 이득을 재조사한다. 이번 조사에서 해당 범위의 구현안이나 완료를 판정하지 않았다. |
+| R-26 | #8350의 `d52b1889e`가 ancestor다. 기존 두 선행 PR 중 하나의 소스가 포함됐다. | #8299 의존과 RECDES helper의 실제 이동 범위를 다시 확인한다. 즉시 착수 가능하다는 판정은 아니다. |
+| R-29 | `RVREPL_OOS_DELETE`의 enum, null-handler entry와 TDE 분류는 남아 있고 `src` 안의 emitter는 발견하지 못했다. | #8347에 묶자는 과거 제안은 accepted postpone·notification 구현과 함께 다시 정한다. `RVOOS_NOTIFY_VACUUM`은 accepted 설계가 필요로 하므로 미사용이라는 이유로 함께 지우지 않는다. index 삭제·재번호 부여는 별도 형식 변경 범위를 명시하고 SERVER·SA 복구 table, TDE, HA, crash/restart를 검증해야 한다. |
+
+R-01·R-10·R-12·R-14의 결과물도 이 head에 포함되어 있다. 각각 `0f51cd24b`, `90fb67265`, `9ee0e616b`, `f67f2f692`의 ancestry와 현재 소스로 확인했다. 같은 작업을 신규 후보로 다시 세지 않는다. R-14의 과거 PR은 손상된 heap header에서의 동작 차이를 밝혔으므로 엄밀한 동작 보존 사례로 인용하지 않는다.
+
+### 이번 추가분에서 제외한 것과 한계
+
+24바이트 stub codec은 R-25, payload 소유권은 R-54, CMake 등록은 R-30, 복제 emitter와 descriptor 상태는 R-24·R-33, log-applier 정리는 R-56부터 R-61에 이미 있다. 작은 helper를 다시 제안해 기존 항목 수를 늘리지 않았다.
+
+DF-02의 demotion target과 DF-03의 rollback·vacuum 문제는 결함 또는 사양 적합성 작업이다. accepted ADR-0008의 postpone·redo-only reclaim, continuation identity, tail-first 삭제도 새 동작을 구현하는 범위다. fixed head에 남은 구현과 accepted 요구를 구분한다. FORCE_INLINE과 fixed-type DEFAULT의 허용 차이도 parser 중복 제거에 섞지 않는다.
+
+결과는 정적 조사 PASS이며 런타임 동작 보존 PASS가 아니다. 신규 소스 변경, 빌드, SQL, 단위 테스트, HA, 복구, fault injection, 동시성·성능 검증은 수행하지 않았다. 조사 checkout에는 build directory와 `compile_commands.json`이 없었다. 기존 본문의 44개 ctest와 CI 성공은 과거 revision의 검증 기록이며 이번 head나 신규 후보의 실행 근거로 재사용하지 않는다.
+
+### 신규 후보 근거 manifest
+
+모든 소스 행은 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f` 기준이다.
+
+| 후보 | 직접 재확인한 anchor |
+| --- | --- |
+| N-20261111-01 | [csql_grammar.y 10187행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/parser/csql_grammar.y#L10187)의 inline 거부, `:23578`의 공용 helper, `:6520`·`:6545`의 ALTER 호출, `:10251`의 중복 clause 검사, `:10717` 이후 네 STORAGE production. `src/parser/parse_tree_cl.c:2519`의 node zero 초기화와 `:7114`의 attribute 초기화. `src/parser/parse_tree.h:2024`의 UNSET enum. |
+| N-20261111-02 | [test_oos_sql_common.hpp 137행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/sql/test_oos_sql_common.hpp#L137)의 tuple 읽기와 `:144` 이후 변환, `unit_tests/oos/sql/test_oos_sql_heap_fixture.hpp:70`의 `get_int_column`, `unit_tests/oos/sql/test_oos_sql_show.cpp:104`와 `test_oos_sql_deferred_write.cpp:463`의 소비자, `unit_tests/oos/sql/CMakeLists.txt:23` 이후 SA target 정의. |
+
+중복 판정에는 기존 `CBRD-27881-oos-refactoring-candidates_dcbf09e_claude.md`와 2026-11-11에 저장한 JIRA 본문을 사용했다. accepted 요구는 2026-11-09판 `OOS-CONTEXT.md`, SHA-256 `426f294420285381835a0e733b12bde9ed2ffa14dfdd6264db5e3c33894f533d`를 기준으로 구분했다. 이 추가분은 기존 본문 끝에 붙일 내용이며, 과거 본문이나 담당자의 결정 기록을 교체하지 않는다.

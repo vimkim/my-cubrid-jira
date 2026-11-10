@@ -241,4 +241,3 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 추적 중인 다중 chunk 삽입은 dummy 로그 뒤 tail부터 chunk를 쓰고, 완료 때 dummy LSA와 tail LSA를 그 순서로 큐에 넣는다. null 참조 marker 뒤 실제 head 참조가 오며 복제 emitter는 이 순서를 소비한다. 중간 오류의 publication 상태 정리와 이미 쓴 chunk의 transaction undo는 서로 다른 책임이다. 자동 enqueue 두 곳, 논리 publication 시작, 오류 정리, descriptor 초기화, FK swap의 경계를 유지한다. savepoint별 큐 snapshot이 없다는 정적 관찰만으로 rollback 결함을 단정하지 않는다.
 
 [#8330](https://github.com/CUBRID/cubrid/pull/8330)의 merge `902fe1452360dcdd4c6e08812dbe0ae7d52ae9c7`는 fixed head의 ancestor다. #8299의 현재 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`에서도 관련 queue·flag 지점은 유지된다. [#8434](https://github.com/CUBRID/cubrid/pull/8434)의 현재 head `94ed2ea463f17694db33a283b56fdeb42856e835`는 append·recovery 경로를 바꾸므로 실제 통합 revision에서 다시 확인한다. 단일·다중 chunk, batch, 일반 억제·no-logging, FK 중첩 실패, allocation 실패, sysop·transaction·savepoint rollback, 재시작 복구와 HA 검증은 실행하지 않았다.
-

@@ -229,3 +229,16 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 보존할 계약은 FORCE_OUTLINE 선행 선택, 24B 초과 조건, ordinary 우선·크기 내림차순·동률 attribute index 내림차순, loop 전 header 추정값과 loop 뒤 한 번의 재계산, MVCC 여유분, 선택 flag와 `has_oos`, offset 폭, 실제 revision의 할당·오류 순서다. header를 매 선택마다 다시 계산하면 VOT 폭 경계에서 선택 결과가 달라질 수 있다. 수용된 FORCE_INLINE·bigone 정책의 적합성 변경과 OOS 저장·WAL·latch 동작은 이 정리에 섞지 않는다.
 
 실행 검증은 하지 않았다. 향후 구현에서는 gate 미진입, 강제·NULL·24B 경계, 우선순위·동률, 후보 소진, MVCC·VOT 폭 전환에서 선택 index와 최종 크기·offset·flag를 비교한다. 할당 실패 시점과 오류, 일반 행의 지연 할당 경로, SA·SERVER 통합도 별도로 확인해야 한다. 순수 연산 경계가 복사 없이 유용한지 확인되기 전에는 현재 함수에 두는 안을 유지한다.
+
+## R-33 복제 큐와 억제 상태의 소유권 재확인
+
+2026-11-11에 같은 fixed head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`와 base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`를 정적으로 추적했다. 새 후보는 추가하지 않는다. R-33은 미구현이며 실행 동등성도 미검증이다.
+
+`LOG_LSA_QUEUE`는 이미 vector와 소비 위치 `m_head`를 가진 FIFO 타입이다(`src/transaction/log_lsa.hpp:127`). `LOG_TDES`의 큐와 thread의 OOS 참조 vector는 수명이 다르다. FK 갱신 재귀는 두 컨테이너 전체를 swap해 부모를 보관하고, 성공·오류 분기 전에 복원한다(`locator_sr.c:9653`). 큐 내용만 복사하거나 복제 상태 전체를 한 타입으로 묶으면 소비 위치와 이 소유권 경계가 흐려질 수 있다. 일반 `suppress_replication`은 복제 로그 기록을 막고 OOS 큐 소비 전에 반환한다(`replication.c:313`). OOS 전용 flag는 `RVOOS_INSERT`의 자동 enqueue만 막으므로 둘을 합치지 않는다.
+
+파일 생성은 flag가 false였을 때만 true로 바꾸고 복원하지만(`oos_file.cpp:1193`), 다중 chunk 삽입은 추적 중 true로 설정한 뒤 종료 때 false로 만든다(`:2358`). 조사한 운영 경로는 파일 조회·생성을 삽입 전에 끝내고 batch의 다중 chunk 호출도 순차 실행한다. FK 재귀가 chunk loop 안에서 발생한다는 근거도 찾지 못했다. 이미 true인 상태로 진입하는 경로는 입증하지 못했으며, 할당·회수 하위 경로의 간접 재진입까지 배제한 것은 아니다. 이전 값을 복원하는 guard는 그 상태에서 결과를 바꾸므로, 단순 추출과 구분해 도달성과 의도된 동작부터 확인한다. R-48의 기존 guard 후보도 중복 추가하지 않는다.
+
+추적 중인 다중 chunk 삽입은 dummy 로그 뒤 tail부터 chunk를 쓰고, 완료 때 dummy LSA와 tail LSA를 그 순서로 큐에 넣는다. null 참조 marker 뒤 실제 head 참조가 오며 복제 emitter는 이 순서를 소비한다. 중간 오류의 publication 상태 정리와 이미 쓴 chunk의 transaction undo는 서로 다른 책임이다. 자동 enqueue 두 곳, 논리 publication 시작, 오류 정리, descriptor 초기화, FK swap의 경계를 유지한다. savepoint별 큐 snapshot이 없다는 정적 관찰만으로 rollback 결함을 단정하지 않는다.
+
+[#8330](https://github.com/CUBRID/cubrid/pull/8330)의 merge `902fe1452360dcdd4c6e08812dbe0ae7d52ae9c7`는 fixed head의 ancestor다. #8299의 현재 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`에서도 관련 queue·flag 지점은 유지된다. [#8434](https://github.com/CUBRID/cubrid/pull/8434)의 현재 head `94ed2ea463f17694db33a283b56fdeb42856e835`는 append·recovery 경로를 바꾸므로 실제 통합 revision에서 다시 확인한다. 단일·다중 chunk, batch, 일반 억제·no-logging, FK 중첩 실패, allocation 실패, sysop·transaction·savepoint rollback, 재시작 복구와 HA 검증은 실행하지 않았다.
+

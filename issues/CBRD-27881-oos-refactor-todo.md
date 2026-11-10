@@ -183,3 +183,19 @@ DF-02의 demotion target과 DF-03의 rollback·vacuum 문제는 결함 또는 �
 mutex 획득·해제와 page fix·unfix, 후보 순서, 오류 반환은 기존 위치에 둔다. 특히 VPID 삭제의 recovery growth-gate 재무장은 cache miss 검사보다 먼저 실행되므로 helper 밖에 그대로 둔다. reclaim-state 삭제와 header hint 정리도 각 호출자에 남긴다. pending postpone 변경과는 이 경계를 기준으로 다시 비교한다. CBRD-27213의 미래 재설계가 이 helper를 남길지는 미정이지만, 현재 세 지점의 좁은 정리를 검토하는 데 재설계 완료를 일괄 선행조건으로 두지는 않는다. 실제 작업 순서는 대상 revision과 재설계 진행 상황을 보고 정한다.
 
 구현 후에는 SERVER와 SA를 빌드하고 기존 `OosBestspaceTest`의 `BestspaceStaleCacheEviction`, `BestspaceHeaderPageNeverReturned`, `BestspaceMultipleFilesIsolation`, `BestspaceCacheCleanedOnFileRemove` 등을 실행한다. free-list 재사용과 용량 경계, 공간 부족 검색 budget, cache hit와 miss의 recovery 재무장, reclaim 이후 재사용도 원본과 비교한다. 기존 테스트가 각 분기에 실제 도달하는지는 별도로 확인한다. 이번에는 소스와 테스트를 읽었으며 빌드·런타임 검증은 수행하지 않았다.
+
+
+## 2026-11-11 후속 확인. R-19 테스트 bridge 선언의 작은 공통 범위
+
+R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보존한다. 같은 고정 head에서 확인한 아래 두 선언은 기존 private 테스트 header를 재사용하는 별도 범위로 검토할 수 있다. 신규 후보나 구현 완료로 세지 않는다.
+
+- `int bridge_oos_get_max_chunk_size_within_page ();`는 실제 호출이 있는 테스트 파일 14개에 반복된다. SA 8개와 SERVER 6개이며, 모두 기존 fixture header를 통해 `test_oos_utils.hpp`를 이미 포함한다.
+- `OOS_HDR_STATS *bridge_oos_get_header_stats_ptr (THREAD_ENTRY *thread_p, PAGE_PTR page_header);`는 `test_oos_bestspace.cpp:47`과 `test_oos_growth_sweep.cpp:46`에 반복되고 두 파일 모두 호출한다. 두 선언은 [oos_file.cpp 3891행 이후 정의](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L3891)와 일치한다.
+
+가장 작은 후보는 [test_oos_utils.hpp](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_utils.hpp#L19)에 두 선언을 전역 C++ scope로 두고 호출부의 복사본을 지우는 것이다. 이 header는 필요한 기존 타입 header를 포함한다. `namespace test_oos_utils` 안으로 옮기거나 `extern "C"`, default argument, wrapper를 추가하지 않는다. `CUBRID_UNIT_TEST_ENABLED` 경계와 SA·SERVER 가시성을 유지한다. 이 범위는 호출자 사이의 선언 차이를 막는다. 정의 파일이 이 테스트 header를 포함하지 않으므로 선언과 정의의 불일치까지 컴파일로 검출한다는 주장은 하지 않는다.
+
+작은 전용 bridge header는 SQL 테스트까지 공유하는 debug counter 선언과 page RAII 반환형을 함께 옮길 때 별도로 비교할 수 있다. 위 두 선언만 옮기기 위해 새 header나 엔진의 테스트 utility 의존을 추가하지 않는다. CS 전용 log-applier bridge, heap·locator bridge, 새 이름의 seam, CMake target·등록·fixture 변경은 이번 범위에서 제외한다.
+
+#8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a`, #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`의 관련 header·정의와 테스트 diff도 별도로 확인했다. 두 PR은 조회 당시 Open이며, 선택한 두 signature의 변경은 확인되지 않았다. #8128은 같은 max-chunk 선언과 호출을 새 테스트에도 추가하므로, 그 테스트가 들어오면 함께 옮길 복사본으로 대조한다. 전체 PR 종료를 일괄 선행조건으로 삼는 대신 실제 구현 revision의 해당 선언·include 변경을 다시 대조한다. 향후 충돌이 없다는 보장은 아니다.
+
+정적 확인만 수행했다. 구현 시 OOS 단위 테스트를 켠 구성에서 영향받는 SA·SERVER target 14개를 빌드·링크하고, 기존 등록 테스트와 fixture를 그대로 실행해야 한다. 비테스트 엔진 빌드에 새 symbol 의존이 생기지 않는지도 확인한다. 이번 조사에서는 빌드·링크·런타임 검증을 수행하지 않았다.

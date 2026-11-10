@@ -241,3 +241,15 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 추적 중인 다중 chunk 삽입은 dummy 로그 뒤 tail부터 chunk를 쓰고, 완료 때 dummy LSA와 tail LSA를 그 순서로 큐에 넣는다. null 참조 marker 뒤 실제 head 참조가 오며 복제 emitter는 이 순서를 소비한다. 중간 오류의 publication 상태 정리와 이미 쓴 chunk의 transaction undo는 서로 다른 책임이다. 자동 enqueue 두 곳, 논리 publication 시작, 오류 정리, descriptor 초기화, FK swap의 경계를 유지한다. savepoint별 큐 snapshot이 없다는 정적 관찰만으로 rollback 결함을 단정하지 않는다.
 
 [#8330](https://github.com/CUBRID/cubrid/pull/8330)의 merge `902fe1452360dcdd4c6e08812dbe0ae7d52ae9c7`는 fixed head의 ancestor다. #8299의 현재 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`에서도 관련 queue·flag 지점은 유지된다. [#8434](https://github.com/CUBRID/cubrid/pull/8434)의 현재 head `94ed2ea463f17694db33a283b56fdeb42856e835`는 append·recovery 경로를 바꾸므로 실제 통합 revision에서 다시 확인한다. 단일·다중 chunk, batch, 일반 억제·no-logging, FK 중첩 실패, allocation 실패, sysop·transaction·savepoint rollback, 재시작 복구와 HA 검증은 실행하지 않았다.
+
+## R-30 테스트 등록의 최소 범위 재확인
+
+2026-11-11 정적 조사에서 기존 R-30의 선택지를 좁혔다. 새 TODO나 구현 완료로 세지 않는다. 기준은 PR #7990 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`다.
+
+[SQL CMake 등록부](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/sql/CMakeLists.txt#L38)는 공유 DB 테스트 13개 이름을 등록과 속성 지정에 각각 나열한다. 작은 명시적 목록과 loop가 두 결정을 함께 맡는 안을 검토한다. source glob은 target 생성만 맡도록 그대로 두고, glob의 모든 파일을 자동 등록하지 않는다. `OOS_DB`, `RUN_SERIAL TRUE`, 기본 timeout 30초와 deferred-write의 180초 override를 유지한다. crash-recovery는 `OOS_RECOVERY_DB`와 180초를 쓰므로 이 목록 밖에 둔다.
+
+현재 Open인 [#8128](https://github.com/CUBRID/cubrid/pull/8128) head `e3589ae42d42b04eb020e1ae43e165b01d31b12a`는 SQL ownership을 두 목록에 추가하고, parent에 boundaries target과 등록을 추가한다. 기존 DEFERRED 이력은 보존하고 실제 통합 revision에서 두 항목을 대조한다. pending boundaries는 공유 `unittestdb`를 쓰지만 등록에는 `OOS_DB`와 60초만 있고 shared-DB lock과 `RUN_SERIAL`은 없다. 병렬 실행 안전성은 별도 확인 사항이며, 이번 정리에 잠금을 추가하거나 결함이 입증됐다고 기록하지 않는다.
+
+[parent CMake](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/CMakeLists.txt#L80)의 registry lock과 공유 DB 소비자 lock은 목적이 다르다. shared setup은 기존 DB를 재사용할 수 있지만 isolated setup은 소유하지 않은 기존 DB를 거부한다. 네 isolated fixture pair 공통화는 별도 선택지이며, shared fixture까지 묶는 범용 helper는 이점이 입증되지 않았다. no-fixture 테스트에도 실제 DB가 없는 경우와 private DB를 소유하는 workspace가 있으므로 구분한다. 이름·명령·인자·target mode·link·include·fixture 의존성·lock·serial·환경·timeout·비활성 상태와 속성의 부재를 보존한다. filtered vacuum의 별도 명령과 환경도 유지한다.
+
+실행 검증은 하지 않았다. 향후 구현 전후에 같은 구성의 `ctest --show-only=json-v1`과 target 구성을 비교하고 영향받는 target의 빌드·링크, shared·isolated·no-database·filtered 테스트를 확인해야 한다. 현재의 정적 분석 완료는 R-30 구현이나 실행 동등성 검증 완료가 아니다.

@@ -141,3 +141,26 @@ DF-02의 demotion target과 DF-03의 rollback·vacuum 문제는 결함 또는 �
 | N-20261111-02 | [test_oos_sql_common.hpp 137행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/sql/test_oos_sql_common.hpp#L137)의 tuple 읽기와 `:144` 이후 변환, `unit_tests/oos/sql/test_oos_sql_heap_fixture.hpp:70`의 `get_int_column`, `unit_tests/oos/sql/test_oos_sql_show.cpp:104`와 `test_oos_sql_deferred_write.cpp:463`의 소비자, `unit_tests/oos/sql/CMakeLists.txt:23` 이후 SA target 정의. |
 
 중복 판정에는 기존 `CBRD-27881-oos-refactoring-candidates_dcbf09e_claude.md`와 2026-11-11에 저장한 JIRA 본문을 사용했다. accepted 요구는 2026-11-09판 `OOS-CONTEXT.md`, SHA-256 `426f294420285381835a0e733b12bde9ed2ffa14dfdd6264db5e3c33894f533d`를 기준으로 구분했다. 이 추가분은 기존 본문 끝에 붙일 내용이며, 과거 본문이나 담당자의 결정 기록을 교체하지 않는다.
+
+## 2026-11-11 후속 확인. 담당자 결정과 기존 후보의 범위
+
+아래는 기존 항목의 상태와 구현 선행조건을 구체화한 기록이다. 신규 후보나 sub-task를 추가하지 않는다. 소스 판단은 위와 같은 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b` 기준이다.
+
+### 확인한 담당자 결정
+
+- R-34는 [CBRD-27213의 담당자 댓글 4778284](https://jira.cubrid.org/browse/CBRD-27213?focusedCommentId=4778284&page=com.atlassian.jira.plugin.system.issuetabpanels:comment-tabpanel)의 2026-11-10 결정에 따라 해당 재설계로 넘긴다. 기존 tier-3 sync를 별도로 고치지 않고 재설계에서 legacy 구조와 함께 제거한다. 이 결정은 현재 구현의 제거 완료를 뜻하지 않는다.
+- R-39는 기능 이름에 맞게 develop 병합 전에 변경하기로 했다. [CBRD-28023](https://jira.cubrid.org/browse/CBRD-28023)이 이 결정을 추적하는 기존 Open sub-task다. 정확한 새 문자열과 테스트 수정 범위는 해당 이슈의 ANALYSIS에서 정한다. 고정 head의 `file_type_to_string(FILE_OOS)`는 여전히 `OUT_OF_LINE_OVERFLOW_STORAGE`를 반환한다. 사용자 출력 문자열의 변경이므로 동작 보존 정리와 구분한다.
+
+2026-11-03 NEEDS-DECISION 집계는 당시 기록으로 유지한다. 이번 확인은 위 두 결정에 한정하며, 다른 다섯 항목의 담당자 선택을 새로 확정하지 않는다.
+
+### N-20261111-01의 정적 조건 확인과 남은 실행 검증
+
+`attr_def_one`의 현재 거부 블록 진입점에서는 STORAGE mask bit와 `attr_storage != UNSET`가 동치라는 정적 확인을 마쳤다. grammar 의존 관계, 초기화와 쓰기 지점, 생성된 parser의 error-token shift 부재, 유한 상태 모델을 확인했다. 실제 SQL parser 실행 결과는 아니다.
+
+교체 범위는 `csql_grammar.y:10187`의 기존 위치에 helper를 호출하는 것으로 제한한다. 거부 후에는 mask가 남고 storage만 UNSET이므로 두 조건은 더 이상 동치가 아니다. helper 호출을 옮기거나 `PARSER_SAVE_ERR_CONTEXT`, visibility·중복 진단 순서, 늦은 ALTER 검사를 바꾸지 않는다. 구현 시 SA·CS에서 정상 입력과 잘못된 입력의 오류 내용·위치·순서를 원본과 비교해야 한다. 후보는 계속 미구현이며 런타임 동치는 미확인이다.
+
+### N-20261111-02의 반환값과 수명 경계
+
+`get_int_column`은 result를 종료하지 않는다. 변경할 때 `fetch_single_int`는 cursor 위치 결정에 성공한 뒤 이 helper를 호출하고, helper가 반환한 다음 result를 한 번 종료하며 helper의 반환값을 돌려준다. 기존 SHOW 소비자는 같은 result에서 여러 열을 읽으므로 종료 책임을 공유 helper로 옮기지 않는다.
+
+오류 처리 개선을 섞지 않는다. SQL 실행 실패의 원래 반환값, first-tuple 실패의 `ER_FAILED`, tuple-fetch 실패의 원래 반환값과 `DB_VALUE`를 clear하지 않는 기존 분기, `db_query_end` 반환값을 무시하는 순서를 보존한다. 지원 타입만 `out_val`에 쓰고, BIGINT의 기존 `int` cast도 유지한다. 범위 밖 BIGINT는 같은 compiler·platform의 원본과 변경 바이너리로 비교해야 한다. header 이동 뒤 전체 OOS SQL target의 빌드와 실제 SQL·오류 경로 비교는 미실행이며 구현 때 남은 검증이다.

@@ -54,12 +54,12 @@ merge에서 생긴 OOS 쪽 변경은 다음 두 가지다.
 | `test_medium` | 0 | 0 | 0 |
 | `test_sql` | 2 | 2 | 0 |
 | `test_sql_by_cci` | 38 | 38 | 0 |
-| `test_shell` | 4 | 1 | 3 (answer 미갱신, 아래 참고) |
+| `test_shell` | 4 | 1 | 3 (answer 미갱신, 고친 뒤 재실행에서 0) |
 
 - 비교 기준은 같은 날 develop 대상 PR run 3개다. [42807018862](https://github.com/CUBRID/cubrid/actions/runs/42807018862)(#8409), [42790013637](https://github.com/CUBRID/cubrid/actions/runs/42790013637)(#8356), [42784848562](https://github.com/CUBRID/cubrid/actions/runs/42784848562)(#8168)이다. `test_sql_by_cci`는 develop 대상 PR run 7개(#8019, #8424 등)를 더 썼다.
 - 실패한 case마다 JUnit XML diff에서 `+` 줄 집합과 `-` 줄 집합을 뽑아 develop run의 같은 case와 비교했다. 줄 안의 공백은 하나로 줄였다. `test_sql` 2건과 `test_sql_by_cci` 38건 모두 develop run 하나 이상과 diff가 같다.
 - `test_shell`의 `cbrd_27571.sh`는 develop run 2개(#8409, #8168)에서도 같은 단계에서 실패한다. 서버 재시작이 `log_append_compensate_internal`의 `Assertion 'false'`로 멈춘다. 다른 것은 assertion의 줄 번호(develop 3202, OOS 3214)뿐이다.
-- `test_shell`에서 OOS에서만 실패한 3건(`bug_bts_9836`, `bug_bts_14120`, `bug_bts_15529`)은 `call_stack_dump_activation_list` 기본값의 출력만 다르다. 엔진은 새 OOS code `-1395,-1397,-1398`을 출력하는데, answer에는 이전 번호 `-1387,-1389,-1390`이 남아 있었다. private-ex `8ef4f6278`이 answer 5개를 고쳤고, PR #7990의 `/run shell`([run 42819814597](https://github.com/CUBRID/cubrid/actions/runs/42819814597))로 확인한다.
+- `test_shell`에서 OOS에서만 실패한 3건(`bug_bts_9836`, `bug_bts_14120`, `bug_bts_15529`)은 `call_stack_dump_activation_list` 기본값의 출력만 다르다. 엔진은 새 OOS code `-1395,-1397,-1398`을 출력하는데, answer에는 이전 번호 `-1387,-1389,-1390`이 남아 있었다. private-ex `8ef4f6278`이 answer 5개를 고쳤다. 그 뒤 PR #7990의 `/run shell`([run 42819814597](https://github.com/CUBRID/cubrid/actions/runs/42819814597))에서 세 case 모두 통과했고, 실패는 `cbrd_27571.sh` 1건만 남았다.
 
 ### 판단
 

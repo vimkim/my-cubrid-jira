@@ -300,3 +300,12 @@ hash 우선 순서와 mutex 해제 뒤의 conditional WRITE fix를 유지한다.
 - `oos_file.cpp:1161-1178`은 `sizeof(OOS_HDR_STATS)`의 raw bytes를 sticky first-page slot 0에 넣고, `:1210`에서 `RVOOS_INSERT`로 초기 image를 기록한다. `:485-494`는 같은 bytes를 PEEK 후 cast한다. 이후 hint 수정의 `log_skip_logging`은 초기 생성까지 비로깅이라는 뜻이 아니다. field 순서, padding, nested VPID/VFID, 크기와 정렬, 초기 bytes, WAL index와 sysop, queue suppression, latch·dirty·unfix 순서를 유지한다.
 - #8367은 head `39720850512a011204609053b559946f39055fd0`, merge `0f51cd24b7d28427da27b1a8004182242c60717f`가 조사 head의 ancestor다. 미병합 #8434 head `94ed2ea463f17694db33a283b56fdeb42856e835`는 별도 chunk의 next stamp와 header 삽입 logging 경로를 바꾼다. accepted ADR-0008의 chunk 형식 변경을 R-13의 hint 정의 이동과 섞거나 현재 chunk 크기로 고정하지 않는다.
 - layout assertion은 지원 ABI의 독립적인 크기·정렬·offset 기준을 확보한 뒤 검토한다. assertion만으로 기존 DB bytes나 복구 동등성을 입증할 수 없다. 구현 선정 시 실제 통합 head에서 사용자 census와 지원 SA·SERVER layout/초기 image 비교, header 생성·재개방·crash/restart, bestspace·stale hint·reclaim·rollback 검증을 수행한다. 이번에는 build, DB, CI와 runtime 검증을 실행하지 않았다.
+
+
+### R-29 복구 인덱스의 현재 통합 상태
+
+2026-11-11 정적 재확인이다. 조사 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b` 는 유지한다. 새 후보나 구현 완료 기록은 아니다.
+
+- [#8347](https://github.com/CUBRID/cubrid/pull/8347) 은 head `e523d4f51572c0299daba4c14ba92f511a6fc17e` 에서 병합 없이 닫혔다. 해당 변경은 알림 인덱스를 지우고 뒤 번호를 이동하지만 `RVREPL_OOS_DELETE=139` 는 남긴다. 위의 R-29를 #8347에 합치자는 제안은 과거 제안이며 현재 그대로 실행할 수 없다.
+- 미병합 [#8434](https://github.com/CUBRID/cubrid/pull/8434) head `94ed2ea463f17694db33a283b56fdeb42856e835` 는 `oos_file.cpp:4119` 에서 `RVOOS_NOTIFY_VACUUM=140` 을 기록하고 `vacuum.c:3867` 에서 소비한다. `recovery.h:205-210` 은 기존 forward-delete 알림을 제거한 자리에 `RVOOS_RECLAIM_POSTPONE=142` 와 `RVOOS_UPDATE_DROP_POSTPONE=143` 을 둔다. #8347의 삭제·재번호 부여를 이 변경과 기계적으로 합치지 않는다.
+- 두 head에서도 `RVREPL_OOS_DELETE` 의 이름 기반 `src` 검색 결과는 enum, 복구 table, TDE 분류뿐이다. 이 관찰은 숫자·생성 코드·외부 또는 과거 로그까지 사용되지 않음을 증명하지 않는다. R-29는 실제 통합 revision에서 다시 판단하며, 살아 있는 알림·postpone과 위치 기반 `RV_fun[]`, MVCC·logical·TDE 분류를 보존한다. SERVER·SA 빌드, commit·rollback·savepoint·crash/restart와 HA 검증은 이번 조사에서 실행하지 않았다.

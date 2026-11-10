@@ -253,3 +253,15 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 [parent CMake](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/CMakeLists.txt#L80)의 registry lock과 공유 DB 소비자 lock은 목적이 다르다. shared setup은 기존 DB를 재사용할 수 있지만 isolated setup은 소유하지 않은 기존 DB를 거부한다. 네 isolated fixture pair 공통화는 별도 선택지이며, shared fixture까지 묶는 범용 helper는 이점이 입증되지 않았다. no-fixture 테스트에도 실제 DB가 없는 경우와 private DB를 소유하는 workspace가 있으므로 구분한다. 이름·명령·인자·target mode·link·include·fixture 의존성·lock·serial·환경·timeout·비활성 상태와 속성의 부재를 보존한다. filtered vacuum의 별도 명령과 환경도 유지한다.
 
 실행 검증은 하지 않았다. 향후 구현 전후에 같은 구성의 `ctest --show-only=json-v1`과 target 구성을 비교하고 영향받는 target의 빌드·링크, shared·isolated·no-database·filtered 테스트를 확인해야 한다. 현재의 정적 분석 완료는 R-30 구현이나 실행 동등성 검증 완료가 아니다.
+
+### R-16 재검토. 페이지 free-space 조회 다섯 복사본
+
+2026-11-11 정적 조사에서 기존 R-16의 첫 작업 범위를 좁혔다. 기준 head는 `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base는 `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`다. #8368의 merge `f3215feefb1cdd71157ceb33579cecf6d61ea73e`는 head의 ancestor이며, 기존 `test_oos_utils.hpp`를 재사용할 수 있다. 신규 후보나 구현 완료 판정은 아니다.
+
+`get_free_space_of_oid_page`는 [SA delete 39행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_delete.cpp#L39), [SERVER delete 38행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_delete_server.cpp#L38), [bestspace 62행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_bestspace.cpp#L62), [mock vacuum 43행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_mock_vacuum_server.cpp#L43), [vacuum 546행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_vacuum_server.cpp#L546)에 같은 본문으로 남아 있다. 다섯 파일에 실제 호출 구문 26곳이 있다. SA 두 파일과 SERVER 세 파일의 공통 fixture는 이미 해당 공용 header를 include한다.
+
+선택 가능한 최소 변경은 본문 하나를 기존 `test_oos_utils` namespace에 inline helper로 두고, 같은 `thread_p`를 명시적 인자로 전달하며 다섯 local 정의를 지우는 것이다. 페이지 조회 규칙을 고칠 위치가 한 곳으로 줄어든다. OID에서 VPID를 만들고 `OLD_PAGE_IF_IN_BUFFER`, READ latch, unconditional latch를 쓰는 순서와 fix 실패의 `-1`을 보존한다. 성공 시 기존 `auto_unfixed_page_ptr`가 `spage_get_free_space` 뒤 함수 종료 때 unfix하며 page pointer를 내보내지 않는 수명도 유지한다. 필요한 `slotted_page.h`는 직접 include한다. 범용 page wrapper는 추가하지 않는다.
+
+호출자의 assertion과 로그는 그대로 둔다. 특히 bestspace에는 `-1`도 통과할 수 있는 비교가 있어, helper 안에서 assert하거나 sentinel을 바꾸는 일은 동작 보존 정리에 포함하지 않는다. 별도의 두 `peek_oos_header`는 실패값이 `ER_FAILED`이고 PEEK bytes를 latch 안에서 복사하므로 이번 다섯 본문과 묶지 않는다. `OLD_PAGE`, deallocation 허용 fix, WRITE latch 또는 caller가 page를 소유하는 경로도 제외한다. R-19의 선언 이동과 N-20261111-02의 SQL 변환 중복은 별개다.
+
+진행 중 #8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a`, #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`에서도 선택한 다섯 본문은 같다. 이는 향후 충돌이 없다는 보장이 아니므로 실제 통합 revision의 include와 호출자를 다시 대조한다. 구현 시 공용 header 소비자를 SA·SERVER 모드에서 다시 컴파일하고 관련 기존 delete·bestspace·vacuum 테스트로 반환값, assertion, latch 수명을 비교한다. 이 빌드와 실행은 수행하지 않았으며 후보는 미구현이다.

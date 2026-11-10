@@ -216,3 +216,16 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 [현재 #8299](https://github.com/CUBRID/cubrid/pull/8299) head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`는 주변 planner, nullable plan과 VOT decoder를 바꾼다. 해당 revision에서도 위 writer와 parser의 공통화 대상은 남는다. 기존 DEFERRED 이력은 유지하며, 실제 통합 revision에서 경계와 호출 순서를 다시 확인한다. #8434 head `94ed2ea463f17694db33a283b56fdeb42856e835`의 회수 정책 변경은 이 codec 정리에 포함하지 않는다.
 
 구현 시 확인할 항목은 24바이트 디스크 bytes 동일성, 기존 짧거나 잘린 VOT 필드 거부, NULL OID와 pending owner 거부의 오류·출력 보존, 실제 cursor 용량 부족의 grow-and-retry, 복제 fixup의 길이 보존이다. SA·SERVER 관련 기존 테스트와 빌드도 실행해야 한다. 이번 조사에서는 모두 미실행이며, malformed-image 결함 수정이나 accepted OOS 요구사항 구현으로 완료 처리하지 않는다.
+
+
+## R-27 planner 경계 재확인 (2026-11-11 정적 조사)
+
+기존 R-27의 선택지를 좁힌다. 신규 TODO나 구현 완료로 세지 않는다. [PR7990](https://github.com/CUBRID/cubrid/pull/7990) head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`에서 `heap_attrinfo_determine_disk_layout`의 직접 production 호출은 `heap_attrinfo_transform_to_disk_internal` 한 곳이다 (`heap_file.c:13743`, `:14840`). INSERT·UPDATE와 pending 준비는 그 경로를 공유한다. 별도 planner 모듈이나 결과 복사를 추가하는 이점은 아직 입증되지 않았다.
+
+현재 [#8299](https://github.com/CUBRID/cubrid/pull/8299) head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`는 크기 계산과 강제 선택을 합치고, 8개 이하 크기 배열은 stack을 쓰며, 첫 선택 때만 plan을 할당한다. planner의 `std::bad_alloc`을 기존 C 오류로 바꾸는 경계도 추가한다. 이 revision의 target은 `heap_oos_inline_target_size()`이고 gate와 stop이 같은 값을 쓴다. fixed head의 `DB_PAGESIZE / 4`를 바꾸는 DF-02는 별도 동작 변경이다. 두 revision의 할당 실패 동작까지 같다고 판정하지 않는다. DEFERRED 이력은 유지하고 실제 통합 revision에서 다시 대조한다.
+
+추출한다면 이미 있는 `heap_oos_demote_candidate`와 comparator를 재사용하고, 측정된 크기·기존 선택 상태·target을 받는 작은 선택 연산으로 한정하는 안을 검토한다. 전체 descriptor 배열과 결과 복사, production 호출이 하나뿐인 전달 helper는 이점이 없으면 추가하지 않는다. `heap_oos_column_plan`의 OID·stamp·pending index는 뒤의 직렬화 상태이므로 선택 연산에 복제하지 않는다.
+
+보존할 계약은 FORCE_OUTLINE 선행 선택, 24B 초과 조건, ordinary 우선·크기 내림차순·동률 attribute index 내림차순, loop 전 header 추정값과 loop 뒤 한 번의 재계산, MVCC 여유분, 선택 flag와 `has_oos`, offset 폭, 실제 revision의 할당·오류 순서다. header를 매 선택마다 다시 계산하면 VOT 폭 경계에서 선택 결과가 달라질 수 있다. 수용된 FORCE_INLINE·bigone 정책의 적합성 변경과 OOS 저장·WAL·latch 동작은 이 정리에 섞지 않는다.
+
+실행 검증은 하지 않았다. 향후 구현에서는 gate 미진입, 강제·NULL·24B 경계, 우선순위·동률, 후보 소진, MVCC·VOT 폭 전환에서 선택 index와 최종 크기·offset·flag를 비교한다. 할당 실패 시점과 오류, 일반 행의 지연 할당 경로, SA·SERVER 통합도 별도로 확인해야 한다. 순수 연산 경계가 복사 없이 유용한지 확인되기 전에는 현재 함수에 두는 안을 유지한다.

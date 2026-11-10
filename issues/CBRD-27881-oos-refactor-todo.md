@@ -199,3 +199,20 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 #8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a`, #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`의 관련 header·정의와 테스트 diff도 별도로 확인했다. 두 PR은 조회 당시 Open이며, 선택한 두 signature의 변경은 확인되지 않았다. #8128은 같은 max-chunk 선언과 호출을 새 테스트에도 추가하므로, 그 테스트가 들어오면 함께 옮길 복사본으로 대조한다. 전체 PR 종료를 일괄 선행조건으로 삼는 대신 실제 구현 revision의 해당 선언·include 변경을 다시 대조한다. 향후 충돌이 없다는 보장은 아니다.
 
 정적 확인만 수행했다. 구현 시 OOS 단위 테스트를 켠 구성에서 영향받는 SA·SERVER target 14개를 빌드·링크하고, 기존 등록 테스트와 fixture를 그대로 실행해야 한다. 비테스트 엔진 빌드에 새 symbol 의존이 생기지 않는지도 확인한다. 이번 조사에서는 빌드·링크·런타임 검증을 수행하지 않았다.
+
+
+## R-25 scope clarification, 2026-11-11
+
+기존 R-25의 구현 범위를 좁히는 정적 조사다. 새 후보나 sub-task를 추가하지 않는다. 기준은 PR #7990 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`다. 구현과 실행 검증은 하지 않았다.
+
+24바이트 stub의 필드 순서와 offset 지식이 반복된다. [직렬화 writer](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/heap_file.c#L14594)와 [pending 확정 writer](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/heap_oos.cpp#L250)는 OID, 길이, packed stamp를 쓴다. [디스크 전용 parser](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/heap_oos.cpp#L665)와 [pending-aware decoder](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/heap_oos_value_ref.cpp#L58)도 같은 위치를 해석한다. 필드 배치가 바뀔 때 한쪽만 고칠 위험을 줄이는 것이 공통화의 목적이다.
+
+후보 방안은 필드 배치만 공유하는 작은 읽기·쓰기 연산이다. 기존 `OR_OOS_INLINE_SIZE`, `oos_pack_identity_stamp`와 `oos_unpack_identity_stamp`를 재사용하고, [VOT 필드 경계 검사](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/heap_file.c#L11495)는 기존 `heap_recdes_get_oos_inline_stub`에 둔다. 최종 위치와 인터페이스는 ANALYSIS에서 정한다. 다음 계약을 합치거나 바꾸지 않는다.
+
+- 디스크 parser는 NULL OID와 잘못된 길이를 거부한다. pending decoder는 NULL OID일 때 마지막 8바이트를 owner index로 해석한다. `heap_pending_record::resolve`의 준비 상태, allocation 소유, index와 길이 검사를 유지한다. pending bytes를 디스크 참조로 취급하지 않는다.
+- [복제 fixup](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/transaction/locator_sr.c#L15294)은 replica-local OID와 stamp만 교체하고 가운데 길이 8바이트는 그대로 둔다. 공통 writer를 쓰기 위해 길이를 다시 쓰는 변경은 이 범위에서 제외한다.
+- 직렬화 writer는 실제 `*ptr_varvals` 위치의 용량 검사, `S_DOESNT_FIT`, cursor 갱신과 상위 grow-and-retry를 유지한다. decoder별 출력 초기화와 실패 전에 이미 대입된 출력값, 오류 코드와 설정 순서, pending batch 성공 뒤의 확정·수명도 유지한다. 공통 연산은 validation, 오류 설정, 메모리 할당이나 storage 접근을 맡지 않는다.
+
+[현재 #8299](https://github.com/CUBRID/cubrid/pull/8299) head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`는 주변 planner, nullable plan과 VOT decoder를 바꾼다. 해당 revision에서도 위 writer와 parser의 공통화 대상은 남는다. 기존 DEFERRED 이력은 유지하며, 실제 통합 revision에서 경계와 호출 순서를 다시 확인한다. #8434 head `94ed2ea463f17694db33a283b56fdeb42856e835`의 회수 정책 변경은 이 codec 정리에 포함하지 않는다.
+
+구현 시 확인할 항목은 24바이트 디스크 bytes 동일성, 기존 짧거나 잘린 VOT 필드 거부, NULL OID와 pending owner 거부의 오류·출력 보존, 실제 cursor 용량 부족의 grow-and-retry, 복제 fixup의 길이 보존이다. SA·SERVER 관련 기존 테스트와 빌드도 실행해야 한다. 이번 조사에서는 모두 미실행이며, malformed-image 결함 수정이나 accepted OOS 요구사항 구현으로 완료 처리하지 않는다.

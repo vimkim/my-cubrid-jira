@@ -265,3 +265,15 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 호출자의 assertion과 로그는 그대로 둔다. 특히 bestspace에는 `-1`도 통과할 수 있는 비교가 있어, helper 안에서 assert하거나 sentinel을 바꾸는 일은 동작 보존 정리에 포함하지 않는다. 별도의 두 `peek_oos_header`는 실패값이 `ER_FAILED`이고 PEEK bytes를 latch 안에서 복사하므로 이번 다섯 본문과 묶지 않는다. `OLD_PAGE`, deallocation 허용 fix, WRITE latch 또는 caller가 page를 소유하는 경로도 제외한다. R-19의 선언 이동과 N-20261111-02의 SQL 변환 중복은 별개다.
 
 진행 중 #8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a`, #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`에서도 선택한 다섯 본문은 같다. 이는 향후 충돌이 없다는 보장이 아니므로 실제 통합 revision의 include와 호출자를 다시 대조한다. 구현 시 공용 header 소비자를 SA·SERVER 모드에서 다시 컴파일하고 관련 기존 delete·bestspace·vacuum 테스트로 반환값, assertion, latch 수명을 비교한다. 이 빌드와 실행은 수행하지 않았으며 후보는 미구현이다.
+
+## 2026-11-11 R-20 fault hook 계약 재조사
+
+기준은 PR #7990 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b` 이다. 기존 R-20의 분석 조건을 보강한다. 새 TODO나 구현 완료 기록이 아니다. 두 소스 조사와 호출부 대조에 따른 정적 판단이며 실행 동등성은 검증하지 않았다.
+
+- 7개 hook은 bool 6개와 publication 횟수 임계값 1개다. `heap_file.c` 의 preparation·heap-insert hook은 기본 sequentially consistent 연산을 쓰고, 나머지는 relaxed 연산을 쓴다. 임계값 hook은 횟수 조건이 맞을 때 한 번의 `compare_exchange_strong` 으로 -1을 기록한다. 이를 bool 소비나 재시도 루프로 바꾸지 않는다.
+- 소비 조건과 실패 효과를 호출 위치에 유지해야 한다. preparation은 publication 시작 성공 뒤, heap insert는 검증된 OOS 포함 비주소 레코드에서만 소비한다. VFID hook은 HFID 조회 성공 뒤 소비한다. OID publication hook은 `bad_alloc` 을 던지며 기존 catch·publication cleanup을 따른다. reclaim hook은 WRITE fix에서만 소비하고 page를 null로 하여 성공한 skip을 반환한다. 에러 반환으로 통일하지 않는다.
+- SQL 테스트 `SmallWorkspaceFlushDoesNotNeedOosPreparation`, `InternalAndAddressReservationsBypassPreparation`, `AbandonedDuplicateCandidateDoesNotWriteOos` 는 우회 작업 뒤까지 hook을 무장한 채 두는 흐름을 검사한다. 새 guard가 이 구간을 짧게 만들면 테스트 의미가 바뀐다. 기존 scope cleanup과 두 publication 상태를 함께 해제하는 순서를 보존한다.
+- 공통 타입이 없애는 반복은 주로 arm·exchange 문법이다. 실제 소비 조건과 에러 처리는 남는다. 이번 조사에서는 추가 인터페이스를 정당화할 반복 결정이나 작은 공유 범위를 확인하지 못했으므로 일괄 추출을 권하지 않는다. 기존 R-20의 구현 여부와 별개인 분석 결과다.
+- 기존 DF-26의 해제 API 추가는 별도 동작 변경이다. 현재 reclaim hook도 명시적 disarm이 없지만, 이를 새 결함이나 관측한 누수로 등록하지 않는다. 트랜잭션 종료·fixture 종료 때 자동 초기화를 추가하는 변경도 R-20에 섞지 않는다.
+- pending #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`, #8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a` 의 각 PR diff는 조사한 hook의 arm·consume·disarm 지점을 직접 바꾸지 않는다. #8299는 인접 preparation 경로와 테스트를 바꾸므로 통합 후 재검사는 필요하다. PR 전체를 일률적 선행 차단 조건으로 해석하지 않는다.
+- 추후 구현을 제안하면 test-enabled·일반 SA/SERVER 빌드와 기존 server·deferred-write·growth-sweep 동작을 대조한다. 무장 후 조기 반환, 우회 뒤 소비, threshold 미도달·경합, 기존 disarm·에러·cleanup·skip 재시도 계약을 확인해야 한다. 이 검사는 실행하지 않았다.

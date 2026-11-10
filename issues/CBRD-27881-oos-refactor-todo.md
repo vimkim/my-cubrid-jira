@@ -164,3 +164,22 @@ DF-02의 demotion target과 DF-03의 rollback·vacuum 문제는 결함 또는 �
 `get_int_column`은 result를 종료하지 않는다. 변경할 때 `fetch_single_int`는 cursor 위치 결정에 성공한 뒤 이 helper를 호출하고, helper가 반환한 다음 result를 한 번 종료하며 helper의 반환값을 돌려준다. 기존 SHOW 소비자는 같은 result에서 여러 열을 읽으므로 종료 책임을 공유 helper로 옮기지 않는다.
 
 오류 처리 개선을 섞지 않는다. SQL 실행 실패의 원래 반환값, first-tuple 실패의 `ER_FAILED`, tuple-fetch 실패의 원래 반환값과 `DB_VALUE`를 clear하지 않는 기존 분기, `db_query_end` 반환값을 무시하는 순서를 보존한다. 지원 타입만 `out_val`에 쓰고, BIGINT의 기존 `int` cast도 유지한다. 범위 밖 BIGINT는 같은 compiler·platform의 원본과 변경 바이너리로 비교해야 한다. header 이동 뒤 전체 OOS SQL target의 빌드와 실제 SQL·오류 경로 비교는 미실행이며 구현 때 남은 검증이다.
+
+
+## 2026-11-11 R-18 범위 구체화. 잠금 상태의 cache entry 제거
+
+이 기록은 기존 R-18의 정적 재검토다. 신규 후보나 sub-task를 추가하지 않는다. head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`에서 entry 수를 줄이는 네 지점을 모두 확인했다. 두 hash에서 entry를 빼고 free-list에 반환하거나 해제한 뒤 개수를 줄이는 책임이 반복된다. 한쪽만 수정하면 hash와 entry 소유 상태의 일관성을 놓칠 수 있다는 유지보수상 위험을 줄이는 후보다.
+
+| 지점 | 현재 순서와 범위 판단 |
+| --- | --- |
+| [VPID 삭제 443행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L443) | VFID hash 제거, VPID hash 제거, 기존 `oos_stats_entry_free`, entry 수 감소 순서다. |
+| [검색 중 header 제외 616행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L616), [공간 부족 제외 628행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L628) | 같은 네 동작을 같은 순서로 반복한다. header 제외의 `continue`와 공간 부족의 `notfound_cnt++`는 호출자에 남긴다. |
+| [파일 전체 삭제 470행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L470) | VPID hash를 먼저 지운다. 순서를 보존하기 위해 이번 helper 대상에서 제외한다. 순서 선택 인자는 추가하지 않는다. |
+
+작은 인터페이스 후보는 `static void oos_stats_remove_entry_locked (THREAD_ENTRY *thread_p, OOS_STATS_ENTRY *ent)`다. 기존 mutex를 보유하고 두 hash에 등록된 non-null entry만 받으며, 위의 VFID 우선 세 지점만 대체한다. identifier 비교는 값 기준이므로 entry의 VFID와 VPID를 key로 쓸 수 있다. 기존 free callback의 반환값을 무시하는 동작과 free-list 용량 정책을 유지하고, callback 뒤에는 entry를 읽지 않는다. 이 인터페이스는 ANALYSIS 후보이며 구현 확정이나 동작 보존 검증 완료를 뜻하지 않는다.
+
+[삽입 실패 정리 410행](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L410)은 두 hash 등록과 entry 수 증가가 끝나기 전이므로 대상에서 제외한다. finalization과 array hint 제거도 제외한다. count 감소를 기존 `oos_stats_entry_free` 안으로 옮기지 않는다.
+
+mutex 획득·해제와 page fix·unfix, 후보 순서, 오류 반환은 기존 위치에 둔다. 특히 VPID 삭제의 recovery growth-gate 재무장은 cache miss 검사보다 먼저 실행되므로 helper 밖에 그대로 둔다. reclaim-state 삭제와 header hint 정리도 각 호출자에 남긴다. pending postpone 변경과는 이 경계를 기준으로 다시 비교한다. CBRD-27213의 미래 재설계가 이 helper를 남길지는 미정이지만, 현재 세 지점의 좁은 정리를 검토하는 데 재설계 완료를 일괄 선행조건으로 두지는 않는다. 실제 작업 순서는 대상 revision과 재설계 진행 상황을 보고 정한다.
+
+구현 후에는 SERVER와 SA를 빌드하고 기존 `OosBestspaceTest`의 `BestspaceStaleCacheEviction`, `BestspaceHeaderPageNeverReturned`, `BestspaceMultipleFilesIsolation`, `BestspaceCacheCleanedOnFileRemove` 등을 실행한다. free-list 재사용과 용량 경계, 공간 부족 검색 budget, cache hit와 miss의 recovery 재무장, reclaim 이후 재사용도 원본과 비교한다. 기존 테스트가 각 분기에 실제 도달하는지는 별도로 확인한다. 이번에는 소스와 테스트를 읽었으며 빌드·런타임 검증은 수행하지 않았다.

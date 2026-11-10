@@ -277,3 +277,16 @@ R-19의 전체 이동을 #8128·#8299 병합 뒤로 미룬 과거 기록은 보�
 - 기존 DF-26의 해제 API 추가는 별도 동작 변경이다. 현재 reclaim hook도 명시적 disarm이 없지만, 이를 새 결함이나 관측한 누수로 등록하지 않는다. 트랜잭션 종료·fixture 종료 때 자동 초기화를 추가하는 변경도 R-20에 섞지 않는다.
 - pending #8299 head `cd24a212aa81e2a11d72d1ac57bb10113727a4d8`, #8128 head `e3589ae42d42b04eb020e1ae43e165b01d31b12a` 의 각 PR diff는 조사한 hook의 arm·consume·disarm 지점을 직접 바꾸지 않는다. #8299는 인접 preparation 경로와 테스트를 바꾸므로 통합 후 재검사는 필요하다. PR 전체를 일률적 선행 차단 조건으로 해석하지 않는다.
 - 추후 구현을 제안하면 test-enabled·일반 SA/SERVER 빌드와 기존 server·deferred-write·growth-sweep 동작을 대조한다. 무장 후 조기 반환, 우회 뒤 소비, threshold 미도달·경합, 기존 disarm·에러·cleanup·skip 재시도 계약을 확인해야 한다. 이 검사는 실행하지 않았다.
+
+
+## R-21 scope clarification, 2026-11-11
+
+기존 R-21의 검색 함수 분해를 같은 PR #7990 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`에서 다시 검토했다. 현재 근거에서는 단계별 helper 추가보다 지역 제어 흐름 유지를 권한다. 신규 후보나 구현 완료가 아니며 실행 검증은 하지 않았다.
+
+[검색 함수](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L572)의 production 호출자는 `oos_find_best_page` 한 곳이다. 직접 검색하는 후보는 hash와 `best[]`이고, sync는 상위 호출자가 제어하는 다음 tier다. [기존 stale-hint helper](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L557)가 세 검증 실패 지점의 출처별 제거 결정을 이미 공유한다. R-18의 세 지점 hash-entry 제거 후보는 별도로 남긴다. R-21의 후보 검증 분리는 retry·error·found, 출처와 array index, counter, 고정 page 소유를 넘겨야 하므로, 실제 인터페이스가 추적할 상태를 줄이는지 입증한 뒤 선택한다. 함수 길이만으로 분해하지 않는다.
+
+hash 우선 순서와 mutex 해제 뒤의 conditional WRITE fix를 유지한다. header hash hint 제거는 실패 횟수를 늘리지 않고, 공간 부족 hash hint 제거는 늘린다. array 순회와 hash 재시도의 경계도 다르다. 잘못된 page type과 foreign page는 unfix 뒤 hint를 제거하지만, file ownership의 `DISK_ERROR`는 unfix 후 ERROR를 반환하며 hint를 제거하지 않는다. interrupt와 나머지 fix 실패의 오류 지우기 차이, 실제 공간 부족 때 hash 제거와 array freespace 갱신 차이를 보존한다.
+
+[성공 경로](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L3116)는 WRITE latch를 해제하지 않은 채 page를 `auto_unfix_page_ptr`에 인계한다. `idx_badspace`는 production 호출자가 이후 읽지 않지만 test bridge가 노출한다. ERROR 뒤에도 계산하며 첫 NULL, 그 외에는 첫 최소값을 고르는 현재 출력을 유지한다. [직접 테스트](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_bestspace.cpp#L1218)는 NOTFOUND와 첫 NULL 경우만 확인하므로 다른 분기의 실행 증거로 쓰지 않는다. 상위 함수의 이른 allocation fallback, sync 정책과 오류 변경은 R-22·DF-04 등의 별도 범위로 남긴다.
+
+#8330은 head `4fd785d3a9ed6e7d88d1c073821347a34cac865d`, merge `902fe1452360dcdd4c6e08812dbe0ae7d52ae9c7`로 Merged이며 merge commit은 조사 head의 ancestor다. CBRD-27213 재설계와 실제 구현 revision을 보고 남은 코드의 유지 비용을 다시 판단한다. R-21을 구현하려면 SA·SERVER 빌드와 기존 bestspace 테스트를 실행하고, 후보 순서·busy 재시도·stale/foreign page·오류 상태와 출력·index 동률·insert/reclaim 경합 및 latch 인계를 원본과 비교해야 한다. 이 확인은 모두 미실행이다.

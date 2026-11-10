@@ -290,3 +290,13 @@ hash 우선 순서와 mutex 해제 뒤의 conditional WRITE fix를 유지한다.
 [성공 경로](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/src/storage/oos_file.cpp#L3116)는 WRITE latch를 해제하지 않은 채 page를 `auto_unfix_page_ptr`에 인계한다. `idx_badspace`는 production 호출자가 이후 읽지 않지만 test bridge가 노출한다. ERROR 뒤에도 계산하며 첫 NULL, 그 외에는 첫 최소값을 고르는 현재 출력을 유지한다. [직접 테스트](https://github.com/CUBRID/cubrid/blob/50619ce53ef7b0e6bc8b468b2065ae7da4ef592f/unit_tests/oos/test_oos_bestspace.cpp#L1218)는 NOTFOUND와 첫 NULL 경우만 확인하므로 다른 분기의 실행 증거로 쓰지 않는다. 상위 함수의 이른 allocation fallback, sync 정책과 오류 변경은 R-22·DF-04 등의 별도 범위로 남긴다.
 
 #8330은 head `4fd785d3a9ed6e7d88d1c073821347a34cac865d`, merge `902fe1452360dcdd4c6e08812dbe0ae7d52ae9c7`로 Merged이며 merge commit은 조사 head의 ancestor다. CBRD-27213 재설계와 실제 구현 revision을 보고 남은 코드의 유지 비용을 다시 판단한다. R-21을 구현하려면 SA·SERVER 빌드와 기존 bestspace 테스트를 실행하고, 후보 순서·busy 재시도·stale/foreign page·오류 상태와 출력·index 동률·insert/reclaim 경합 및 latch 인계를 원본과 비교해야 한다. 이 확인은 모두 미실행이다.
+
+## R-13 header hint 소유권 재선정. 2026-11-11
+
+같은 PR #7990 head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`에서 기존 R-13의 사용자를 정적 조사했다. 신규 TODO가 아니며 구현과 실행 동등성은 미검증이다.
+
+- `oos_file.hpp:119-154`의 hint 개수, `OOS_BESTSPACE`, `OOS_HDR_STATS`를 직접 사용하는 production 파일은 `oos_file.cpp` 하나다. `test_oos_bestspace.cpp:47-54,1088,1227`와 `test_oos_growth_sweep.cpp:46,72-84`도 test bridge를 통해 타입과 field를 직접 사용한다. `test_oos_remove_file.cpp:270`은 주석의 언급뿐이다. 캐시 entry, hash, mutex 정의는 이미 `.cpp` 내부에 있다. `OOS_FINDSPACE`도 bestspace test bridge가 사용하는 검색 결과이며 disk layout과 구분한다.
+- 정의만 내부 header로 옮겨도 반복 판단이나 숨은 상태가 줄지는 않는다는 조사 판단이다. 현재는 단독 이동을 보류하고 실제 include 결합 감소가 입증되거나 CBRD-27213 설계가 정해졌을 때 다시 선정한다. production과 두 test 사용자를 함께 보존하며 큰 파일 분리는 제안하지 않는다.
+- `oos_file.cpp:1161-1178`은 `sizeof(OOS_HDR_STATS)`의 raw bytes를 sticky first-page slot 0에 넣고, `:1210`에서 `RVOOS_INSERT`로 초기 image를 기록한다. `:485-494`는 같은 bytes를 PEEK 후 cast한다. 이후 hint 수정의 `log_skip_logging`은 초기 생성까지 비로깅이라는 뜻이 아니다. field 순서, padding, nested VPID/VFID, 크기와 정렬, 초기 bytes, WAL index와 sysop, queue suppression, latch·dirty·unfix 순서를 유지한다.
+- #8367은 head `39720850512a011204609053b559946f39055fd0`, merge `0f51cd24b7d28427da27b1a8004182242c60717f`가 조사 head의 ancestor다. 미병합 #8434 head `94ed2ea463f17694db33a283b56fdeb42856e835`는 별도 chunk의 next stamp와 header 삽입 logging 경로를 바꾼다. accepted ADR-0008의 chunk 형식 변경을 R-13의 hint 정의 이동과 섞거나 현재 chunk 크기로 고정하지 않는다.
+- layout assertion은 지원 ABI의 독립적인 크기·정렬·offset 기준을 확보한 뒤 검토한다. assertion만으로 기존 DB bytes나 복구 동등성을 입증할 수 없다. 구현 선정 시 실제 통합 head에서 사용자 census와 지원 SA·SERVER layout/초기 image 비교, header 생성·재개방·crash/restart, bestspace·stale hint·reclaim·rollback 검증을 수행한다. 이번에는 build, DB, CI와 runtime 검증을 실행하지 않았다.

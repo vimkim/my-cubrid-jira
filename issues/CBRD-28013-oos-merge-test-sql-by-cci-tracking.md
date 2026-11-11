@@ -10,7 +10,7 @@
 
 **영향**: 대상은 OOS 개발자와 PR #7990 리뷰어다. 남은 실패는 develop과 같은 출력으로 실패하므로, PR #7990 병합을 판단할 때 OOS 결함 근거로 보지 않아도 된다. 다만 이 실패들은 develop 자체의 미해결 실패로 남는다. 기준선은 develop 대상 PR run이며, develop push run과는 비교하지 않았다.
 
-**이슈 수행 방안**: develop 동기화로 57건을 해소했다. 남은 실패는 develop 공통 실패로 분류하고 이 이슈의 범위에서 제외한다. develop 쪽 처리는 `test_sql_by_cci` 도입 작업(CUBRIDQA-1709 계열)과 각 testcase 담당 이슈에서 다룬다.
+**이슈 수행 방안**: develop 동기화로 57건을 해소했다. 남은 실패는 develop 공통 실패로 분류하고, develop 쪽 처리는 `test_sql_by_cci` 도입 작업(CUBRIDQA-1709 계열)과 각 testcase 담당 이슈에 맡긴다. 이 이슈는 `feature/oos-merge`가 develop에 병합될 때까지 열어 두고, develop을 merge할 때마다 OOS에서만 생기는 실패가 있는지 확인한다.
 
 ---
 
@@ -65,6 +65,15 @@ merge에서 생긴 OOS 쪽 변경은 다음 두 가지다.
 
 OOS 엔진이 고쳐야 할 `test_sql_by_cci`·`test_sql`·`test_shell`·`test_medium` 실패는 없다. 처음 57건은 develop 미동기화 때문에 생겼고, 동기화로 해소되었다. 남은 실패 41건(`test_sql` 2, `test_sql_by_cci` 38, `test_shell` 1)은 develop에서도 같은 출력으로 실패한다.
 
+### 계속 추적
+
+develop을 merge할 때마다 같은 종류의 실패가 다시 생길 수 있다. 이번에 두 번 생긴 것은 다음과 같다.
+
+- develop이 error code를 새로 써서 OOS error code 번호가 밀리면, 그 번호가 들어 있는 sql·shell answer도 바꿔야 한다. 1차·2차 동기화에서 모두 생겼다.
+- develop의 새 실행 경로가 heap record bytes를 직접 읽으면 OOS 값을 잘못 읽을 수 있다. page batch(CBRD-27361)에서 생겼다.
+
+PR #7990에서 run을 돌릴 때마다 [oos-ci-compare.py](https://github.com/vimkim/my-cubrid-docs/blob/f8e725f/cbrd-oos-sql-by-cci/tools/oos-ci-compare.py)로 같은 날의 develop 대상 PR run과 비교한다. 실패한 case를 `same`(develop과 diff가 같음), `differs`(develop에서도 실패하지만 diff가 다름), `oos-only`로 나눈다. `differs`나 `oos-only`가 나오면 원인을 확인하고 이 이슈에 결과를 남긴다. `oos-only`가 OOS 엔진 결함이면 별도 이슈로 나눈다.
+
 ### 한계
 
 - 기준선은 develop 대상 PR run이며, develop push run과는 비교하지 않았다. 각 PR의 변경이 일부 case에 영향을 줄 수 있어 run 여러 개를 함께 썼다.
@@ -76,6 +85,6 @@ OOS 엔진이 고쳐야 할 `test_sql_by_cci`·`test_sql`·`test_shell`·`test_m
 
 - 상위 이슈: [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978) OOS TODO
 - 관련 이슈: [CBRD-27403](https://jira.cubrid.org/browse/CBRD-27403). 이전 develop merge 때 같은 방식으로 OOS error code 번호를 바꾸고 answer를 갱신했다.
-- 분석 보고서: [cbrd-oos-sql-by-cci/report.md](https://github.com/vimkim/my-cubrid-docs/blob/4811cb9/cbrd-oos-sql-by-cci/report.md). 실패 case 목록, develop 동기화 결과, 2차 동기화와 전체 run 결과가 있다.
+- 분석 보고서: [cbrd-oos-sql-by-cci/report.md](https://github.com/vimkim/my-cubrid-docs/blob/f8e725f/cbrd-oos-sql-by-cci/report.md). 실패 case 목록, develop 동기화 결과, 2차 동기화와 전체 run 결과가 있다.
 - 처음 분석: [PR #8434 test_sql_by_cci CI 분석](https://github.com/vimkim/my-cubrid-docs/blob/d009ff1a2759fb237e81c2684443b558bf474e5e/cbrd-27781/ci-analysis-sql-by-cci.md)
 - 최종 확인 대상: PR [#7990](https://github.com/CUBRID/cubrid/pull/7990) head `50619ce53ef7b0e6bc8b468b2065ae7da4ef592f`, testcase `tc/pr-7990`(`b53a7984c`, private-ex `8ef4f6278`)

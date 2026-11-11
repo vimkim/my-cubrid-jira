@@ -50,11 +50,17 @@ SA에서는 같은 OID의 representation과 길이가 바뀌어 실제 재작성
 - [ ] 기존 OOS stub에서 시작하는 rewrite와 필요한 Expand·소유권 처리를 별도로 검증한다. 현재 lazy-default fixture만으로 이 범위를 통과 처리하지 않는다.
 - [ ] 아래 3000B payload와 21000B lazy default fixture에서도 정상 OOS 배치를 적용한다. 20KB를 넘는 재작성 입력을 기존 heap overflow로 우회 저장하지 않으며 전체 값과 owner를 검증한다.
 - [ ] OOS 대상 값이 없는 큰 행(예: 큰 고정 길이 컬럼이나 `FORCE_INLINE` 값만으로 한 페이지를 넘는 행)도 SA compact가 `REC_BIGONE`으로 쓰지 않는다. 그 행의 처리(compact 실패, 해당 객체 건너뛰기와 보고 등)를 정하고 검증한다.
+- [ ] heap 계층에서 multipage(`REC_BIGONE`) 데이터를 쓰는 insert·update 분기에 debug assert를 둔다. 대상은 `heap_insert_handle_multipage_record`, `heap_update_home`, `heap_update_relocation`, `heap_update_bigone` 의 큰 레코드 분기다. 조건은 `OID_ISNULL (&context->class_oid) || oid_is_system_class (&context->class_oid)` 이다. delete 두 분기(`heap_delete_home`, `heap_delete_relocation`)는 규칙 이전에 저장된 행 때문에 제외하거나, 포함하면 그 이유를 기록한다. debug 빌드에서 unit·SQL·shell 회귀와 `gap_compact_sa_cs` 가 assert 없이 통과함을 확인한다.
+
 - [ ] 수정 commit·검증 결과·잔여 제한을 CBRD-26659에 연결한다.
 
 ## 범위 추가 (2026-11-09)
 
 [CBRD-27259](https://jira.cubrid.org/browse/CBRD-27259)([PR #8416](https://github.com/CUBRID/cubrid/pull/8416))에서 명세를 바꿨다. 이전에는 OOS 값이 없는 행의 `REC_BIGONE`을 허용했지만, 이제 `heap_attrinfo_transform_to_disk_internal`을 거치는 비시스템 클래스 행은 `REC_BIGONE`이 될 크기면 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE`로 거부한다. 크기에는 MVCC 헤더 최대치가 들어간다. heap 계층에는 검사가 없어서, SA compact처럼 이 함수를 거치지 않고 `heap_update_logical`을 직접 부르는 경로는 여전히 `REC_BIGONE`을 만든다([OOS 명세](https://github.com/vimkim/cubrid-oos-context/blob/faee27e/OOS-CONTEXT.md#bigone-rejection-cbrd-26937-cbrd-27259)). 그래서 이 이슈는 OOS 분리뿐 아니라 이 크기 판정까지 SA compact에 적용해야 한다.
+
+## 범위 추가 (2026-11-11)
+
+[PR #8416 리뷰](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4536816674)에서 heap 계층의 `REC_BIGONE` 분기에 "시스템 클래스 행만 허용"하는 debug assert를 요청했다. 거부 판정은 행 배치 함수 한 곳에만 있어서, 그 함수를 거치지 않는 새 writer가 생기면 원칙이 조용히 깨진다. assert를 이 이슈의 수정 전에 넣으면 debug 빌드의 SA compact TC가 assert에 걸리므로, SA compact 수정과 함께 넣는다. SA compact가 갱신하는 행은 대개 `REC_HOME` 이라 `heap_update_home` 의 큰 레코드 분기(`heap_ovf_insert`)를 지난다. 그래서 리뷰에서 제안한 세 분기 외에 이 분기도 대상에 넣는다.
 
 ## Additional verification
 

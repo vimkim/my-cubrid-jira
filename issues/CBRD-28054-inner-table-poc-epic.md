@@ -1,4 +1,4 @@
-# [OOS] [EPIC] [POC] Inner Table: 큰 VARCHAR·VARBIT 값을 숨은 companion 테이블의 chunk 행으로 저장
+# [OOS] [EPIC] [POC-2] Inner Table: 큰 VARCHAR·VARBIT 값을 숨은 companion 테이블의 chunk 행으로 저장
 
 **한 줄 요약**: OOS(CBRD-26357)의 대안 설계 후보인 Inner Table POC를 추적하는 이슈다. 큰 값을 OOS 전용 파일 대신 일반 MVCC 테이블의 행으로 저장해도 OOS와 같은 조회 이득을 얻으면서 복구·vacuum·DDL을 기존 경로에 맡길 수 있는지 POC로 확인한다.
 
@@ -61,6 +61,7 @@
 ### 관련 이슈
 
 - CBRD-26357: OOS EPIC. 이 POC는 그 대안 후보다.
+- CBRD-28053: POC-1 Sidecar. 같은 목표의 다른 대안 후보다. 큰 값을 테이블별 store heap의 일반 MVCC 레코드로 분리한다.
 - CBRD-27935, CBRD-27936: phase 1에서 실제 서버로 재현한 heap vacuum 결함. 이 POC가 기대는 기존 경로의 결함이다.
 - CBRD-27827, CBRD-28035: OOS 전용 경로에서 나온 결함의 예
 - CBRD-27725: OOS 분리 시점을 늦추는 방식의 평가. OOS 구조 안의 다른 대안이다.

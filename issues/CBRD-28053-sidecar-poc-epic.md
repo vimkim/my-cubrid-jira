@@ -1,4 +1,4 @@
-# [OOS] [EPIC] [POC] Sidecar: 큰 컬럼 값을 테이블별 store heap의 일반 MVCC 레코드로 분리
+# [OOS] [EPIC] [POC-1] Sidecar: 큰 컬럼 값을 테이블별 store heap의 일반 MVCC 레코드로 분리
 
 **한 줄 요약**: OOS(CBRD-26357)를 대체할 수 있는 대안 설계 후보인 Sidecar의 POC 진행 상황, 측정 결과, 남은 일을 한곳에서 추적하는 epic이다.
 
@@ -82,5 +82,5 @@ P3 수락 결과:
 - 설계 문서: [my-cubrid-docs/sidecar](https://github.com/vimkim/my-cubrid-docs/tree/main/sidecar) (`design.md` 설계와 수락 조건·계획, `grounding.md` 기존 엔진 사실, `decisions.tsv` 결정 기록, `model/` TLA+ 모델)
 - OOS EPIC: [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357)
 - 전제 수정: [CBRD-27937](https://jira.cubrid.org/browse/CBRD-27937), [CBRD-27935](https://jira.cubrid.org/browse/CBRD-27935), [CBRD-27936](https://jira.cubrid.org/browse/CBRD-27936)
-- 같은 목표의 다른 대안 설계: Inner Table POC (별도 이슈)
+- 같은 목표의 다른 대안 설계: [CBRD-28054](https://jira.cubrid.org/browse/CBRD-28054) POC-2 Inner Table
 - Draft PR: 생성 후 추가

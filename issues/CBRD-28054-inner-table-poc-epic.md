@@ -56,7 +56,7 @@
 ### 산출물
 
 - 설계·계획 문서: [my-cubrid-docs inner-table](https://github.com/vimkim/my-cubrid-docs/tree/main/inner-table)
-- 엔진 draft PR: 생성 후 추가
+- 엔진 draft PR: [CUBRID/cubrid#8494](https://github.com/CUBRID/cubrid/pull/8494)
 
 ### 관련 이슈
 

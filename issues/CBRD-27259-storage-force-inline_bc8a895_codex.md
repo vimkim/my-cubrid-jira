@@ -78,15 +78,15 @@ DDL 작성자나 스키마 관리 도구가 컬럼의 저장 정책을 기본값
 
 ### OOS와 전체 행 overflow의 경계
 
-`FORCE_INLINE` 은 해당 컬럼 값의 OOS 분리를 금지한다. 전체 행이 커서 기존 `REC_BIGONE` 경로로 저장되는 것까지 금지하지 않는다. 다음 경계는 기존 [OOS 명세의 OOS + bigone 규칙](https://github.com/vimkim/cubrid-oos-context/blob/3462a7f69a7ec0de8a0b97ad8da32b463ecf0e8c/OOS-CONTEXT.md#oos--bigone-rejection-cbrd-26937)과 함께 유지해야 한다.
+`FORCE_INLINE` 은 해당 컬럼 값의 OOS 분리를 금지한다. 2026-11-09에 [OOS 명세의 bigone 거부 규칙](https://github.com/vimkim/cubrid-oos-context/blob/3c325825b2dc2bf742218412a853a9859b31f2b2/OOS-CONTEXT.md#bigone-rejection-cbrd-26937-cbrd-27259)을 바꿨다. 이제 비시스템 클래스 행은 OOS 값이 없어도 `REC_BIGONE` 이 될 크기면 거부한다. 이전에 허용하던 non-OOS `REC_BIGONE` 저장은 더 이상 허용하지 않는다. 다음 경계는 이 규칙을 따른다.
 
 | 저장 상황 | 필요한 결과 |
 |---|---|
-| OOS inline stub이 없는 행이 최대 slotted-record 크기를 초과한다. | 기존 non-OOS `REC_BIGONE` 저장을 허용한다. |
+| OOS inline stub이 없는 행이 최대 slotted-record 크기를 초과한다. | `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 로 실패한다. `FORCE_INLINE` 값, 큰 고정 길이 값, 작은 가변 길이 값이 많은 행이 해당한다. |
 | 다른 컬럼이 OOS로 분리되었지만 남은 행이 최대 slotted-record 크기 이내다. | `FORCE_INLINE` 컬럼을 분리하지 않은 채 저장할 수 있다. OOS inline target을 초과했다는 이유만으로 실패시키지 않는다. |
 | 다른 컬럼이 OOS로 분리된 후에도 남은 행이 `REC_BIGONE` 을 필요로 한다. | 기존 OOS+bigone 금지 규칙에 따라 실패한다. `FORCE_INLINE` 을 무시해 OOS로 보내는 우회 동작을 두지 않는다. |
 
-마지막 경우의 오류는 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 이며, 기존 명세와 같이 새 OOS value chain을 쓰기 전에 판단해야 한다. 오류가 발생한 쓰기 작업은 데이터와 정책을 일부만 변경하거나 회수되지 않는 새 chain을 남기지 않아야 한다.
+첫째와 마지막 경우의 오류는 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 이며, 새 OOS value chain을 쓰기 전에 판단해야 한다. 시스템 클래스 행은 이 거부에서 제외한다. 오류가 발생한 쓰기 작업은 데이터와 정책을 일부만 변경하거나 회수되지 않는 새 chain을 남기지 않아야 한다.
 
 ### 사용자 관점의 SQL 예시
 
@@ -135,7 +135,7 @@ TBD - ANALYSIS 단계에서 결정한다.
 2. 가변 길이 컬럼의 명시적 `FORCE_INLINE` 이 스키마와 DDL 재생성에서 보존되며, 새 정책으로 배치를 결정하는 값은 OOS로 분리되지 않는다.
 3. `STORAGE DEFAULT` 로 명시적 정책을 해제할 수 있고, 고정 길이 컬럼에는 별도 OOS 정책 flag나 불필요한 출력이 남지 않는다.
 4. 타입 및 정책 전환이 ANALYSIS에서 정한 규칙과 일치하며, 실패한 ALTER는 기존 스키마와 데이터를 보존한다.
-5. non-OOS `REC_BIGONE` 은 계속 허용하고 OOS+bigone은 계속 거부한다. 실패를 피하려고 `FORCE_INLINE` 을 무시하지 않으며, 거부된 쓰기에서 새 OOS chain이 남지 않는다.
+5. 비시스템 클래스 행은 OOS 값 유무와 관계없이 `REC_BIGONE` 이 될 크기면 거부한다. 실패를 피하려고 `FORCE_INLINE` 을 무시하지 않으며, 거부된 쓰기에서 새 OOS chain이 남지 않는다.
 6. 기존 `PREFER_INLINE`, `PREFER_OUTLINE`, `FORCE_OUTLINE` 동작이 유지된다. 기존 행과 UPDATE 재사용에 대한 정책 적용 시점은 문서와 검증 결과가 일치한다.
 7. ANALYSIS에서 확정한 recovery, replication 및 스키마 전달 경로에서 정책과 값이 올바르게 보존된다.
 

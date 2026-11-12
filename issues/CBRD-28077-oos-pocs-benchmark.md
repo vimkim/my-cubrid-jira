@@ -45,7 +45,7 @@
 - **OOS 작은 컬럼 UPDATE.** 바꾸지 않은 큰 값을 다시 읽고 새로 적재한다. 8 KB 30,000행에서 UPDATE 한 번에 OOS 페이지가 30,001개에서 60,001개가 되었다. CBRD-27230의 동작과 같다.
 - **OOS 큰 값 교체 UPDATE.** 새 OOS 페이지를 할당할 때마다 빈 페이지 회수 sweep이 파일의 데이터 페이지를 훑는다. 64 KB warm 조건에서 750행 교체가 23~71초, page fetch 5,200만~1억 8,000만 회였고, 프로파일의 85%가 `oos_try_reclaim_page_internal`이었다. CBRD-27872의 sweep이다.
 - **Inner Table PK 조회.** index scan을 여는 경로가 참조 확장 생략 flag(`inner_table_skip_expand`)를 켜지 않는다. 그래서 큰 컬럼을 고르지 않아도 모든 chunk를 읽는다. 코드로 확인했다.
-- **develop 결함.** 같은 형태의 `UPDATE ... SET b = REPEAT(X'D1', 100)`가 처음 실행될 때는 100바이트를 저장한다. XASL cache의 plan을 재사용하면 16진 텍스트 25바이트를 저장한다. develop `a7f220d5d7`에서 재현했다. 별도 이슈로 등록이 필요하다.
+- **develop 결함.** 같은 형태의 `UPDATE ... SET b = REPEAT(X'D1', 100)`가 처음 실행될 때는 100바이트를 저장한다. XASL cache의 plan을 재사용하면 16진 텍스트 25바이트를 저장한다. develop `a7f220d5d7`에서 재현했다. CBRD-28079로 등록했다.
 
 ### 측정 방법
 
@@ -61,7 +61,7 @@
 
 ### 후속
 
-- REPEAT plan 재사용 결함은 별도 이슈로 등록한다.
+- REPEAT plan 재사용 결함은 CBRD-28079로 등록했다.
 - CBRD-27230(재적재)과 CBRD-27872(회수 sweep)이 반영된 OOS로 작은 컬럼 UPDATE, 큰 값 교체, 반복 UPDATE를 다시 측정한다.
 - Inner Table의 index 경로 참조 확장을 생략할 수 있는지 확인한다. 생략할 수 있다면 PK 조회를 다시 측정한다.
 - HA를 켠 비교는 Sidecar와 Inner Table이 HA를 구현한 뒤에 한다.

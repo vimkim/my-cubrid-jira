@@ -26,30 +26,33 @@
 - DROP, TRUNCATE, RENAME은 부모 테이블에서 companion으로 같은 savepoint 안에서 전파된다. companion에 직접 거는 같은 DDL은 거부된다.
 - 큰 값 컬럼을 읽지 않는 스캔은 참조를 펼치지 않는다. 그래서 chunk 페이지를 읽지 않는다.
 
-### 진행 현황 (2026-11-11)
+### 진행 현황 (2026-11-13)
 
-엔진 브랜치는 `inner-table`이며 `develop` `e64a04a79` 기반이다. 수락 판정은 각 phase의 driver(`contrib/benchmarks/inner_table/`)가 하고, 모든 driver에 일부러 틀린 입력으로 실패하는지 보는 대조군이 있다.
+엔진 브랜치는 `inner-table`이다. 2026-11-13에 최신 `develop`(`a7f220d5d7`)을 머지했다. 수락 판정은 각 phase의 driver(`contrib/benchmarks/inner_table/`)가 하고, 모든 driver에 일부러 틀린 입력으로 실패하는지 보는 대조군이 있다.
 
 | Phase | 내용 | 결과 |
 | --- | --- | --- |
-| 1 lifecycle | slot 재사용과 restart undo 경합을 실제 서버에서 재현 | CBRD-27935, CBRD-27936 재현과 수정 확인 |
+| 1 lifecycle | slot 재사용과 restart undo 경합을 실제 서버에서 재현 | CBRD-27935, CBRD-27936 재현. 두 수정은 POC 브랜치에서 되돌렸고 담당자 이슈에서 다룬다 |
 | 2 storage | VARCHAR·VARBIT, 경계값, 여러 컬럼, chunk 누락 검출 | VERIFIED |
 | 3 recovery | 8개 crash 시점, 두 번씩 restart, checkdb | VERIFIED (60개 판정) |
 | 4 reclamation | 오래된 snapshot, vacuum 회수, 반복 churn | VERIFIED |
 | 5 transport | 인덱스, trigger, 스키마 변경, 실패·rollback된 DDL, unloaddb/loaddb, compactdb | VERIFIED (70개 판정) |
 | 10 projection | 작은 컬럼 집계 스캔의 페이지 수 | VERIFIED. 데이터 페이지 6~10개, 기준 802~1004개 |
 | 11 unused | 기능을 쓰지 않거나 큰 값이 없는 테이블의 INSERT·SELECT·UPDATE·DELETE 비용 | 명령어 수 기준 VERIFIED. 8개 workload 모두 비율 0.958 이상. 시간 기준은 공용 서버 부하로 미확정 |
-| 6 history | CDC, flashback | 미착수 |
-| 7 ha | 복제 | 미착수 |
-| 8 encryption | TDE | 미착수 |
+| 6 history | CDC, flashback | 미착수. 부모 행의 로그 이미지에 값 대신 참조가 남으므로, 소비자에게 값을 돌려주려면 참조를 펼치는 단계가 필요할 것으로 본다(추정) |
+| 7 ha | 복제 | 미착수. 부모 행은 참조를 담은 heap 레코드로 로그에 남고, HA applier는 이 레코드를 로그에서 읽는다(`log_applier.c` `la_get_recdes`). chunk 행은 일반 행처럼 복제된다. standby가 참조를 올바르게 해석하는지는 실제 HA 시험으로 확인해야 한다 |
+| 8 encryption | TDE | 미착수. companion 클래스가 부모의 암호화 설정을 따르게 하는 코드가 없다. 부모만 암호화되면 큰 값이 평문으로 저장·로깅될 수 있다(추정) |
 | 9 compatibility | 이전 바이너리의 거부 | 미착수 |
-| 12 regressions | SQL, shell, medium 회귀 | 미착수 |
+| 12 regressions | SQL, shell, medium 회귀 | 기능을 끈 상태(`inner_table_threshold=0`)로 gha-ci 진행 중. 실패 23건 분류 결과 POC 원인은 shell `cbrd_27547_ddl_2` 1건이다. 이 TC의 gdb 조건이 함수 이름 `sm_delete_class_mop`에 묶여 있는데 POC가 그 본문 이름을 바꿨다. 동작 변화는 아니며 기록만 한다. 나머지는 TC가 엔진보다 앞선 경우(develop 재머지로 해소 예정)와 develop 쪽 실패다. 이전 run의 `btsort_radix_validate` assert는 새 develop에서 재현되지 않아 조사를 마쳤다. 기능을 켠 상태의 회귀는 미착수 |
 
 ### 알려진 한계
 
+- 사용자가 `T__inner`를 직접 만들어야 기능이 켜진다. 제품화하려면 DDL 옵션 같은 opt-in 방식이 필요하다.
 - companion 클래스가 `db_class`에 보이고, 이 클래스에 직접 DML을 할 수 있다.
 - FK cascade로 자식 테이블이 TRUNCATE될 때 자식의 companion에는 전파되지 않는다.
-- CDC와 flashback이 companion 클래스를 걸러내지 않는다(phase 6에서 다룬다).
+- CDC와 flashback이 companion 클래스를 걸러내지 않고, 부모 행에는 값 대신 참조를 내보낸다(phase 6에서 다룬다).
+- HA standby가 참조를 담은 부모 행을 받는다. 동작 여부는 phase 7에서 확인한다.
+- companion 클래스는 부모의 TDE 설정을 따르지 않는다(phase 8에서 다룬다).
 - 64KiB 값을 전부 읽으면 chunk 페이지 약 1400개를 읽는다. 기준 overflow 방식은 800개다. chunk 크기 조정은 아직 하지 않았다.
 - 시간 기준 미사용 비용은 한가한 서버에서 다시 측정해야 한다. 공용 서버(load average 27~175)에서는 신뢰구간이 0.1~0.25로 넓었다. inline UPDATE의 시간 비율은 0.84로 기준에 못 미쳤고, 이것이 실제 비용인지 서버 부하 때문인지는 아직 가르지 못했다.
 

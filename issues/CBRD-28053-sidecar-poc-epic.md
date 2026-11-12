@@ -57,17 +57,36 @@ P3 수락 결과:
 | 항목 | 상태 | 결과 |
 |---|---|---|
 | A3 recovery | 통과 | 7개 kill 지점 × 20회, 총 140회 kill에서 hash 불일치·미커밋 행·손실 행·고아·끊긴 참조 0건. CBRD-27936 수정을 되돌린 negative control에서는 restart가 UNDO 단계에서 멈춰, 이 테스트가 해당 창을 실제로 지나는 것을 확인했다. |
-| A4 MVCC·vacuum | 시나리오 통과, 24시간 stress 미실행 | 6,000 B 10회, 20 KB 3회 모두 통과. REPEATABLE READ 읽기는 항상 첫 값을 보고, committed snapshot 읽기의 retry와 lock fallback이 실제로 일어났으며 모두 커밋된 값을 돌려주었다. retry를 끈 negative control에서는 살아 있는 행을 67회 중 9회 놓쳤다. |
-| A6 회귀 | 일부 | `test_sql` 1,740개를 off/on으로 실행해 1개만 달랐고, 원인은 parallel scan 여부가 바뀌는 레이아웃 효과였다. `test_shell` 279개 off/on 비교에서 12개가 달랐다(TDE 파일 dump에 store 파일이 추가되는 경우, SHOW HEAP HEADER 레이아웃 등). `develop` 대조와 `test_medium`은 진행 중이다. |
-| A7 모델 검사 | 발견 2건, 수정은 별도 브랜치 | 설계 모델(lifecycle 44회, recovery 38회)과 heap slot undo 검사는 통과. 코드 수준 Sidecar 검사에서 store 읽기 결함 2건을 찾았다(재배치된 store 레코드 읽기 중 forward 슬롯 재사용으로 같은 길이의 다른 값을 읽는 경우, 재읽기 한도 초과로 보호된 읽기가 실패하는 경우). 수정은 store 슬롯을 재사용하지 않게 하고 재읽기 한도를 없앴으며, 브랜치 `sidecar-storeread`에 있고 아직 `sidecar`에 합치지 않았다. |
+| A4 MVCC·vacuum | 시나리오 통과, 24시간 stress 진행 중 | 6,000 B 10회, 20 KB 3회 모두 통과. REPEATABLE READ 읽기는 항상 첫 값을 보고, committed snapshot 읽기의 retry와 lock fallback이 실제로 일어났으며 모두 커밋된 값을 돌려주었다. retry를 끈 negative control에서는 살아 있는 행을 67회 중 9회 놓쳤다. 24시간 stress(공격적 vacuum, 긴 읽기, 보호되지 않은 읽기, 무작위 rollback, `kill -9`)는 2026-11-13 02:06 기준 67회 반복, `kill -9` 21회와 recovery 21회, 검증 실패 0건이다. |
+| A6 회귀 | CI 결과 분류 완료, 수정 진행 중 | 로컬: `test_sql` 1,740개 off/on에서 1개 차이(레이아웃 효과), `test_medium`은 Sidecar 고유 실패 없음. CI(draft PR #8504, 모든 큰 값을 store로 보내는 CI 전용 설정): build, `test_sql`, `test_medium` 통과. `test_shell` 실패 29건은 모두 Sidecar 변경에서 나왔다. 26건은 기대 출력 변화(새 `Num_sidecar_*` 통계와 `sidecar_*` 파라미터 출력, 새 DB의 sector 1개 증가, heap 페이지·sector 수 변화)이고, 3건은 결함 의심이다(`diagdb`가 store heap을 class heap처럼 덤프하다 assert, 인덱스가 있는 `char(255)` 행의 DELETE에서 B+tree key를 못 찾는 assert, unique 위반 rollback 반복 후 `spacedb` 1 MB 증가). `test_sql_by_cci` 실패 shard는 같은 시기 `develop` 기반 PR #8510과 같다. |
+| A7 모델 검사 | 통과 | 설계 모델(lifecycle 44회, recovery 38회)과 heap slot undo 검사는 통과. 코드 수준 Sidecar 검사에서 찾은 store 읽기 결함 2건(재배치된 store 레코드 읽기 중 forward 슬롯 재사용, 재읽기 한도 초과로 보호된 읽기 실패)은 수정해 `sidecar`에 합쳤고, 코드 수준 검사도 통과한다. |
+
+검증 중 `develop` 결함을 더 찾았다. POC 브랜치는 아래 수정을 로컬 커밋으로 가지고 있다.
+
+- [CBRD-27635](https://jira.cubrid.org/browse/CBRD-27635): 온라인 인덱스 생성의 overflow key 누수(재현 확인, 담당자 PR #8307).
+- [CBRD-28065](https://jira.cubrid.org/browse/CBRD-28065): 커밋 레코드가 디스크에 쓰이기 전에 커밋 응답이 나가는 경우.
+- [CBRD-28063](https://jira.cubrid.org/browse/CBRD-28063): committed snapshot 버전 탐색이 커밋되지 않은 버전을 반환하는 경우.
+- [CBRD-28068](https://jira.cubrid.org/browse/CBRD-28068): GCC 11.5 release 빌드 실패(`qo_node_partition_key`, PR #8510).
 
 ### 남은 일
 
-- A7 수정(`sidecar-storeread`)을 `sidecar`에 합치고 A3, A4를 다시 확인한다.
-- A4 24시간 stress(공격적 vacuum, 긴 읽기, 보호되지 않은 읽기, 무작위 rollback, `kill -9`).
-- A6: `test_shell`, `test_medium`의 off/on 결과를 `develop`과 대조하고 차이를 분류한다. 전체 corpus는 CI에서 실행한다.
+POC 단계:
+
+- A3, A4: 24시간 stress 완료와 결과 검토.
+- A6: CI 결함 의심 3건 재현과 수정, 기대 출력 변화 26건의 분류 확인.
 - checkpoint 2: A1, A2, A3, A4, A6, A7 결과 검토.
-- P4: HA 복제(A5).
+- P4: HA 복제(A5). fresh-value list, 새 replication sub-type 2개, applier splice, replica 쪽 지역화, 같은 호스트 HA pair와 `checksumdb` 검증.
+
+`develop` 병합을 위해 필요한 일(채택이 정해지면 하위 이슈로 나눈다):
+
+- CDC와 flashback 지원: supplemental record의 값 위치 목록, UPDATE의 유지 값과 DELETE 값의 supplemental 복사, `cdc_get_recdes` 조립, supplemental record의 TDE 표시.
+- `STORAGE INLINE`/`STORAGE EXTERNAL` DDL 절과 스키마 출력(`unloaddb` 포함). POC는 파라미터로 대신한다.
+- 기존 store의 `ALTER ... ENCRYPT`.
+- 도구: `spacedb`의 store 파일 표시, SA `compactdb` 조정.
+- 회귀 testcase 기대 결과 갱신(새 통계·파라미터 출력, heap 레이아웃 변화).
+- 사용자 매뉴얼: 파라미터, `SHOW HEAP SIDECAR`, 통계 항목, 제약.
+- PR 정리: CI 전용 설정과 디버그·fault injection 코드 정리, 리뷰 가능한 단위로 PR 분할, 위 `develop` 결함 수정의 선행 병합.
+- 성능 검토: DELETE instructions가 `develop`보다 58% 많다(stamp 공간 예약은 recovery 형식 변경이라 보류). wide scan의 BIGONE map page fix.
 
 ### 알려진 한계
 
@@ -83,4 +102,4 @@ P3 수락 결과:
 - OOS EPIC: [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357)
 - 전제 수정: [CBRD-27937](https://jira.cubrid.org/browse/CBRD-27937), [CBRD-27935](https://jira.cubrid.org/browse/CBRD-27935), [CBRD-27936](https://jira.cubrid.org/browse/CBRD-27936)
 - 같은 목표의 다른 대안 설계: [CBRD-28054](https://jira.cubrid.org/browse/CBRD-28054) POC-2 Inner Table
-- Draft PR: 생성 후 추가
+- Draft PR: [CUBRID/cubrid#8504](https://github.com/CUBRID/cubrid/pull/8504)

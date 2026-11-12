@@ -165,3 +165,35 @@ overflow 입력의 Q4는 OS cache 유지 조건에서는 빨라졌지만, 파일
 - **미측정 범위**: 측정 시작 시점의 PR #7990 head를 고정했으며, 별도 PR #8299와
   약 16KB 임계값 비교용 빌드는 포함하지 않았다. UPDATE 재사용·DML·HA·복구·전체 회사 회귀는
   별도 범위다. 제품 임계값 변경, PR merge, CI 재실행도 이 작업에서 수행하지 않았다.
+
+## 후속 범위 (2026-11-11 추가)
+
+[CBRD-27785](https://jira.cubrid.org/browse/CBRD-27785)가 PR #8299 병합(`feature/oos-merge` `67220b7e2`)으로 Resolved되면서 남은 성능 판정 두 가지를 이 이슈로 옮긴다.
+
+- **AC-P2**: 기본 threshold의 4~16KB 값 전체 읽기. threshold parameter의 이름·지원 상태 확인 → 행이 페이지를 넘을 때만 OOS로 가도록 설정 → develop의 heap/overflow와 같은 저장 위치 확인 → 재측정. 기본값 결과와 구분한다.
+
+- **AC-P3**: 위 결과를 PR #8299 반영본 `67220b7e2` 기준으로 다시 측정하고, heap→heap·overflow→OOS의 성능 저하를 잠정 2% 이내로 평가한다.
+
+- 측정 기록 조건은 CBRD-27785의 공통 기준을 따른다. 양쪽 SHA·빌드·conf·데이터·실제 저장 위치·DB locale과 charset·collation·반복별 원시값이다.
+
+## 후속 측정 결과 (2026-11-12)
+
+> 2026-11-11~12 Asia/Seoul에 직접 실행한 측정이다. 판정 지표는 서버 `instructions:u` 중앙값이며, 변화율은 `(develop − 비교 대상) / develop`이다. 좋아지면 +, 나빠지면 −다(CBRD-27785와 같은 부호).
+
+비교 대상은 develop merge-base `2dd94e32ab86a756b0f1ea2123ad7d2ac913321b`와 `feature/oos-merge` `67220b7e230ff1587ba5940001d72e10477a1fc4`다. GCC 11.5.0 RelWithDebInfo O2, unit test 계측 없음, DB `en_US`·utf8·`utf8_bin`이다. 측정 전에 실제 저장 위치를 `SHOW HEAP CAPACITY`·`SHOW HEAP OOS`로 확인했다.
+
+| 항목 | 결과 (명령어 수) | 잠정 2% 판정 |
+| --- | --- | --- |
+| AC-P2 threshold parameter | `67220b7e2`에 없다. 임계값은 `heap_oos_inline_target_size()`의 고정값(16KiB 페이지에서 약 4KB)이다 | 설정 불가 |
+| AC-P2 기본 임계값, 4.6~13.8KB 값 전체 읽기 12개 경우 | −2.8% ~ −69.5%. 값이 작을수록 나쁘다. 6KB는 −14% ~ −33% | 목표 밖 |
+| AC-P2 임계값을 overflow 경계로 바꾼 측정 전용 빌드 | 같은 12개 경우 −0.24% ~ +0.08%. 값이 develop처럼 heap에 남는다 | 목표 안 |
+| AC-P3 heap→heap 일반 테이블 scan / 조건 scan / UPDATE | −0.55% / +0.03% / −1.06% | 목표 안 |
+| AC-P3 overflow→OOS 큰 값 하나 읽기 Q4 | −0.40% | 목표 안 |
+| AC-P3 overflow→OOS 모든 컬럼 읽기 Q5 | −6.05% (`dcbf09e` −6.6%) | 목표 밖 |
+| overflow→OOS 작은 컬럼 조회 Q1~Q3 | +38% ~ +72% | 이득 |
+
+- 측정 전용 빌드는 임계값을 develop의 overflow 경계(`heap_Maxslotted_reclength`)로 바꾼 로컬 커밋이다. 제품 코드 변경이 아니며, threshold parameter 추가나 기본값 변경 여부는 아직 정하지 않았다. 이 경우 작은 컬럼 조회의 이득도 함께 사라진다.
+- 반복 사이 spread는 대부분 1% 미만이고 두 라운드의 결과가 0.15%p 안에서 일치했다. 공유 호스트(load 9.6~83.2)라 cycles와 실행 시간은 판정에 쓰지 않았다.
+- 파일 캐시 해제 후 큰 값 읽기는 이번에 다시 재지 않았다([CBRD-27791](https://jira.cubrid.org/browse/CBRD-27791) 범위).
+
+[상세 보고서와 재현 절차](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-27788/CBRD-27788-ac-p2-p3-remeasure_67220b7_claude.md)에 저장 위치, 질의별 값, 측정 도구가 있다.

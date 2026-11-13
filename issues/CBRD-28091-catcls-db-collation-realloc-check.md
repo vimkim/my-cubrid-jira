@@ -131,4 +131,4 @@ curr_coll = 0x98
 ### Additional Information
 
 - ANALYSIS 확인 사항: `_db_collation` 행이 256개를 넘을 수 있는 경로(카탈로그 손상, 업그레이드, 향후 `LANG_MAX_COLLATIONS` 변경)가 있는지 확인하지 않았다. 없다면 확장 분기 자체가 불필요한지도 함께 판단할 수 있다.
-- 같은 함수 5431-5432행의 `coll_name` 복사는 이름 길이가 `sizeof (curr_coll->coll_name)` 이상이면 배열 바로 뒤에 `'\0'`을 쓴다. 이 이슈의 범위는 아니며, 실행으로 확인하지 않았다.
+- 같은 함수 5431-5432행의 `coll_name` 복사는 이름 길이가 `sizeof (curr_coll->coll_name)` 이상이면 배열 바로 뒤에 `'\0'`을 쓴다. 코드를 읽고 판단한 결과이며 실행으로 확인하지 않았다. 같은 함수이므로 별도 이슈로 나누지 않고, ANALYSIS 단계에서 도달 가능성과 함께 수정 범위에 넣을지 판단한다.

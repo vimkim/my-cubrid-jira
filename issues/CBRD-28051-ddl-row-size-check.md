@@ -1,19 +1,19 @@
 # [OOS] 고정 길이 부분만으로 한 페이지를 넘는 테이블을 DDL 시점에 거부
 
-**한 줄 요약**: PR #8416(CBRD-27259) 리뷰에서 "CREATE·ALTER가 고정 길이 컬럼만으로 한 페이지를 넘는 테이블을 받아 주어 DDL은 성공하고 모든 쓰기가 실패한다"는 지적([discussion_r4536816663](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4536816663))에 대응하여, 이런 스키마를 DDL 시점에 거부하는 후속 이슈다.
+**한 줄 요약**: PR #8416(CBRD-27259) 리뷰에서 "CREATE·ALTER가 고정 길이 컬럼만으로 한 페이지를 넘는 테이블을 받아 주어 DDL은 성공하고 모든 쓰기가 실패한다"는 지적([discussion_r4536816663](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4536816663))에 대응하여, 이런 스키마를 DDL 시점에 거부하는 후속 이슈다. 이후 리뷰([discussion_r4598356662](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4598356662))에서 요청된, 큰 FORCE_INLINE 값이 있는 테이블에 ADD COLUMN으로 행을 키우는 경우도 함께 다룬다.
 
 ## Issue Triage
 
-**이슈 수행 목적**: 고정 길이 부분만으로 행 크기 한도를 넘는 사용자 테이블을 CREATE TABLE과 ALTER 같은 DDL 시점에 거부한다. 사용자가 행을 하나도 쓸 수 없는 테이블을 만들거나, 기존 행을 더 이상 수정할 수 없게 만드는 일을 막는다.
+**이슈 수행 목적**: 고정 길이 부분만으로 행 크기 한도를 넘는 사용자 테이블을 CREATE TABLE과 ALTER 같은 DDL 시점에 거부한다. 사용자가 행을 하나도 쓸 수 없는 테이블을 만들거나, 기존 행을 더 이상 수정할 수 없게 만드는 일을 막는다. 고정 길이 부분은 한도 아래여도 기존 FORCE_INLINE 값 때문에 기존 행이 새 스키마로 한 페이지에 들어가지 않게 되는 `ALTER TABLE ... ADD COLUMN` 도 같은 결과를 내므로 함께 막는다.
 
-**이슈 수행 이유**: CBRD-27259(PR #8416)부터 사용자 테이블 행이 한 페이지에 들어가지 않아 `REC_BIGONE` (여러 페이지에 걸친 레코드)이 필요하면 OOS 값이 없어도 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` (-1396)로 거부된다. 고정 길이 컬럼은 OOS로 옮길 수 없고 값이 NULL이어도 행 안에서 자리를 차지한다. 그래서 고정 길이 부분이 한도를 넘는 테이블에는 어떤 행도 쓸 수 없다. 그런데 DDL에는 이 판단이 없다. PR #8416 head(`89496263e`)에서 다음 DDL이 모두 성공하고, 그 뒤 쓰기는 모두 실패함을 확인했다.
+**이슈 수행 이유**: CBRD-27259(PR #8416)부터 사용자 테이블 행이 한 페이지에 들어가지 않아 `REC_BIGONE` (여러 페이지에 걸친 레코드)이 필요하면 OOS 값이 없어도 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` (-1396)로 거부된다. 이 코드는 develop 병합으로 `feature/oos-merge` `3e541fcf67` 부터 -1397이다. 고정 길이 컬럼은 OOS로 옮길 수 없고 값이 NULL이어도 행 안에서 자리를 차지한다. 그래서 고정 길이 부분이 한도를 넘는 테이블에는 어떤 행도 쓸 수 없다. 그런데 DDL에는 이 판단이 없다. PR #8416 head(`89496263e`)에서 다음 DDL이 모두 성공하고, 그 뒤 쓰기는 모두 실패함을 확인했다.
 
 - `CREATE TABLE`
 - `ALTER TABLE ... ADD COLUMN`, `ALTER TABLE ... MODIFY` (빈 테이블)
 - `CREATE TABLE ... UNDER`
 - `CREATE TABLE ... LIKE`
 
-**영향**: 사용자는 DDL이 성공했으므로 테이블을 쓸 수 있다고 생각하지만, 이후 INSERT와 UPDATE가 모두 실패한다. 행이 있는 테이블에 고정 길이 컬럼을 추가하면 기존 행의 무관한 UPDATE(조회수 증가, 새 컬럼을 NULL로 바꾸기 포함)까지 실패하고, 읽기와 DELETE만 된다. 컬럼을 다시 DROP해야 풀린다. 이 DB를 `unloaddb` 한 파일을 `loaddb` 하면 해당 테이블의 행이 하나도 실리지 않는다(리뷰어 보고, 직접 실행하지 않음). 대상은 사용자 타입 중 큰 고정 길이 타입, 사실상 `BIT(n)` 이나 수천 개의 고정 길이 컬럼을 쓰는 스키마로 좁다. 실제 발생 빈도는 알 수 없다.
+**영향**: 사용자는 DDL이 성공했으므로 테이블을 쓸 수 있다고 생각하지만, 이후 INSERT와 UPDATE가 모두 실패한다. 행이 있는 테이블에 고정 길이 컬럼을 추가하면 기존 행의 무관한 UPDATE(조회수 증가, 새 컬럼을 NULL로 바꾸기 포함)까지 실패하고, 읽기와 DELETE만 된다. 컬럼을 다시 DROP해야 풀린다. 이 DB를 `unloaddb` 한 파일을 `loaddb` 하면 해당 테이블의 행이 하나도 실리지 않는다(리뷰어 보고, 직접 실행하지 않음). 대상은 사용자 타입 중 큰 고정 길이 타입, 사실상 `BIT(n)` 이나 수천 개의 고정 길이 컬럼을 쓰는 스키마로 좁다. 실제 발생 빈도는 알 수 없다. 큰 FORCE_INLINE 값이 있는 테이블에서는 고정 길이 컬럼이 작아도 ADD COLUMN 뒤 같은 일이 생기며, 이 경우 unloaddb·loaddb 실패도 직접 확인했다(아래 "기존 FORCE_INLINE 값이 있는 행에 ADD COLUMN").
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 
@@ -76,6 +76,32 @@ insert into photo (id) values (2);                                          -- -
 
 가변 컬럼이 있으면 가변 값이 모두 NULL인 행이 하한이다. 이때 가변 오프셋 테이블 `OR_VAR_TABLE_SIZE_INTERNAL (n_variable, 2)` 가 더해진다. 가변 컬럼의 선언 크기는 더하지 않는다. 더하면 `VARCHAR(20000) STORAGE FORCE_INLINE` 처럼 값에 따라 들어갈 수 있는 스키마까지 막는다.
 
+### 기존 FORCE_INLINE 값이 있는 행에 ADD COLUMN
+
+리뷰어가 PR #8416에서 별도로 요청한 경우다([discussion_r4598356662](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4598356662)). PR #8416은 컬럼이 FORCE_INLINE을 새로 얻는 `ALTER ... MODIFY`, `ALTER ... CHANGE` 에서만 기존 행이 새 스키마로 한 페이지에 들어가는지 검사한다(`do_check_rows_fit_in_hierarchy`, `src/query/execute_schema.c`). `ADD COLUMN` 은 기존 행을 다시 쓰지 않으므로 이 검사를 거치지 않는다. 새 컬럼은 그 행을 다음에 다시 쓸 때 행 안에 자리를 차지한다. FORCE_INLINE 값은 OOS로 옮길 수 없으므로, 한도에 가까운 행은 새 컬럼만큼 커져서 거부된다.
+
+위의 스키마 하한 검사로는 잡히지 않는다. 아래 예의 고정 길이 컬럼 크기 합은 208바이트(`int` 2개와 `bit(1600)`)이고, 한도를 넘는 원인은 기존 행의 FORCE_INLINE 값이다.
+
+PR #8416 head에 `feature/oos-merge` `3e541fcf67` 을 병합한 빌드(`11.5.0.3017-1f1c177`, debug)에서 `csql -S` (SA 모드)로 실행했다.
+
+```sql
+create table a (id int, v int, content bit varying storage force_inline);
+insert into a values (1, 0, CAST(REPEAT('AA', 16100) AS BIT VARYING));   -- 성공, 값은 행 안에 저장
+insert into a values (2, 0, CAST(REPEAT('AA', 100) AS BIT VARYING));
+alter table a add column pad bit(1600);                                     -- 성공
+update a set v = v + 1 where id = 1;     -- 실패: 16356 bytes > 16236 bytes
+update a set pad = NULL where id = 1;    -- 실패: 같은 크기
+```
+
+| 단계 | `storage force_inline` | 저장 옵션 없음(대조) |
+|---|---|---|
+| `alter table a add column pad bit(1600)` | 성공 | 성공 |
+| id 1 행의 두 UPDATE | 둘 다 -1397, 16356 bytes > 16236 bytes | 둘 다 성공 |
+| `cubrid unloaddb -S` | 성공 | 성공 |
+| 새 DB에 `cubrid loaddb -S` (기본 옵션) | 종료 코드 3, id 1 행에서 같은 오류. 테이블 `a` 는 0행 | 종료 코드 0, 2행 |
+
+대조 테이블에서는 `content` 의 큰 값이 OOS로 옮겨지므로 UPDATE와 load가 성공한다. FORCE_INLINE 쪽 loaddb에서는 한 페이지에 들어가는 id 2 행도 실리지 않았다. loaddb가 왜 그 행까지 싣지 않았는지는 확인하지 않았다.
+
 ### Acceptance Criteria
 
 - 고정 길이 부분의 최소 행 크기가 한도를 넘는 사용자 테이블을 만드는 `CREATE TABLE`, `ALTER ... ADD/MODIFY/CHANGE`, `CREATE TABLE ... UNDER`, `CREATE TABLE ... LIKE` 가 DDL 시점에 오류로 실패하고 스키마가 바뀌지 않는다.
@@ -83,16 +109,18 @@ insert into photo (id) values (2);                                          -- -
 - 하한이 한도 이하인 스키마는 지금처럼 허용된다. 경계값에서 잘못 거부하지 않는다.
 - 이미 한도를 넘는 기존 테이블(PR #8416 이전에 만들어 `REC_BIGONE` 행을 가진 DB)의 무관한 ALTER(ADD INDEX 등)와 DROP COLUMN은 막지 않는다.
 - 시스템 클래스와 VCLASS는 검사 대상이 아니다.
+- FORCE_INLINE 값이 있는 기존 행이 새 스키마로 한 페이지에 들어가지 않을 때, `ALTER ... ADD COLUMN` 이 성공한 뒤 그 행의 UPDATE와 unloaddb·loaddb가 실패하는 상태가 생기지 않는다.
 - `feature/oos-merge` 를 `develop` 에 병합하기 전에 완료한다.
 
 ### Definition of done
 
-- SQL TC로 CREATE, ADD, MODIFY, CHANGE, UNDER, LIKE, 경계값, 기존 초과 테이블의 ADD INDEX와 DROP COLUMN을 확인한다.
+- SQL TC로 CREATE, ADD, MODIFY, CHANGE, UNDER, LIKE, 경계값, 기존 초과 테이블의 ADD INDEX와 DROP COLUMN, FORCE_INLINE 값이 큰 행이 있는 테이블의 ADD COLUMN을 확인한다.
 
 ### ANALYSIS 확인 사항
 
 - **검사 위치.** `classobj_install_template` (`src/object/class_object.c`)이 flatten된 템플릿의 고정 길이 크기 합을 이미 계산한다(`class_->fixed_size`). 이 함수는 `install_new_representation` → `update_class` (`schema_manager.c`) 경로에서 불리고, 위 DDL이 모두 이 경로를 지난다. 다만 `fixed_size` 는 `DB_ATT_ALIGN` 으로 올림된 값이라 그대로 쓰면 경계에서 최대 3바이트 잘못 거부한다. heap 검사와 같은 식으로 다시 계산해야 하는지 확인한다.
 - **기존 초과 테이블.** `sm_add_constraint` 도 같은 갱신 경로를 지난다. 단순 검사를 넣으면 ADD INDEX까지 막힌다. "새 하한이 한도를 넘고 이전 하한보다 커질 때만 거부"하는 조건이 적절한지 정한다.
+- **기존 행 검사(ADD COLUMN).** 기존 행이 새 스키마로 한 페이지에 들어가는지 확인하는 방법을 정한다. PR #8416의 `do_check_rows_fit_in_hierarchy` 를 ADD COLUMN에도 쓸 수 있는지, 검사를 FORCE_INLINE 컬럼이 있는 클래스로 좁힐 수 있는지, 큰 테이블에서 전체 스캔 비용을 받아들일지 확인한다. 기본값이 있는 ADD COLUMN과 가변 길이 컬럼 추가도 같은 문제가 있는지 확인한다(확인 안 함).
 - **한도 값.** 한도는 페이지 크기에 따라 달라지는 서버 값이다. 클라이언트에서는 기존 API `heap_get_maxslotted_reclength` 로 받을 수 있다.
 - **오류 코드.** -1396 메시지는 쓰기 시점 문구라 DDL에 맞지 않는다. 새 오류 코드와 메시지가 필요한지 정한다.
 - **미확인 경로.** 파티션 테이블, `CREATE TABLE ... AS SELECT`, `ALTER ... CHANGE`, 상속 전파 중 ALTER 실패의 원자성, CS 모드 동작은 확인하지 않았다.
@@ -102,4 +130,4 @@ insert into photo (id) values (2);                                          -- -
 
 - CBRD-26937: OOS 이후에도 한도를 넘는 행을 쓰기 시점에 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 로 거부하는 규칙과 오류 코드를 도입했다. DDL 검사는 다루지 않았다.
 - CBRD-27259: 이 거부 규칙을 OOS 값이 없는 사용자 행까지 넓힌 이슈(PR #8416).
-- 같은 리뷰의 `ALTER ... STORAGE FORCE_INLINE` 뒤 unload/load 실패 지적([discussion_r4536816653](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4536816653))도 "DDL은 받고 이후 쓰기에서 거부"라는 같은 모양이다. 그러나 가변 컬럼의 FORCE_INLINE은 값에 따라 들어갈 수 있으므로 이 이슈의 DDL 하한 검사로는 해결되지 않는다.
+- 같은 리뷰의 `ALTER ... STORAGE FORCE_INLINE` 뒤 unload/load 실패 지적([discussion_r4536816653](https://github.com/CUBRID/cubrid/pull/8416#discussion_r4536816653))도 "DDL은 받고 이후 쓰기에서 거부"라는 같은 모양이다. 그러나 가변 컬럼의 FORCE_INLINE은 값에 따라 들어갈 수 있으므로 이 이슈의 DDL 하한 검사로는 해결되지 않는다. PR #8416이 MODIFY·CHANGE에 기존 행 검사를 넣어 그 지적을 해결했고, 남은 ADD COLUMN 경우를 이 이슈에서 다룬다.

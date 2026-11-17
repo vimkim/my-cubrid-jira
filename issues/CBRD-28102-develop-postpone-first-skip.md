@@ -10,7 +10,7 @@
 
 **영향**: 현재 develop에서 확인한 producer는 RVHF_MARK_REUSABLE_SLOT 하나이고, 결과는 DONT_REUSE_OID 테이블의 slot 하나가 재사용되지 않고 남는 작은 공간 누수다. checkdb는 이를 잡지 못한다. 기본값인 REUSE_OID 테이블에서는 겉으로 드러나는 영향이 없다. 다만 이 함수는 모든 postpone이 실행된다는 전제로 쓰이므로, postpone 바로 뒤에 sysop이 오는 producer가 새로 생기면 그 동작이 조용히 빠진다. OOS 브랜치(PR #8434)에서는 UPDATE의 drop postpone 뒤에 OOS 페이지 할당 sysop이 와서 OOS chain이 누수되었다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: log_do_postpone의 범위 비교를 `LSA_LT`에서 `LSA_LE`로 바꾸어, 탐색이 lastparent에서 시작하면 그 레코드를 sysop 바깥으로 보고 처리하게 한다. OOS 브랜치의 같은 수정(commit b7abf652bc)과 같은 변경이며, develop에 따로 반영한다. 구현은 [PR #8565](https://github.com/CUBRID/cubrid/pull/8565)이고, 시험 케이스는 `shell/_40_guava/cbrd_28102/cases/cbrd_28102.sh`(cubrid-testcases-private-ex, 브랜치 `tc/pr-8565`)다.
 
 ---
 
@@ -46,7 +46,7 @@ log_do_postpone은 log_get_next_nested_top으로 commit된 sysop들의 범위 [l
 경우 2: postpone 바로 뒤에 sysop이 시작, 탐색이 그 postpone에서 시작 → 그 postpone이 실행되지 않음
 ```
 
-탐색 시작점은 commit 경로에서는 트랜잭션의 첫 postpone(tdes->posp_nxlsa)이다. 재시작 복구에서는 log_recovery_find_first_postpone이 고른 "아직 실행되지 않은 첫 postpone"이다. 따라서 복구 경로에서는 트랜잭션의 첫 postpone이 아니어도, crash 시점에 첫 미실행 postpone이 된 것이 sysop의 lastparent이면 같은 일이 생길 수 있다. 이 두 번째 형태는 코드를 읽고 추론한 것이며 재현하지는 않았다.
+탐색 시작점은 commit 경로에서는 트랜잭션의 첫 postpone(tdes->posp_nxlsa)이다. 재시작 복구에서는 log_recovery_find_first_postpone이 고른 "아직 실행되지 않은 첫 postpone"이다. 따라서 복구 경로에서는 트랜잭션의 첫 postpone이 아니어도, crash 시점에 첫 미실행 postpone이 된 것이 sysop의 lastparent이면 같은 일이 생길 수 있다. 이 두 번째 형태도 재현했다(아래 ANALYSIS 결론 참고).
 
 ### develop에서 경우 2가 생기는 경로
 
@@ -158,8 +158,18 @@ LSA_LE 빌드(fixovf1)에서는 같은 slot 4가 `DELETED_WILL_REUSE`였다. ovf
 - CBRD-27781 / PR #8434: OOS 브랜치에서 같은 비교를 LSA_LE로 고쳤다(commit b7abf652bc). 거기서는 UPDATE의 drop postpone 뒤에 OOS 페이지 할당 sysop이 와서, 고치기 전 release 3000행 실행 7번 중 5번에서 chain 누수가 났고, 고친 뒤 4번 중 0번이었다.
 - CBRD-27987(analysis의 tran_start_postpone_lsa가 헤더 하나만큼 어긋남)과 CBRD-28065(logpb_flush_pages의 LSA_LT 경계)는 다른 위치의 다른 문제다.
 
-### ANALYSIS 확인 사항
+### ANALYSIS 결론
 
-- log_recovery_find_first_postpone(src/transaction/log_recovery.c)에도 같은 LSA_LT 비교가 있다. 이 함수에서 같은 경계가 결과를 바꾸는 경우가 있는지 확인해야 한다. 위 재현에서는 log_do_postpone만 바꾸어도 복구 경로가 고쳐졌다.
-- 복구 경로에서 첫 postpone이 아닌 postpone이 "첫 미실행 postpone"으로 sysop의 lastparent에 놓이는 경우를 재현으로 확인해야 한다.
-- 이 수정을 OOS 기능이 develop에 병합될 때 함께 넣을지, develop에 따로 넣을지 정해야 한다.
+- **log_recovery_find_first_postpone은 바꾸지 않는다.** 이 함수의 `LSA_LT`는 같은 경계에서 start_postpone_lsa 하나만 건너뛴다. 그 레코드는 이 함수가 원래 결과에서 빼는 레코드이므로 결과가 달라지지 않는다. log_do_postpone만 고친 빌드에서 아래 두 복구 시험이 모두 통과했다.
+- **복구 경로의 두 번째 형태를 재현했다.** 시험 트랜잭션을 `UPDATE(id=40)`, `UPDATE(id=39)`, `INSERT`, 나머지 UPDATE 순서로 바꾸어, 두 번째 postpone이 페이지 할당 sysop의 lastparent가 되게 했다. gdb로 첫 RVHF_MARK_REUSABLE_SLOT의 LOG_RUN_POSTPONE을 flush한 뒤 서버를 죽이면, 재시작 복구는 두 번째 postpone부터 탐색을 시작한다. 수정 전에는 10/11만 실행되었고(두 번째 postpone LSA 184:256 실행 안 됨), 수정 뒤에는 11/11이 실행되었다.
+- **develop에 따로 반영한다.** OOS 브랜치에는 이미 같은 수정(같은 비교와 주석)이 있으므로, OOS가 develop에 병합될 때 충돌이 생기지 않을 것으로 본다(추론). develop만으로도 DONT_REUSE_OID 테이블의 slot 누수가 있으므로 OOS 병합을 기다리지 않는다.
+- **수정 빌드 결과**(develop 666bb10ae6 + PR #8565, debug build):
+
+| 시험 | 수정 전 | 수정 뒤 |
+|---|---|---|
+| commit 경로, postpone_cache_size=4 | 10/11 | 11/11 |
+| 복구, postpone 실행 전 crash | 10/11 | 11/11 |
+| 복구, 첫 postpone 실행 뒤 crash(두 번째 형태) | 10/11 | 11/11 |
+| 건너뛴 postpone의 slot 상태 | MARKDELETED | DELETED_WILL_REUSE |
+
+- sysop 자체의 postpone(log_sysop_do_postpone)도 같은 함수를 거치므로 같은 수정이 적용된다. 이 경로에서 경우 2를 만드는 producer는 찾지 못했고 재현하지 않았다.

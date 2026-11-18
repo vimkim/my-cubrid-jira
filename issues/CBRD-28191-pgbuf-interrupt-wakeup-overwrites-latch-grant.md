@@ -105,5 +105,5 @@ ER_INTERRUPTED 반환                     -> G가 더한 fix count 1의 주인�
 
 ### 관련 이슈
 
-- CBRD-27739: 같은 증상. page latch timeout 처리의 두 경쟁 때문에 주인 없는 latch(READ, 그리고 2026-11-18 코멘트에 따르면 WRITE)가 남는다. 원인은 timeout 처리 순서이고, 외부 interrupt wakeup은 다루지 않는다. PR #8611(https://github.com/CUBRID/cubrid/pull/8611)이 그 두 경쟁을 닫는다. 이 이슈는 PR #8611 리뷰에서 범위 밖으로 남긴 세 번째 경로다.
-- CBRD-28163: 같은 함수의 timeout 처리에서 `waiter_exists` 표시가 남는 결함이다. 그 PR #8587(https://github.com/CUBRID/cubrid/pull/8587, head `76a68499eb`)도 timeout 분기에서 entry lock을 다시 잡도록 고친다. 이 PR도 page_buffer.c만 바꾸고 외부 wakeup 경로는 건드리지 않으므로, 이 이슈의 경로는 두 PR이 모두 병합된 뒤에도 남는다(코드 읽기).
+- CBRD-27739: 같은 증상. page latch timeout 처리의 두 경쟁 때문에 주인 없는 latch(READ, 그리고 2026-11-18 코멘트에 따르면 WRITE)가 남는다. 원인은 timeout 처리 순서이고, 외부 interrupt wakeup은 다루지 않는다. [PR #8611](https://github.com/CUBRID/cubrid/pull/8611)이 그 두 경쟁을 닫는다. 이 이슈는 PR #8611 리뷰에서 범위 밖으로 남긴 세 번째 경로다.
+- CBRD-28163: 같은 함수의 timeout 처리에서 `waiter_exists` 표시가 남는 결함이다. 그 [PR #8587](https://github.com/CUBRID/cubrid/pull/8587)(head `76a68499eb`)도 timeout 분기에서 entry lock을 다시 잡도록 고친다. 이 PR도 page_buffer.c만 바꾸고 외부 wakeup 경로는 건드리지 않으므로, 이 이슈의 경로는 두 PR이 모두 병합된 뒤에도 남는다(코드 읽기).

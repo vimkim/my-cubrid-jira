@@ -67,7 +67,7 @@ COMMIT;
 
 PR #8182 head `13105c1636` 의 `callback_handler::end_transaction ()` 은 commit 전에 `sp_check_statement_allowed (SP_STMT_TCL, ...)` 를 부른다 (`src/method/method_callback.cpp:233`). SQL 문 안에서 불린 SP 이면 `ER_SP_TCL_DDL_IN_QUERY` 를 돌려준다. 위 재현의 `COMMIT` 이 이 경로를 지나므로, 규칙 1 이 들어가면 세션 1 의 SELECT 는 lock 과 snapshot 을 유지한 채 오류로 끝나고 세션 2 의 DROP 은 기다릴 것이다. 코드만 확인했고, PR #8182 빌드로 실행하지는 않았다.
 
-이 사례를 위한 별도 회귀 test 는 필요 없어 보인다. SELECT 의 WHERE 에서 부른 함수의 `COMMIT` 이 거부되는지 규칙 1 의 test 가 확인하면, 이 사례도 함께 막힌다. PR #8182 의 test 목록은 확인하지 않았다. 이 사례가 더하는 것은 영향 범위다. 문장 안 TCL 은 server 종료나 결과 불일치뿐 아니라, 실행 중인 scan 이 다른 세션의 DDL 과 vacuum 으로부터 보호받지 못하게 만든다. OOS 의 sector 할당 확인이 지금 release 빌드에서 이를 막는 유일한 확인이다. 따라서 PR #8491 에서 그 확인을 줄일 수 있는지는 규칙 1 이 들어간 뒤에 다시 판단할 수 있다.
+이 사례를 위한 별도 회귀 test 는 필요 없어 보인다. SELECT 의 WHERE 에서 부른 함수의 `COMMIT` 이 거부되는지 규칙 1 의 test 가 확인하면, 이 사례도 함께 막힌다. PR #8182 의 test 목록은 확인하지 않았다. 이 사례가 더하는 것은 영향 범위다. 문장 안 TCL 은 server 종료나 결과 불일치뿐 아니라, 실행 중인 scan 이 다른 세션의 DDL 과 vacuum 으로부터 보호받지 못하게 만든다. OOS 의 sector 할당 확인이 지금 release 빌드에서 이를 막는 유일한 확인이다. 따라서 그 확인을 줄일 수 있는지는 규칙 1 이 들어간 뒤에 다시 판단한다. 이 판단은 [CBRD-28187](https://jira.cubrid.org/browse/CBRD-28187) 에서 추적하며, CBRD-28187 은 이 이슈에 막혀 있다.
 
 ### 확인하지 않은 것
 

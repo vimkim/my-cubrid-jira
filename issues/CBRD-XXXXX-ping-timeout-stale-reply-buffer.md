@@ -8,7 +8,7 @@
 
 **이슈 수행 이유**: 현재 develop 소스에서 `net_client_ping_server`는 스택 변수 `reply_buf`를 연결의 `buffer_queue`에 등록한 뒤 응답을 기다린다. timeout이 나면 그 등록을 빼지 않고 반환한다. 이후 16비트 request id가 한 바퀴 돌아 같은 id가 다시 쓰이면 그 요청은 큐에 남은 죽은 스택 주소를 자기 응답 버퍼로 받는다. debug 빌드 CAS에서 이 경로로 SIGSEGV, `free()` abort, `-187`을 직접 재현했고, Sidecar 코드가 없는 develop 커밋에서도 같은 abort를 확인했다.
 
-**영향**: 응용 프로그램과 QA 실행은 서버가 잠시(5초 이상) 응답하지 못한 뒤, 같은 CAS 연결의 나중 요청에서 CAS 비정상 종료나 `-187 Communications buffer not used` 오류를 겪는다. 실패는 원인이 된 ping보다 수천 요청 뒤에 나타나므로 원인을 찾기 어렵다. 재현은 debug 빌드와 로컬 SQL 회귀 실행에서만 했다. release 빌드에서의 증상, 운영 환경 발생 빈도, 같은 함수를 부르는 HA `applylogdb`(log_applier.c)의 영향은 확인하지 않았다.
+**영향**: 응용 프로그램과 QA 실행은 서버가 잠시(5초 이상) 응답하지 못한 뒤, 같은 CAS 연결의 나중 요청에서 CAS 비정상 종료나 `-187 Communications buffer not used` 오류를 겪는다. 실패는 원인이 된 ping보다 request id가 한 바퀴 도는 약 65,536개 요청 뒤에 나타나므로 원인을 찾기 어렵다. 재현은 debug 빌드와 로컬 SQL 회귀 실행에서만 했다. release 빌드에서의 증상, 운영 환경 발생 빈도, 같은 함수를 부르는 HA `applylogdb`(log_applier.c)의 영향은 확인하지 않았다.
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 

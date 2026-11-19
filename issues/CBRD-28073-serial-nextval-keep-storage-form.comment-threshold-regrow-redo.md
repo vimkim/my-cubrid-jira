@@ -30,7 +30,7 @@ PR #8632([CBRD-28062](https://jira.cubrid.org/browse/CBRD-28062), `oos_trigger_t
 **CBRD-28062에서 하는 것과 이 이슈에 남는 것**
 
 * PR #8632는 시스템 클래스 행에는 `oos_trigger_threshold` 를 적용하지 않고 계속 자동 목표값을 쓰기로 했습니다. 그러면 기준을 바꿔도 `_db_serial` 행의 배치가 바뀌지 않으므로, 이 PR이 새로 만드는 노출은 막힙니다.
-* `serial_update_serial_object` 가 `spage_update` 성공 여부를 알기 전에 redo를 남기는 순서는 이 이슈의 문제로 남습니다. PR #8514 head `8d736ff51c` 에도 같은 순서가 있습니다(`serial.c:1588` assert, `1590` redo, `1593` `spage_update`). keep_form으로 inline 행이 커지는 경우(설계 검토 댓글 3절)에도 page가 꽉 차 있으면 같은 결과가 됩니다. 수정 후보: redo를 남기기 전에 `spage_is_updatable` 로 확인하고 로그 없이 실패하거나, 들어가지 않으면 `heap_update` 로 처리하기. 시험 후보: 4K DB에서 serial 행이 들어 있는 page를 채운 뒤 행이 커지는 NEXT VALUE.
+* `serial_update_serial_object` 가 `spage_update` 성공 여부를 알기 전에 redo를 남기는 순서는 이 이슈의 문제로 남습니다. PR #8514 head `8d736ff51c` 에도 같은 순서가 있습니다(`serial.c:1588` assert, `1590` redo, `1593` `spage_update`). keep_form에서 inline 행이 커지는 경우(설계 검토 댓글 3절)에도, 커진 행이 page에 들어가지 않으면 같은 순서 때문에 같은 결과가 될 것으로 봅니다(소스, 재현하지 않음). 수정 후보: redo를 남기기 전에 `spage_is_updatable` 로 확인하고 로그 없이 실패하거나, 들어가지 않으면 `heap_update` 로 처리하기. 시험 후보: 4K DB에서 serial 행이 들어 있는 page를 채운 뒤 행이 커지는 NEXT VALUE.
 
 **HA 반영 정지 (참고)**
 

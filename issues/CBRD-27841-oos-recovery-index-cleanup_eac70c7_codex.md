@@ -10,7 +10,7 @@
 
 **영향**: 이 항목 때문에 생긴 사용자 오류는 없다. 남겨 두면 develop은 쓰이지 않는 번호를 영구히 비워 두어야 한다. 병합 뒤에 지우려면 storage-format revision을 올리고 develop 개발 DB를 모두 다시 만들어야 한다. 병합 전에 지우면 PR #7990이 이미 요구하는 개발 DB 재생성 외에 추가 비용이 없다. 번호를 당기므로 이 변경 전에 만든 `feature/oos-merge` 개발 DB는 새 빌드에서 재사용하지 않고 다시 만든다.
 
-**이슈 수행 방안**: 팀장 원칙(r4409612618)과 2026-11-05 댓글의 결정("필요한 복구 인덱스는 실제 생산자·소비자와 함께 정의한다")에 따른다. enum 항목, `RV_fun[]` 항목, TDE 분류 한 줄을 지우고 141~144를 140~143으로 당긴다. `RVOOS_NOTIFY_VACUUM`은 유지한다.
+**이슈 수행 방안**: 팀장 원칙(r4409612618)과 2026-11-05 댓글의 결정("필요한 복구 인덱스는 실제 생산자·소비자와 함께 정의한다")에 따른다. enum 항목, `RV_fun[]` 항목, TDE 분류 한 줄을 지우고 뒤의 OOS 인덱스(#8559 병합 뒤 141~145)를 하나씩 당긴다. `RVOOS_NOTIFY_VACUUM`은 유지한다.
 
 ---
 
@@ -48,7 +48,8 @@
 | `RVOOS_NOTIFY_VACUUM` | 141 | 140 |
 | `RVREPL_DUMMY_OOS_RECORD` | 142 | 141 |
 | `RVOOS_RECLAIM_POSTPONE` | 143 | 142 |
-| `RVOOS_UPDATE_DROP_POSTPONE` (`RV_LAST_LOGID`) | 144 | 143 |
+| `RVOOS_UPDATE_DROP_POSTPONE` | 144 | 143 |
+| `RVREPL_OOS_REUSE` (`RV_LAST_LOGID`, #8559) | 145 | 144 |
 
 develop의 마지막 인덱스는 `RVPGBUF_INIT_NEW_PAGE = 136`이므로 develop 쪽 번호는 바뀌지 않는다. 다른 분류 매크로(`LOG_IS_MVCC_OPERATION`, `RCV_IS_NOTHING_TO_UNDO`, `RCV_IS_LOGICAL_LOG`), 로그 덤프, log applier는 이름으로 인덱스를 비교하므로 번호 변경에 따른 추가 수정이 없다. 두 testcase 저장소의 `feature/oos-merge`에도 이 번호를 숫자로 쓰는 기대값은 없다. 이름으로 쓰는 곳은 TDE shell 테스트의 `RVOOS_INSERT`, `RVOOS_DELETE`뿐이고 둘 다 번호가 그대로다.
 
@@ -59,20 +60,20 @@ ADR-0008의 병합 전 결정대로 `DISK_STORAGE_FORMAT_REVISION`은 1로 유�
 ### 관련 작업
 
 - 상위 작업: [CBRD-26583](https://jira.cubrid.org/browse/CBRD-26583)(OOS M2).
-- [CBRD-27230](https://jira.cubrid.org/browse/CBRD-27230)의 [#8559](https://github.com/CUBRID/cubrid/pull/8559)는 `RVREPL_OOS_REUSE = 145`를 끝에 더한다. 이 변경이 들어가면 #8559는 144로 다시 매겨야 하고, `RV_LAST_LOGID` 줄과 `tde.h` 마지막 줄에서 rebase 충돌을 해결해야 한다.
+- [CBRD-27230](https://jira.cubrid.org/browse/CBRD-27230)의 [#8559](https://github.com/CUBRID/cubrid/pull/8559)가 먼저 병합되어 `RVREPL_OOS_REUSE = 145`를 더했다. 이 이슈의 변경이 그 번호도 144로 당긴다.
 
 ## Implementation and Validation
 
-구현은 [PR #8646](https://github.com/CUBRID/cubrid/pull/8646)(draft, `feature/oos-merge` 대상, head `1d86f1d31b`)이다. 세 파일에서 8줄을 지우고 4줄의 번호를 바꾼다. 테스트케이스 변경은 없다.
+구현은 [PR #8646](https://github.com/CUBRID/cubrid/pull/8646)이다. 2026-11-19에 `feature/oos-merge`에 squash 병합되었다(`8c478d8559`). 세 파일에서 8줄을 지우고 5줄의 번호를 바꾼다. 테스트케이스 변경은 없다. 변경이 기계적이어서 리뷰 승인 없이 trivial refactoring으로 병합했다.
 
-debug 빌드에서 확인한 결과는 다음과 같다. 절차와 다시 실행할 수 있는 스크립트는 [verification.md](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27841/verification.md)에 있다.
+병합한 head `4ee2bc4ebb`를 debug 빌드로 확인한 결과는 다음과 같다. 절차와 다시 실행할 수 있는 스크립트는 [verification.md](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27841/verification.md)에 있다.
 
-- 설치한 서버·SA 라이브러리에서 `RV_fun[]` 144개 항목이 모두 `recv_index == i`이고, 항목 수가 `RV_LAST_LOGID + 1`(143 + 1)이다.
-- 설정한 CTest 66개가 모두 통과했다.
-- OOS UPDATE·DELETE를 커밋하고 다른 UPDATE·INSERT를 커밋하지 않은 채 서버를 `kill -9`로 종료했다. 재시작 뒤 데이터는 커밋 상태와 같았다. vacuum은 `RVOOS_NOTIFY_VACUUM` 200개를 소비해 UPDATE의 옛 OOS chain 400개를 회수했고, DELETE의 chain도 모두 회수했다. `checkdb`도 통과했다. 로그 덤프에서 이 레코드들은 새 번호에 맞는 이름으로 읽혔다.
-- HA 복제 smoke test는 하지 않았다. `RVREPL_OOS_INSERT`(139)는 번호가 그대로이고, `RVREPL_DUMMY_OOS_RECORD`는 복제 코드가 이름으로만 처리한다.
+- 설치한 서버·SA 라이브러리에서 `RV_fun[]` 145개 항목이 모두 `recv_index == i`이고, 항목 수가 `RV_LAST_LOGID + 1`(144 + 1)이다.
+- 설정한 CTest 70개가 모두 통과했다.
+- OOS UPDATE·DELETE를 커밋하고 다른 UPDATE·INSERT를 커밋하지 않은 채 서버를 `kill -9`로 종료했다. 재시작 뒤 데이터는 커밋 상태와 같았다. vacuum은 `RVOOS_NOTIFY_VACUUM` 200개를 소비해 UPDATE의 옛 OOS chain 200개를 회수했고, DELETE의 chain도 모두 회수했다. `checkdb`도 통과했다. 로그 덤프에서 이 레코드들은 새 번호에 맞는 이름으로 읽혔다.
+- HA 복제 smoke test는 하지 않았다. `RVREPL_OOS_INSERT`(139)는 번호가 그대로이고, `RVREPL_DUMMY_OOS_RECORD`와 `RVREPL_OOS_REUSE`는 복제 코드가 이름으로만 처리한다.
 
-PR CI는 2026-11-19에 `/run all`로 시작했다([run 44501180486](https://github.com/CUBRID/cubrid/actions/runs/44501180486)).
+PR CI는 #8559 이전 head에서 시작했다([run 44501180486](https://github.com/CUBRID/cubrid/actions/runs/44501180486)). build 두 개와 `test_medium`이 통과한 뒤, head가 바뀌어 병합 후 취소했다. 합쳐진 `feature/oos-merge`는 #7990의 `/run all`로 검증한다.
 
 ## Acceptance Criteria
 

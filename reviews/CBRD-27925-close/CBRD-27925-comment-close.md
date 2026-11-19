@@ -36,5 +36,5 @@ ADR-0009의 요구(같은 OOS 파일은 새 섹터를 예약하기 전에 회수
 
 **5. 이 이슈 밖으로 옮긴 것**
 
-- 빈 페이지를 반환하지 않고 그 자리에서 재사용하고 vacuum fast path를 없애는 변경(ADR-0011, Draft PR #8493)은 새 개선 이슈 [CBRD-XXXXX](https://jira.cubrid.org/browse/CBRD-XXXXX)에서 다룹니다.
+- 빈 페이지를 반환하지 않고 그 자리에서 재사용하고 vacuum fast path를 없애는 변경(ADR-0011, Draft PR #8493)은 새 개선 이슈 [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281)에서 다룹니다.
 - 보충 2 댓글의 모델 한계(rollback이 후보마다 맞춰 래치를 잡고 성장 중 쓰기가 겹치는 경우)는 그대로 남습니다.

@@ -8,7 +8,7 @@
 
 **이슈 수행 이유**: PR #8434(ADR-0010)로 성장 전 회수 규칙은 충족했다. 하지만 지금도 빈 페이지는 `file_dealloc`으로 파일 관리자에 반환한 뒤 다음 `file_alloc`으로 다시 받는다. 영구 파일의 섹터는 `file_destroy`에서만 디스크로 돌아가므로 이 반환은 공간을 만들지 않는다. 반환된 페이지를 쓸 수 있는 것은 같은 파일의 다음 할당뿐이다. Draft PR #8493이 이를 제자리 재사용으로 바꾼 구현과 측정을 갖췄다. 다만 미팅에서 정한 vacuum fast path 유지를 뒤집으므로 따로 판단해야 한다.
 
-**영향**: 단일 세션 churn 측정(release 빌드)에서 INSERT 1,000건당 로그 레코드가 39% 줄고, DML 중 페이지 반환·할당 system operation이 사라졌다. 대량 UPDATE는 약 14% 빨라졌고 단건·동시 INSERT와 섹터 수는 같았다. 대가는 세 가지다. 빈 페이지가 파일에 할당된 채 남아 `SHOW HEAP OOS`·`spacedb`의 사용 페이지 수가 커지고, UPDATE 뒤 vacuum이 옛 chunk를 다 지우는 시간이 원인 미상으로 길어졌으며, 일부 crash 시점과 여러 OOS 파일이 동시에 churn하는 경우는 검증하지 않았다.
+**영향**: 단일 세션 churn 측정(release 빌드)에서 INSERT 1,000건당 로그 레코드가 39% 줄고, DML 중 페이지 반환·할당 system operation이 사라졌다. 대량 UPDATE는 약 14% 빨라졌고 단건·동시 INSERT와 섹터 수는 같았다. 기존에 원인을 모르던 UPDATE 뒤 vacuum drain 지연(0.34 s → 2.4 s)과 재초기화~INSERT 사이 crash 검증 공백은 추가 검증으로 모두 해소되었다. 남는 대가는 빈 페이지가 파일에 할당된 채 남아 `SHOW HEAP OOS`·`spacedb`의 사용 페이지 수가 커지는 점과, 여러 OOS 파일이 동시에 churn하는 경우 및 집합 상한(4,096쪽) 도달을 아직 재지 않았다는 점이다.
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 채택 여부와 범위를 결정한다. 후보 구현은 Draft PR #8493(ADR-0011, 제안 상태)이다.
 
@@ -71,10 +71,11 @@
 
 ## Open Questions
 
-- **vacuum drain 지연**: UPDATE 뒤 vacuum이 옛 chunk를 다 지우는 시간이 0.34 s에서 2.4 s로 길어졌다. fast path를 없앤 커밋부터 나타나고 원인은 모른다. 큰 filler 하나로 로그를 밀면 두 빌드 모두 바로 끝나므로, 시간보다 vacuum에 필요한 로그 양이 다른 것으로 보인다(추정). 옛 chunk가 늦게 지워지는 동안 파일에 더 큰 공간이 필요한지 확인해야 한다.
-- **재초기화 crash**: 재초기화 로그 뒤, INSERT 로그 전에 서버가 죽는 순간은 테스트 훅이 없어 시험하지 못했다. 재초기화 직후 crash 뒤 재시작하는 단위 테스트는 있다.
+- **vacuum drain 지연 (해소 — 검증 완료)**: UPDATE 뒤 vacuum이 옛 chunk를 다 지우는 시간이 0.34 s(filler 1개)에서 2.4 s(filler 12개)로 길어진 원인을 `er_log_vacuum` 추적으로 규명했다. ADR-0010에서는 vacuum worker가 `file_dealloc` sysop WAL(블록당 약 25~29쪽)을 쓰면서 후속 31쪽 로그 블록을 스스로 닫아(자가 폐쇄) filler 1개 만에 끝났으나, fast path 제거(`2d40794363`) 후에는 redo-only `RVOOS_DELETE`만 소량 기록하므로 외부 filler가 마지막 단일 31쪽 블록을 닫아야 한다(`REPEAT('f', 1500)` filler는 WAL에서 LZ4 압축되어 실제 `pageid` 전진이 약 2.07쪽이다). 대기·filler 없는 연속 churn 3종(2,000행 20 cycle 전체 churn, 500/1,000행 30회 연속 UPDATE, 4세션 동시 15회 UPDATE)에서 무한 누적이나 해소되지 않는 vacuum backlog는 없었고, 섹터 수도 ADR-0010 대비 같거나 작았다(500행 16 vs 17, 1,000행 24 vs 24, 동시 4세션 47 vs 48, 2,000행 36 vs 33~37 sector).
+- **재초기화 crash (해소 — 검증 완료)**: 코드 전수 감사로 live `FILE_OOS` 데이터 페이지의 빈 페이지를 대상으로 하는 undo 경로가 0건임을 재확인했다. 또한 테스트 훅(`oos_test_exit_after_empty_page_reinit`)을 추가해 `RVPGBUF_NEW_PAGE`(redo-only) flush 직후 `RVOOS_INSERT` 전 crash 테스트 2건(단독 crash 및 선행 미커밋 `RVOOS_INSERT`로 재시작 UNDO 페이즈가 실제로 실행되는 경우)을 구현·통과시켜(로컬 커밋 `96fb566bcc`, Debug 빌드 `ctest` OOS 12/12 통과), 재시작 후 해당 페이지가 유효한 빈 `PAGE_OOS`로 남아 새 페이지 할당 없이 재사용되고 값이 보존됨을 확인했다.
+- **검증 보고서**: 위 두 항목의 측정·타임라인·코드 감사 상세는 [기술 검증 보고서](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-28281/adr-0011-technical-verification.md)에 기록했다.
 - **측정 범위**: 여러 OOS 파일의 동시 churn, 동시 쓰기와 rollback이 섞인 churn, 집합 상한(파일당 4,096쪽)에 닿는 경우, bestspace mutex 점유가 다른 OOS 파일에 미치는 영향은 재지 않았다.
-- **PR 상태**: PR #7990의 develop 병합 뒤 PR #8493의 base를 develop으로 바꿨다. 브랜치는 아직 11-12의 `feature/oos-merge` 위에 있어 develop과 충돌한다. develop으로 rebase하고 CI를 다시 돌려야 한다. rebase 전에는 `ctest -R oos` 53건이 모두 통과했다. rebase 뒤에는 부하가 큰 상태에서 51건이 통과했고, 나머지 2건(시간 초과 1, vacuum 타이밍 검사 1)은 단독으로 다시 돌려 통과했다.
+- **PR 상태**: PR #7990의 develop 병합 뒤 PR #8493의 base를 develop으로 바꿨다. 원격 브랜치(`f1c78ce70b`)는 아직 11-12의 `feature/oos-merge` 위에 있어 develop과 충돌한다. triage 후 신규 crash 테스트 커밋(`96fb566bcc`, 로컬)을 포함해 develop으로 rebase하고 CI를 다시 돌려야 한다. rebase 전에는 `ctest -R oos` 53건이 모두 통과했고, rebase 뒤에는 부하가 큰 상태에서 51건이 통과, 나머지 2건은 단독 재실행으로 통과했다.
 
 ## Timing
 

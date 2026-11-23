@@ -1,6 +1,6 @@
 # [OOS] 빈 OOS 페이지를 반환하지 않고 제자리에서 재사용하는 방안의 채택 여부 결정 (ADR-0011)
 
-**한 줄 요약**: CBRD-27925를 PR #8434로 종결하면서 분리한 후속 이슈다. Draft PR #8493이 구현한 ADR-0011(빈 OOS 페이지를 반환·재할당하지 않고 그 자리에서 다시 쓰고, vacuum fast path를 없앤다)은 2026-11-05 미팅 결정을 바꾼다. 측정된 이득과 대가를 근거로 채택 여부와 시점(develop 병합 전/후)을 정한다.
+**한 줄 요약**: CBRD-27925를 PR #8434로 종결하면서 분리한 후속 이슈다. Draft PR #8493이 구현한 ADR-0011(빈 OOS 페이지를 반환·재할당하지 않고 그 자리에서 다시 쓰고, vacuum fast path를 없앤다)은 2026-11-05 미팅 결정을 바꾼다. 측정된 이득과 대가를 근거로 채택 여부를 정한다. ADR-0010까지의 OOS 코드는 2026-11-20 develop에 병합되었으므로([PR #7990](https://github.com/CUBRID/cubrid/pull/7990)), 채택하면 develop 대상 변경이 된다.
 
 ## Issue Triage
 
@@ -10,7 +10,7 @@
 
 **영향**: 단일 세션 churn 측정(release 빌드)에서 INSERT 1,000건당 로그 레코드가 39% 줄고, DML 중 페이지 반환·할당 system operation이 사라졌다. 대량 UPDATE는 약 14% 빨라졌고 단건·동시 INSERT와 섹터 수는 같았다. 대가는 세 가지다. 빈 페이지가 파일에 할당된 채 남아 `SHOW HEAP OOS`·`spacedb`의 사용 페이지 수가 커지고, UPDATE 뒤 vacuum이 옛 chunk를 다 지우는 시간이 원인 미상으로 길어졌으며, 일부 crash 시점과 여러 OOS 파일이 동시에 churn하는 경우는 검증하지 않았다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 채택 여부·범위·시점을 결정한다. 후보 구현은 Draft PR #8493(ADR-0011, 제안 상태)이다.
+**이슈 수행 방안**: TBD - ANALYSIS 단계에서 채택 여부와 범위를 결정한다. 후보 구현은 Draft PR #8493(ADR-0011, 제안 상태)이다.
 
 ---
 
@@ -22,7 +22,7 @@
 
 용어를 먼저 정리한다. OOS 파일에서 값을 지워 데이터 페이지가 완전히 비면, 그 페이지는 파일별 빈 페이지 집합에 들어간다(ADR-0010). 새 페이지가 필요한 INSERT를 "성장"이라 부른다. 성장은 새 섹터를 잡기 전에 이 집합의 페이지를 먼저 쓴다. vacuum fast path는 vacuum이 한 batch에서 비운 페이지를 batch 끝에서 바로 반환하는 최적화다.
 
-### 지금의 동작 (ADR-0010, `feature/oos-merge`)
+### 지금의 동작 (ADR-0010, develop `68a9c7766f`)
 
 - 성장이 집합에서 빈 페이지를 찾으면 그 페이지를 READ fix하고, OOS 헤더 페이지의 WRITE 래치를 잡고, 다시 WRITE fix해서 별도 system operation으로 반환한다. 헤더 래치는 그 system operation이 commit할 때까지 유지된다.
 - 이어서 `file_alloc`이 두 번째 system operation으로 같은 페이지를 다시 받아 초기화한다.
@@ -74,22 +74,15 @@
 - **vacuum drain 지연**: UPDATE 뒤 vacuum이 옛 chunk를 다 지우는 시간이 0.34 s에서 2.4 s로 길어졌다. fast path를 없앤 커밋부터 나타나고 원인은 모른다. 큰 filler 하나로 로그를 밀면 두 빌드 모두 바로 끝나므로, 시간보다 vacuum에 필요한 로그 양이 다른 것으로 보인다(추정). 옛 chunk가 늦게 지워지는 동안 파일에 더 큰 공간이 필요한지 확인해야 한다.
 - **재초기화 crash**: 재초기화 로그 뒤, INSERT 로그 전에 서버가 죽는 순간은 테스트 훅이 없어 시험하지 못했다. 재초기화 직후 crash 뒤 재시작하는 단위 테스트는 있다.
 - **측정 범위**: 여러 OOS 파일의 동시 churn, 동시 쓰기와 rollback이 섞인 churn, 집합 상한(파일당 4,096쪽)에 닿는 경우, bestspace mutex 점유가 다른 OOS 파일에 미치는 영향은 재지 않았다.
-- **PR 상태**: PR #8493은 PR #8434의 옛 head 위에 쌓여 지금 `feature/oos-merge`와 충돌한다. rebase와 CI 재실행이 필요하다. rebase 전에는 `ctest -R oos` 53건이 모두 통과했다. rebase 뒤에는 부하가 큰 상태에서 51건이 통과했고, 나머지 2건(시간 초과 1, vacuum 타이밍 검사 1)은 단독으로 다시 돌려 통과했다.
+- **PR 상태**: PR #7990의 develop 병합 뒤 PR #8493의 base를 develop으로 바꿨다. 브랜치는 아직 11-12의 `feature/oos-merge` 위에 있어 develop과 충돌한다. develop으로 rebase하고 CI를 다시 돌려야 한다. rebase 전에는 `ctest -R oos` 53건이 모두 통과했다. rebase 뒤에는 부하가 큰 상태에서 51건이 통과했고, 나머지 2건(시간 초과 1, vacuum 타이밍 검사 1)은 단독으로 다시 돌려 통과했다.
 
-## Timing Decision
+## Timing
 
-`feature/oos-merge`의 develop 병합과 이 변경의 순서를 정해야 한다.
-
-| 시점 | 장점 | 단점 |
-| --- | --- | --- |
-| develop 병합 전 | develop에 반환 경로·fast path·빈 페이지 목록 API를 들였다가 곧 지우는 일을 피한다. 리뷰와 QA가 한 번에 끝난다. | 위 미해결 항목을 안은 채 병합 범위가 커진다. PR #8493의 rebase와 CI가 병합 일정에 들어간다. |
-| develop 병합 후 | 검증을 마친 ADR-0010 상태가 develop에 먼저 들어간다. CBRD-26659의 회수 TC 5건은 이 상태의 `feature/oos-merge` `8c478d8559`에서 로컬로 통과했다. 남은 문제를 풀고 develop 대상 PR로 들어간다. | 같은 코드 영역을 두 번 바꾼다. develop에서 로그·할당 감소 효과가 늦어진다. |
-
-판단에 필요한 입력은 develop 병합 일정과, 위 Open Questions 중 병합 전에 꼭 닫아야 할 항목이다.
+이 이슈를 만들 때는 `feature/oos-merge`의 develop 병합 전에 넣을지 뒤에 넣을지를 함께 정하려 했다. 2026-11-20 PR #7990(`68a9c7766f`)으로 ADR-0010 상태가 develop에 먼저 들어갔으므로 이 선택은 끝났다. 채택하면 위 Open Questions를 정리한 뒤 develop 대상 PR로 넣는다. 반환 경로·fast path·빈 페이지 목록 API는 develop에 들어간 뒤 다시 지우게 된다. CBRD-26659의 회수 TC 5건은 병합 직전 `feature/oos-merge` `8c478d8559`에서 로컬로 통과했다.
 
 ## Acceptance Criteria
 
-- [ ] 채택 여부와 시점을 결정하고, ADR-0011의 상태와 2026-11-05 미팅 결정의 변경 여부를 기록한다.
+- [ ] 채택 여부를 결정하고, ADR-0011의 상태와 2026-11-05 미팅 결정의 변경 여부를 기록한다.
 - [ ] 채택하면 반복 churn에서 섹터 수와 cycle별 peak가 ADR-0009 결정 4의 기준을 넘지 않는다. CBRD-26659의 회수 TC 5건으로 확인한다.
 - [ ] 채택하면 churn 뒤 단건·동시 INSERT와 대량 UPDATE 시간이 ADR-0010보다 나쁘지 않다.
 - [ ] 채택하면 vacuum drain 지연의 원인을 설명하거나, 그대로 받아들인다는 결정을 근거와 함께 기록한다.

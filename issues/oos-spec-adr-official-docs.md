@@ -1,83 +1,107 @@
-# [OOS] 개인 저장소에 있는 OOS 규범 명세(Spec)와 ADR을 회사 공식 문서로 명문화
+# [OOS] OOS 규범 명세(Spec) 및 아키텍처 결정 기록(OOS-ADR-0001~0011)
 
-**한 줄 요약**: [PR #7990](https://github.com/CUBRID/cubrid/pull/7990) ([CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357))으로 OOS가 `develop` 에 병합된 상태에서, 리뷰어와 개발자가 참조하는 규범 명세(`OOS-CONTEXT.md`)와 아키텍처 결정 기록(`ADR-0001~0010`)이 개인 저장소(`vimkim/cubrid-oos-context`)에만 남아 있어 팀 공식 문서로 편입·유지보수할 방안을 결정하고 이관하는 작업이다.
+**한 줄 요약**: GitHub [vimkim/cubrid-oos-context](https://github.com/vimkim/cubrid-oos-context) 저장소를 단일 원본(Source of Truth)으로 유지하면서, 사내 동료들이 JIRA에서 OOS 규범 명세와 `OOS-ADR-0001`~`0011` 용어 및 설계 결정을 직접 조회·이해할 수 있도록 공식 동기화 허브 이슈를 운영한다.
 
 ## Issue Triage
 
-**이슈 수행 목적**: OOS의 규범 명세, 확정 ADR, 참고 문서를 팀 누구나 접근하고 코드 변경과 함께 검토·갱신할 수 있는 회사 공식 문서로 명문화한다.
+**이슈 수행 목적**: OOS의 규범 명세(`OOS-CONTEXT.md`)와 아키텍처 결정 기록(`OOS-ADR-0001`~`0011`)을 공식 CBRD JIRA 이슈로 동기화하여, 팀·QA·리뷰어가 JIRA 안에서 표준 식별자와 설계 결정을 즉시 찾아 이해할 수 있게 한다.
 
-**이슈 수행 이유**: OOS 엔진 구현이 `CUBRID/cubrid#7990`(커밋 `68a9c7766f`, 2026-11-19)으로 `develop` 에 병합되었고, 기존 15건의 CBRD 이슈와 PR #7990 외부 리뷰(2026-11-19 `CBRD-26357` 댓글)가 개인 저장소 [vimkim/cubrid-oos-context](https://github.com/vimkim/cubrid-oos-context) 의 명세와 ADR을 기준으로 정합성을 판정하고 있다. 반면 공식 저장소 `CUBRID/cubrid` 의 `src/storage/AGENTS.md` 및 `src/storage/docs/`(7개 파일)에는 OOS 설명이 전혀 없다.
+**이슈 수행 이유**: OOS 구현이 [PR #7990](https://github.com/CUBRID/cubrid/pull/7990) (`68a9c7766f`, 2026-11-19)으로 `develop` 에 병합되었고, 기존 15건의 CBRD 이슈와 외부 코드 리뷰([CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357) 2026-11-19 댓글)가 `cubrid-oos-context` 명세를 기준으로 삼고 있다. 그러나 사내 공식 JIRA에는 해당 Spec과 `OOS-ADR` 목록·내용을 한눈에 볼 수 있는 공식 기준 이슈가 없다.
 
-**영향**: 개발자·리뷰어·QA·에이전트가 OOS 동작 계약(demotion target, `STORAGE` 정책, 32B 청크 헤더, postpone/redo-only 회수, 빈 페이지 회수 불변식, 11.5 CDC 유예 범위 등)을 확인할 때 개인 저장소에 의존해야 하며, 저장소 소유자 변경·링크 유실·엔진 코드와의 괴리 위험이 있다. 또한 현재 문서에는 개인 로컬 경로·비공개 작업 ID(`WorkNNN`) 등 조직 공유에 부적합한 참조가 40곳 섞여 있다.
+**영향**: 동료 개발자와 리뷰어가 이슈·PR에서 `OOS-ADR-0008`, `OOS-ADR-0011` 같은 결정 식별자를 접할 때 JIRA 내부 검색만으로 배경과 확정 여부를 확인하기 어렵고, `accepted` 결정과 `proposed` 제안(`OOS-ADR-0011`)을 혼동할 위험이 있다.
 
-**이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
+**이슈 수행 방안**: 확정된 운영 원칙에 따라 [vimkim/cubrid-oos-context](https://github.com/vimkim/cubrid-oos-context) (`main`)를 단일 원본(SoT)으로 유지하고, 본 JIRA 이슈를 공식 단방향 동기화 허브로 운영한다. 본문에는 동기화 메타데이터·규범 명세 요약·`OOS-ADR` 마스터 인덱스 표를 두고, 각 ADR의 상세 결정 요약은 `OOS-ADR-NNNN` 고정 댓글로 1:1 관리한다. 세부 동기화 자동화 범위와 부모 Epic 배치(`CBRD-26357` vs `CBRD-26978`)는 검토를 거쳐 확정한다.
 
 ---
 
 ## AI-Generated Context
 
-## Description
+## Source of Truth and Sync Policy
 
-이 이슈는 [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978) (OOS TODO Epic)의 후속이며 [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357) (OOS 도입 Epic)과 연계된다. 2026-11-19 [PR #7990](https://github.com/CUBRID/cubrid/pull/7990) 병합으로 OOS 코드가 `CUBRID/cubrid` `develop` 에 포함되었고, `CBRD-26357` 외부 코드 리뷰(2026-11-19 댓글)에서도 `cubrid-oos-context` 명세를 구현 정합성 비교의 기준선으로 직접 인용했다. 그러나 해당 명세와 결정 기록은 아직 개인 GitHub 저장소에만 있어, 공식 리뷰 프로세스와 코드 변경 이력에 묶여 관리되지 않고 있다.
+- **단일 원본(Source of Truth)**: [https://github.com/vimkim/cubrid-oos-context](https://github.com/vimkim/cubrid-oos-context) (`main`)
+- **동기화 기준 커밋**: `139ec89` (문서 최종 갱신일 `2026-11-19`)
+- **단방향 동기화 원칙**: 모든 Spec/ADR 수정은 GitHub `cubrid-oos-context` 에 먼저 반영하고, ADR이 추가되거나 수정될 때마다 본 JIRA 이슈의 마스터 인덱스 표와 해당 `OOS-ADR-NNNN` 댓글을 함께 갱신한다. 본 JIRA 본문이나 댓글을 원본보다 먼저 단독 수정하지 않는다.
+- **표준 식별자 규칙**: 사내 JIRA·PR·코드 리뷰에서는 각 결정을 `OOS-ADR-0001`~`OOS-ADR-0011` 형식으로 표기한다.
+- **구현과 규범의 구분**: 본 이슈에 정리된 확정 규범(`OOS-CONTEXT.md`, `accepted` ADR)은 요구 동작을 정의하며, 특정 엔진 커밋의 구현 여부나 버그 상태는 개별 CBRD 티켓과 소스를 기준으로 판단한다.
 
-### 현재 문서 자산 현황
+## Normative Specification Summary (OOS-CONTEXT.md)
 
-현재 [vimkim/cubrid-oos-context](https://github.com/vimkim/cubrid-oos-context) 에 보관된 문서 구성은 다음과 같다.
+원문 전체: [OOS-CONTEXT.md](https://github.com/vimkim/cubrid-oos-context/blob/main/OOS-CONTEXT.md) (`2026-11-19`), 이력 용어: [CONTEXT.md](https://github.com/vimkim/cubrid-oos-context/blob/main/CONTEXT.md)
 
-| 문서 / 경로 | 규모·최종 갱신 | 상태 | 내용 요약 |
+### §1. 트리거·배치·거부 규칙
+
+- **Largest-First 점진적 demotion (`CBRD-26776`, `CBRD-27057`)**: `heap_attrinfo_determine_disk_layout` 에서 레코드 크기(`header_size + payload_size + mvcc_extra`)가 목표치를 넘을 때만 가변 길이 컬럼(`column_size > OR_OOS_INLINE_SIZE`, 즉 24B 초과)을 큰 값부터 하나씩 OOS로 옮긴다. 목표치 이하가 되거나 후보가 소진되면 중단하며, `STORAGE PREFER_INLINE` 컬럼은 일반 후보 뒤 마지막 순위로 밀린다.
+- **PG식 4-record 물리 목표**: 기본 목표는 `heap_oos_inline_target_size()` 가 산출하며, 힙 슬롯 4개를 제외한 비헤더 페이지 용량을 4로 나눈 뒤 `HEAP_MAX_ALIGN` (4B)으로 내림 정렬한다. 16KiB I/O 페이지(`DB_PAGESIZE` 16,344B, 비헤더 용량 16,268B) 기준 자동 목표는 **4,060B** 이며 `unfill_space` 와 무관하다.
+- **정적 서버 파라미터 `oos_trigger_threshold` (`CBRD-28062`)**: 기본값 `0` 은 자동 목표를 뜻하며 OOS를 비활성화하지 않는다. 0이 아닌 값은 자동 목표 이상 `heap_Maxslotted_reclength` 이하만 허용한다(4KiB: 988~3,948B, 8KiB: 2,012~8,044B, 16KiB: 4,060~16,236B). 시스템 클래스(`_db_serial` 등)는 항상 자동 목표를 사용한다. 서버 기동·`createdb`·`patchdb` 에서 검사하며 `restoredb` 중에는 검사하지 않는다.
+- **컬럼 `STORAGE` 정책 (`CBRD-26912`, `CBRD-26067`, `CBRD-27259`)**: 일반 컬럼에 한해 `DEFAULT`/`PREFER_OUTLINE`, `PREFER_INLINE`, `FORCE_INLINE`, `FORCE_OUTLINE` 을 지원한다(고정 길이 타입은 `DEFAULT`/`FORCE_INLINE` 만 허용). `FORCE_INLINE` 으로 `ALTER` 할 때는 기존 모든 행(파티션·하위 클래스 포함)을 새 정책으로 레이아웃 검사해 초과 시 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 로 거부한다.
+- **`bigone` 거부 (`CBRD-26937`, `CBRD-27259`)**: 시스템 클래스와 루트 클래스를 제외한 행은 demotion 후에도 `REC_BIGONE` 이 필요하면 OOS 체인 삽입 전에 `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE` 로 거부한다. 대량 고정 길이 `BIT(n)` 이나 24B 이하 가변 값이 많아 초과한 경우도 거부 대상이다.
+
+### §2. 저장 구조·신원 검사·공간 탐색
+
+- **레코드 및 스터브 레이아웃**: VOT 엔트리의 `IS_OOS` 비트(`OR_VAR_BIT_OOS = 0x1`)가 설정되면 해당 위치에 **24B OOS inline stub**(`head OOS OID` 8B + `full length` 8B + `packed head identity stamp` 8B)이 놓인다. 힙 레코드 MVCC 플래그 `HAS_OOS` (`OR_MVCC_FLAG_HAS_OOS = 0x08`)는 메타데이터이며 MVCC 헤더 크기를 바꾸지 않는다.
+- **다중 청크 체인과 32B 헤더**: 한 OOS 페이지를 넘는 값은 tail(`chunk_2`)부터 head(`chunk_0`) 순으로 역순 삽입하고, 읽기는 head부터 순방향으로 재조립한다. 각 청크는 **32B 헤더**(`total_data_length` 4B + `chunk_index` 4B + `next-chunk OID` 8B + `next-chunk stamp` 8B + `identity_stamp` 8B)를 갖는다.
+- **신원 스탬프 검증 (`CBRD-26950`)**: 각 청크는 쓰기 래치 아래 캡처한 페이지 LSA를 신원 스탬프로 저장한다. 읽기와 회수기는 스탬프를 비교해 해제·재타입화·슬롯 재사용에 따른 stale 참조를 가려낸다. 로깅이 꺼진 대량 적재(`log_is_no_logging`)에서는 스탬프 유일성이 보장되지 않는 예외를 명시한다.
+- **3-Tier Bestspace 및 비순번(non-numerable) 열거 (`CBRD-26658`, `OOS-ADR-0001`)**: `FILE_OOS` 는 힙당 최대 1개 지연 생성되는 비순번 영구 파일이다. 헤더 페이지 0의 `OOS_HDR_STATS` (`best[10]`)와 전역 `OOS_BESTSPACE_CACHE` 로 후보 페이지를 찾고, 미스 시 `file_get_all_data_sectors` 기반 sector-bitmap walk(`OLD_PAGE_MAYBE_DEALLOCATED` 사용)로 빈 공간을 재탐색한다.
+
+### §3. CRUD 및 소유권 계약
+
+- **Resolve vs Expand (`CBRD-26847`, `OOS-ADR-0003`)**: 속성 계층 소비자는 필요한 컬럼만 지연 복원하는 **Resolve** (`heap_attrinfo_read_dbvalues` → `heap_attrvalue_read_oos_inline` → `oos_read`)를 사용한다. 클라이언트 `LC_COPYAREA` 전송·힙 재삽입·바이트 비교·`OR_BUF` 파싱 등 원시 `RECDES` 바이트가 필요한 경로만 `heap_get_visible_version_expand_oos` 로 **Expand** 를 opt-in 한다.
+- **UPDATE 체인 재사용 및 소유권 불변식 (`CBRD-27230`)**: UPDATE 문에서 **할당되지 않은** OOS 속성은 기존 24B 스터브를 그대로 재사용한다. 각 OOS 값 체인은 그것을 참조하는 최신 논리 레코드 버전이 소유하고, 이전 버전의 undo 이미지는 읽기·롤백용 차용 참조만 보유하며 절대 삭제 원천으로 쓰지 않는다. 버려진 체인은 커밋 후 postpone이 발행하는 `RVOOS_NOTIFY_VACUUM` 을 vacuum이 소비할 때 1회만 회수한다.
+
+### §4. 복구·HA·Vacuum·빈 페이지 회수
+
+- **복구와 복제 불변식**: 마스터의 물리 OOS OID를 복제본에 그대로 쓰지 않고 복제본이 자체 `oos_insert` 및 재사용 마커 보정으로 값 동등성을 유지한다. `DELETE` 는 MVCC 모드에서 스터브·체인을 보존하고, SA/비MVCC eager 경로만 커밋 시점에 회수 의도(reclaim intent)를 실행한다.
+- **확정 후 redo-only 회수 (`OOS-ADR-0008`)**: 청크 삭제(`RVOOS_DELETE`)에는 undo가 없다. REMOVE(sysop 커밋 후), UPDATE 알림(vacuum 소비 후), eager 정리(트랜잭션 커밋 후) 모두 회수 의도(`(OOS VFID, head OOS OID, head stamp)`)를 postpone으로 기록하고, 확정된 뒤에야 tail-first reclaimer가 redo-only로 삭제한다. 실패 시 fail-stop 정책으로 재시작 복구가 postpone을 재실행한다.
+- **성장 전 빈 페이지 회수 불변식 (`CBRD-26786`, `OOS-ADR-0009`, `OOS-ADR-0010`)**: 완전히 빈 OOS 데이터 페이지는 파일이 쓰기 없이 유휴 상태일 때 반환할 의무는 없으나, 새 섹터를 예약하기 전에는 반드시 회수·재사용해야 한다. 이를 위해 파일별 `emptied-page set` (`OOS_BESTSPACE_CACHE` bestspace mutex 보호, 성장 잠금과 연동)으로 빈 페이지를 추적해 `oos_alloc_page_with_reclaim` 에서 2단계 검증 후 회수하며, 재시작·오버플로로 집합이 불완전할 때는 sector-bitmap lap 1회로 복구한다.
+
+### §5. 생명주기·TDE·11.5 릴리스 범위 및 용어
+
+- **DROP·TDE·LOB (`CBRD-26608`, `CBRD-26830`, `OOS-ADR-0002`)**: `DROP TABLE` 시 `oos_remove_file` 로 OOS 파일을 제거한다. TDE 테이블은 OOS VFID를 힙 헤더에 공개하기 전에 암호화를 적용한다. BLOB/CLOB는 88B 수준 locator 바이트만 OOS로 이동하며 외부 LOB 파일 수명 관리는 LOB 계층에 남는다.
+- **11.5 병합 CDC 유예 및 부트 포맷 검사 (`OOS-ADR-0005`, `0006`, `0007`)**: 디스크 호환성 `11.5` 를 유지하고 `CBRD-26939` (CDC/flashback용 OOS 보강 이미지)는 11.5 병합에서 유예했다(`cbrd_27064`, `cbrd_27075` 는 QA 회귀에서만 실행). 대신 `disk_format()` 이 볼륨 헤더 `storage_format` 필드에 `DISK_STORAGE_FORMAT_REVISION = 1` 을 기록하고 부트·`patchdb` 에서 일치 여부를 검사해 스탬프 이전 DB를 `ER_BO_INCOMPATIBLE_STORAGE_FORMAT` 으로 거부한다.
+- **핵심 용어 (`OOS-CONTEXT.md` & `CONTEXT.md`)**: `OOS inline stub` (24B 전체 구조), `OOS value chain` (청크 연결 리스트), `OOS Expand` (레코드 단위) / `OOS Resolve` (속성 단위) / `OOS Read` (저장소 단위), `Reclaim intent` (커밋 후 회수 의도), `OOS reclaimer` (redo-only 재실행 회수기), `Emptied-page set` (빈 페이지 집합), `Supported / Legacy OOS history` (CDC 이력 재구성 보장 여부 구분).
+
+## Architecture Decision Records (OOS-ADR-0001 ~ OOS-ADR-0011)
+
+사내에서 각 결정을 인용할 때는 아래 `OOS-ADR-NNNN` 식별자를 사용한다. **주의**: `OOS-ADR-0001`~`0010` 만 현재 `accepted` 상태이며, `OOS-ADR-0011` 은 `proposed` 상태로서 확정 규범이 아니다.
+
+| ID | 상태 | 제목 및 핵심 결정 | 개정·대체 관계 | 관련 CBRD | 원문(GitHub) |
+| --- | --- | --- | --- | --- | --- |
+| `OOS-ADR-0001` | `accepted` | `FILE_OOS` 를 비순번(non-numerable) 영구 파일로 전환하고 sector-bitmap walk로 열거 | - | `CBRD-26831`, `CBRD-26786` | [0001](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0001-oos-page-enumeration-non-numerable.md) |
+| `OOS-ADR-0002` | `accepted` | BLOB/CLOB locator 컬럼도 일반 가변 타입과 동일하게 OOS demotion 대상 유지 | - | `CBRD-26814` | [0002](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0002-oos-lob-locator-demotion.md) |
+| `OOS-ADR-0003` | `accepted` | OOS 레코드 Expand는 원시 바이트 소비자 전용 opt-in 계약으로 유지 | - | `CBRD-26847`, `CBRD-26948` | [0003](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0003-oos-expansion-is-opt-in.md) |
+| `OOS-ADR-0004` | `accepted` | CDC/flashback 이력 보존을 위한 supplemental WAL 보강 이미지 방향 | `OOS-ADR-0005` 에 의해 11.5 활성화·호환 계약 일부 대체(재설계 필요) | `CBRD-26939` | [0004](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0004-durable-oos-supplemental-images.md) |
+| `OOS-ADR-0005` | `accepted` | 11.5 병합에서 OOS CDC/flashback 이력 변경 전면 유예, 디스크 레벨 11.5 유지 | `OOS-ADR-0004` 일부 대체; `OOS-ADR-0006` 개정·`OOS-ADR-0007` 테스트 정책 일부 대체 | `CBRD-26939`, `CBRD-26357` | [0005](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0005-defer-oos-history-from-the-11-5-merge.md) |
+| `OOS-ADR-0006` | `accepted` | 볼륨 헤더 `storage_format` 스탬프(1)로 부트 시 사전 스탬프 DB 거부 | `OOS-ADR-0005` 개정; `OOS-ADR-0008` 에 의해 병합 전 변경 리비전 1 유지 개정 | `CBRD-26357` | [0006](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0006-reject-pre-stamp-databases-at-boot.md) |
+| `OOS-ADR-0007` | `accepted` | 유예된 CDC 회귀(`cbrd_27064`, `27075`)는 `develop` CI에서 빼고 QA 회귀에서만 실행 | `OOS-ADR-0005` 의 테스트 정책 일부 대체 | `CBRD-26939` | [0007](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0007-run-deferred-cdc-regressions-in-qa-regression-only.md) |
+| `OOS-ADR-0008` | `accepted` | 삭제 확정 뒤에만 postpone·redo-only reclaimer(32B 링크 스탬프·fail-stop)로 체인 회수 | `OOS-CONTEXT.md` §2~§4·`OOS-ADR-0006` 개정, LSA gate 제거 | `CBRD-27781`, `CBRD-27237` | [0008](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0008-reclaim-oos-chains-after-the-delete-is-final.md) |
+| `OOS-ADR-0009` | `accepted` | 빈 OOS 페이지는 유휴 시 반환하지 않고 다음 파일 성장 전에만 회수·재사용 보장 | `OOS-CONTEXT.md` §4 빈 페이지 불변식 개정 | `CBRD-27925`, `CBRD-26786` | [0009](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0009-reclaim-empty-pages-before-growth-not-while-idle.md) |
+| `OOS-ADR-0010` | `accepted` | 청크 삭제 카운터 대신 파일별 `emptied-page set` 으로 성장 게이트 회수 트리거 | `OOS-CONTEXT.md` §4 성장 게이트 개정(`RVOOS_INSERT` 8B VFID undo 추가) | `CBRD-27925`, `CBRD-27872` | [0010](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0010-arm-growth-reclaim-with-emptied-pages.md) |
+| `OOS-ADR-0011` | `proposed` | 빈 OOS 페이지를 dealloc/fast path 없이 제자리에서 재사용(미확정 제안) | 채택 시 `OOS-ADR-0009` 결정 3·`OOS-ADR-0010` 결정 3 개정 | `CBRD-28281`, `CBRD-27925` | [0011](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/adr/0011-reuse-emptied-pages-in-place.md) |
+
+각 `OOS-ADR-NNNN` 의 상세 배경·검토한 대안·트레이드오프·결과 요약은 본 이슈의 `OOS-ADR-NNNN` 댓글로 1:1 동기화한다.
+
+## Non-Normative Reference Documents
+
+아래 문서는 규범 명세가 아니며, 배경 이해·과거 관측 확인·테스트 작성 참고용으로만 사용한다.
+
+| 문서 | 역할 및 범위 | 주의사항 | 원문(GitHub) |
 | --- | --- | --- | --- |
-| `OOS-CONTEXT.md` | 327줄, 약 41 KB (2026-11-19) | 규범 명세 | §1 트리거·`STORAGE` 정책·`bigone` 거부, §2 레코드/청크 레이아웃·신원 스탬프·bestspace, §3 CRUD·Expand/Resolve·UPDATE 체인 재사용, §4 복구·HA·vacuum·빈 페이지 회수, §5 파일 생명주기·TDE·11.5 CDC 유예·부트 포맷 검사, 용어집 및 작성 규약 |
-| `CONTEXT.md` | 17줄 | 규범 보조 용어 | CDC/flashback 이력 이미지 관련 용어 정의 (`Before image`, `After image`, `Supported/Legacy OOS history`) |
-| `docs/adr/0001`~`0010` | 10편 (약 64 KB) | `accepted` | 0001: non-numerable 페이지 열거, 0002: LOB locator 자격 유지, 0003: opt-in Expand, 0004: CDC 보강 이미지(0005로 일부 대체), 0005: 11.5 CDC 유예(0006 개정·0007 일부 대체), 0006: 부트 storage-format 스탬프 검사(0008 개정), 0007: 지연 CDC 회귀 QA 전용 실행, 0008: 확정 후 postpone/redo-only 회수, 0009: idle이 아닌 성장 전 빈 페이지 회수, 0010: emptied-page set 기반 성장 게이트 |
-| `docs/adr/0011` | 1편, 59줄 (2026-11-11) | `proposed` | 빈 OOS 페이지 제자리 재사용(dealloc 제거·vacuum fast path 제거). [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281) 에서 채택 여부를 별도 심사 중이므로 1차 공식 규범에 확정 규칙으로 편입하면 안 됨 |
-| `docs/reference/design-history.md` | 145줄, 약 17 KB (2026-11-05) | 비규범 참고 | M1 규칙, PG TOAST/MySQL 비교, ADR-0008 이전 회수 규칙, 유예된 최적화·설계 논의 이력 |
-| `docs/reference/implementation-observations.md` | 201줄, 약 33 KB (2026-11-19) | 비규범 참고 | 이슈별 구현 관측 스냅샷(`CBRD-26950`, `27230`, `27237`, `26786`, `28062`, `27259`, `ADR-0008` 등) |
-| `docs/reference/test-recipes.md` | 147줄, 약 10 KB (2026-10-27) | 비규범 참고 | VARBIT 테스트 패턴, demotion 계산 예시, 카테고리별 시나리오 |
+| `design-history.md` | M1 규칙, PG TOAST/MySQL 비교, ADR-0008 이전 회수 규칙, 유예된 최적화 논의 이력 | 이미 대체된 과거 규칙이 포함되므로 현재 규범으로 오인 금지 | [design-history.md](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/reference/design-history.md) |
+| `implementation-observations.md` | 이슈별 구현·검증 관측 스냅샷(`CBRD-26950`, `27230`, `27237`, `28062`, `ADR-0008` 등) | 상당수가 `PR #7990` 병합 전 커밋 기준이므로 현재 상태는 코드·JIRA로 재확인 필요 | [implementation-observations.md](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/reference/implementation-observations.md) |
+| `test-recipes.md` | `BIT VARYING` 테스트 패턴, demotion 계산 예시, 카테고리별 시나리오 | §9.6에 `bigone` 개정(2026-11-09 비시스템 클래스 거부) 이전 문구가 남아 있어 원본 보정 예정 | [test-recipes.md](https://github.com/vimkim/cubrid-oos-context/blob/main/docs/reference/test-recipes.md) |
 
-### 이관 전 정비가 필요한 확인 사항
+## Sync Maintenance and Related Work
 
-1. **개인 경로·비공개 참조 정리(9개 파일 40건)**: 문서 안에 개인 환경의 로컬 스킬 경로, 개인 문서/이슈/메모 저장소(`my-cubrid-docs`, `my-cubrid-jira`, `cubrid-oos-vault`, `temp/`)를 가리키는 상대 경로, 비공개 작업 ID(`Work742`~`Work878`)가 포함되어 있다. 공식 문서로 옮길 때는 공개 GitHub/JIRA 링크 또는 본문 내 요약 근거로 치환해야 한다.
-2. **스냅샷 노후화 및 일부 문구 보정**: `implementation-observations.md` 의 상당수 항목은 `PR #7990` 병합 이전 커밋(`dcbf09e4f`, `d52b1889e` 등) 기준 관측이다. 또한 `test-recipes.md` 9.6절에는 "A non-OOS bigone ... still succeeds"라는 문구가 남아 있어, 2026-11-09 개정된 비시스템 클래스 `REC_BIGONE` 전면 거부 규칙(`OOS-CONTEXT.md` §1)과 어긋난다. 이관 시 규범과 어긋난 예시 문구를 대조·수정해야 한다.
-3. **기존 공식 저장소 문서 체계와의 관계**: `CUBRID/cubrid` `develop` 에는 [CBRD-26974](https://jira.cubrid.org/browse/CBRD-26974) 와 [CBRD-28038](https://jira.cubrid.org/browse/CBRD-28038) 을 통해 구축된 `src/storage/AGENTS.md` 및 `src/storage/docs/*.md`(7개 분석서)가 존재하지만 OOS 항목은 비어 있다. 반면 과거 JIRA 본문에 직접 스펙 비교표를 올렸던 [CBRD-26592](https://jira.cubrid.org/browse/CBRD-26592) 는 M1 규칙(`DB_PAGESIZE/8`, 512B, 16B 스터브) 상태로 방치된 뒤 `Closed (Won't Fix)` 로 종료되었다.
+### 동기화 유지보수 절차
 
-## Options for Analysis
+1. `cubrid-oos-context` (`main`)에서 `OOS-CONTEXT.md` 또는 `docs/adr/NNNN-*.md` 를 추가·수정하고, 비공개 로컬 경로나 개인 작업 ID가 없는지 확인한다.
+2. 동기화 매니페스트(`docs/maintenance/jira-sync-manifest.json`)를 대조해 변경된 Spec/ADR을 식별한다.
+3. 본 JIRA 이슈의 마스터 인덱스 표·규범 요약을 갱신하고, 추가·수정된 `OOS-ADR-NNNN` 에 대응하는 댓글을 생성 또는 제자리 수정한다.
 
-아래 방안은 ANALYSIS 단계 검토용 후보이며 최종 선택은 ANALYSIS에서 확정한다.
+### Related Work
 
-| 후보 방안 | 기대 효과와 장점 | 한계·단점과 실패 조건 | 비용·위험·호환성 | 근거와 ANALYSIS 확인 사항 |
-| --- | --- | --- | --- | --- |
-| 현재 상태 유지 (기준선: 개인 저장소 단독 관리) | 추가 이관·정비 비용이 즉시 들지 않음 | 공식 리뷰·코드 변경과 분리되어 소유권, 접근성, 최신성 보장 불가; 비공개 로컬 경로가 그대로 남음 | 저장소 소유자 변경·링크 단절 위험; 공식 문서 부재 지속 | `CBRD-26357` 외부 리뷰가 이미 개인 저장소에 의존한 사례가 확인됨 |
-| 방안 A (잠정 권장 후보): `CUBRID/cubrid` 공식 저장소 내 문서 편입 + JIRA 추적 병행 | 코드·PR 리뷰와 같은 워크플로에서 Spec/ADR을 함께 심사·갱신 가능; Git 이력으로 개정 추적 가능 | 저장소 내 위치(`src/storage/docs/` vs 루트 `docs/`)와 언어 정책 합의 필요; PR 승인·정비 공수 발생 | 개인 경로 40건 정비 및 `test-recipes.md` §9.6 등 불일치 보정 필요; 코드 동작 변경 없음 | `CBRD-26974`/`CBRD-28038` (`src/storage/docs/*.md`) 선례 존재; 위치(A-1 `src/storage/docs/` vs A-2 루트 `docs/`), 언어, `reference/` 포함 범위 확인 필요 |
-| 방안 B: JIRA 이슈 본문(단일 또는 ADR별 하위 이슈)으로 Spec/ADR 직접 등재 | 별도 PR 없이 JIRA만으로 문서 확인 가능; 티켓 체계와 바로 결합 | 대용량 Spec(41 KB)·ADR 11편의 diff/PR 리뷰·상호 링크 유지보수가 어려움; 코드 변경과 동기화가 끊기기 쉬움 | jira wiki 변환 시 표·코드블록 가독성 저하 및 갱신 누락으로 문서 노후화 위험 | `CBRD-26592` 가 JIRA 본문 스펙 유지 실패 후 `Closed (Won't Fix)` 된 선례 확인됨 |
-| 방안 C: 별도 조직 저장소·사내 개발 포털(`dev.cubrid.org`) 또는 매뉴얼(`CUBRIDMAN`) 이관 | 개발자 외 독자 접근성 확보; 매뉴얼은 사용자 관점 기능 안내에 적합 | 내부 엔진 계약·ADR을 매뉴얼에 넣으면 범위 불일치; 코드 PR과 저장소가 분리되어 동기화 비용 증가 | 포털/별도 저장소 운영 권한 및 동기화 절차 추가 필요 | 사용자용 DDL/파라미터/에러(`STORAGE`, `oos_trigger_threshold` 등)만 `CUBRIDMAN` 별도 이슈로 분리하는 방안 검토 필요 |
-
-### 후보 비교 및 판별 기준
-
-- **코드-문서 동기화와 리뷰 가능성**을 중시하면 방안 A가 가장 유리하다. 엔진 코드를 바꾸는 PR에서 규범 명세와 ADR 개정을 같은 PR 또는 연계 PR로 리뷰할 수 있고, `src/storage/AGENTS.md` 및 `src/storage/docs/` 선례([CBRD-26974](https://jira.cubrid.org/browse/CBRD-26974), [CBRD-28038](https://jira.cubrid.org/browse/CBRD-28038))를 그대로 활용할 수 있다.
-- **저장소 PR 절차 없이 빠른 사내 공유**만 필요하거나 조직 표준이 위키/포털 중심이라면 방안 B 또는 방안 C가 유리하지만, 방안 B는 `CBRD-26592` 선례처럼 코드가 변할 때 본문이 쉽게 낡는 한계가 있다.
-- 따라서 ANALYSIS에서는 (1) `CUBRID/cubrid` 저장소 안에 OOS Spec/ADR을 두는 것에 대한 팀 합의 여부, (2) 배치 위치(A-1 `src/storage/docs/` 하위 vs A-2 루트 `docs/`), (3) `implementation-observations.md` 같은 시점별 관측 문서를 저장소에 남길지 JIRA로 넘길지를 우선 판별하면 방안을 확정할 수 있다.
-
-## Open Questions for Analysis
-
-1. **문서 저장 위치**: 기존 storage 분석서(`src/storage/docs/*.md`)의 확장으로 둘지(A-1), 아니면 프로젝트 루트 `docs/` 아래에 공식 스펙/ADR 디렉터리(예: `docs/oos/`, `docs/adr/`)를 신설할지(A-2).
-2. **문서 언어 정책**: 기존 `OOS-CONTEXT.md`·`ADR-0001~0010`·`src/storage/docs/` 와 같이 영문으로 유지할지, 한국어 번역/요약을 병기할지.
-3. **`docs/reference/*` 포함 범위**: `implementation-observations.md` 는 PR 병합 전 스냅샷이 많으므로 저장소 이관 대상에서 빼고 JIRA/PR 이력으로만 남길지, `design-history.md` 및 보정된 `test-recipes.md` 는 함께 편입할지.
-4. **`ADR-0011` (`proposed`) 처리**: [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281) 결론 전까지 공식 문서에서 제외할지, `proposed` 상태로 함께 등재하되 미채택 경계를 명시할지.
-5. **상위 Epic 배치 및 기존 저장소 정리**: 이 작업을 `CBRD-26978` 하위에 둘지 `CBRD-26357` 직접 하위에 둘지, 그리고 이관 완료 후 개인 저장소(`vimkim/cubrid-oos-context`)를 아카이브/포인터 안내 전용으로 전환할지.
-6. **사용자 매뉴얼(`CUBRIDMAN`) 범위 분리**: `STORAGE` 컬럼 옵션, `oos_trigger_threshold`, `ER_HEAP_OOS_OVERPASS_MAXOBJ_SIZE`, `ER_BO_INCOMPATIBLE_STORAGE_FORMAT` 등 사용자·운영자 안내를 별도 `CUBRIDMAN` 문서 이슈로 분리할지.
-
-## Acceptance Criteria
-
-- 공식 문서 저장 위치, 언어, 포함 범위(`OOS-CONTEXT.md`, `CONTEXT.md`, `ADR-0001~0010`, `ADR-0011` 및 `docs/reference/*` 처리 방침)가 팀 리뷰를 거쳐 확정된다.
-- 채택된 공식 위치에 개인 로컬 경로·비공개 작업 ID가 제거되고 규범 불일치(`test-recipes.md` §9.6 등)가 정리된 문서가 게시된다.
-- `ADR-0001~0010` 의 상태(accepted/amended/superseded)와 `ADR-0011` (`proposed`, [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281) 연동)의 경계가 명확히 구분된다.
-- [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357) 및 공식 저장소 진입점(`src/storage/AGENTS.md` 등)에서 새 공식 문서로 연결된다.
-- 이관 완료 후 기존 개인 저장소(`vimkim/cubrid-oos-context`)에는 공식 문서 이관 안내와 canonical 링크가 남는다.
-
-## Related Work
-
-- [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357): OOS 도입 Epic (`PR #7990` 병합 완료, 외부 리뷰에서 `cubrid-oos-context` 참조)
-- [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978): OOS TODO Epic (권장 부모 이슈)
-- [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281): ADR-0011(빈 페이지 제자리 재사용, `proposed`) 채택 여부 결정 이슈
-- [CBRD-26592](https://jira.cubrid.org/browse/CBRD-26592): 과거 M1 시점 PG TOAST vs OOS 스펙 비교표 (`Closed / Won't Fix`, JIRA 단독 문서 노후화 선례)
-- [CBRD-27537](https://jira.cubrid.org/browse/CBRD-27537), [CBRD-26974](https://jira.cubrid.org/browse/CBRD-26974), [CBRD-28038](https://jira.cubrid.org/browse/CBRD-28038): `CUBRID/cubrid` 저장소 내 `src/storage/AGENTS.md` 및 `src/storage/docs/` 공식 문서화·갱신 선례
+- [CBRD-26357](https://jira.cubrid.org/browse/CBRD-26357): OOS 도입 Epic (`PR #7990` 병합 완료)
+- [CBRD-26978](https://jira.cubrid.org/browse/CBRD-26978): OOS TODO Epic
+- [CBRD-28281](https://jira.cubrid.org/browse/CBRD-28281): `OOS-ADR-0011` (빈 페이지 제자리 재사용, `proposed`) 채택 여부 결정 이슈
+- [CBRD-26592](https://jira.cubrid.org/browse/CBRD-26592): 과거 M1 시점 PG TOAST vs OOS 스펙 비교표 (`Closed / Won't Fix`)
+- 핵심 설계 결정 연계 이슈: [CBRD-26950](https://jira.cubrid.org/browse/CBRD-26950), [CBRD-27230](https://jira.cubrid.org/browse/CBRD-27230), [CBRD-27781](https://jira.cubrid.org/browse/CBRD-27781), [CBRD-27925](https://jira.cubrid.org/browse/CBRD-27925), [CBRD-28062](https://jira.cubrid.org/browse/CBRD-28062)

@@ -80,10 +80,27 @@
 
 ### 완료 조건 제안
 
-- [ ] 두 파일의 모든 지침에 대해 유지·수정·삭제 여부와 근거를 검토 기록에 남긴다.
-- [ ] 두 파일에서 같은 규칙을 중복 선언하지 않으며, 참조하는 파일과 절이 실제로 존재한다.
-- [ ] 명령·경로·컴파일 모드·검사 예외를 기준 커밋의 설정 및 코드와 대조한다. 미확인 사항을 확정 규칙으로 쓰지 않는다.
-- [ ] 소스 추가, 예외를 발생시킬 수 있는 STL 사용, XASL 변경을 가정했을 때 필요한 확인 경로와 검증 범위를 두 문서에서 찾을 수 있다.
-- [ ] 문서 diff와 링크를 검사하고 확인 결과를 기록한다. 문서만 바꾸는 경우 엔진 전체 회귀 검사를 완료 조건으로 요구하지 않는다.
+- [x] 두 파일의 모든 지침에 대해 유지·수정·삭제 여부와 근거를 검토 기록에 남긴다.
 
-사용자 매뉴얼과 제품 사양 변경은 해당하지 않는다. 실제 문서 구현과 리뷰 결과는 후속 PR에서 확인한다.
+- [x] 두 파일에서 같은 규칙을 중복 선언하지 않으며, 참조하는 파일과 절이 실제로 존재한다.
+
+- [x] 명령·경로·컴파일 모드·검사 예외를 기준 커밋의 설정 및 코드와 대조한다. 미확인 사항을 확정 규칙으로 쓰지 않는다.
+
+- [x] 소스 추가, 예외를 발생시킬 수 있는 STL 사용, XASL 변경을 가정했을 때 필요한 확인 경로와 검증 범위를 두 문서에서 찾을 수 있다.
+
+- [x] 문서 diff와 링크를 검사하고 확인 결과를 기록한다. 문서만 바꾸는 경우 엔진 전체 회귀 검사를 완료 조건으로 요구하지 않는다.
+
+사용자 매뉴얼과 제품 사양 변경은 해당하지 않는다.
+
+### 구현 및 최종 검증 결과 (`origin/develop` `cbed1d5707`, PR #8751)
+
+1차 분석(`c63a3b993b`) 이후 `origin/develop`(`cbed1d5707`, PR `#8234`·`#7347`·`#8486` 반영 상태)을 기준으로 전수 재검증 및 리뷰 보완을 완료했다([PR #8751](https://github.com/CUBRID/cubrid/pull/8751), [감사 보고서](https://github.com/vimkim/my-cubrid-docs/blob/main/cbrd-27539/audit-report.md)).
+
+- **실제 수정 범위**: `AGENTS.md`(216줄 → 35줄), `src/AGENTS.md`(46줄 → 92줄), 및 두 문서 개편으로 참조 경로가 바뀐 `src/base/AGENTS.md`(5·41·169행 링크·표현 3줄 보완). 엔진 소스, CMake 설정, SQL 동작은 변경하지 않았다.
+- **초기 7대 점검 항목 재검증 및 보정**:
+  - `src/compat/dbi_compat.h`는 `error_code.h`를 include만 할 뿐 별도 `ER_*` 매크로 정의가 없음을 확인하고 오류 코드 절차에서 제외했다. 실제 갱신 대상은 `src/base/error_code.h`와 `msg/en_US.utf8/cubrid.msg`·`msg/ko_KR.utf8/cubrid.msg`의 `$set 5 MSGCAT_SET_ERROR`(양수 ID `-ER_CODE`)이며, `cubrid-cci/` 서브모듈(`src/cci/base_error_code.h`)은 엔진 PR에서 직접 수정하지 않고 별도 PR 및 서브모듈 갱신으로 분리하도록 명시했다.
+  - `disk_compatibility_level`(`src/base/release_string.c`)은 릴리스 단위 호환성 버전이므로 일반 기능 PR에서 임의로 올리지 않도록 명확히 제한했다.
+  - `LOG_RCVINDEX`(`src/transaction/recovery.h`) 추가 시 `RV_LAST_LOGID`, `src/transaction/recovery.c`의 위치 기반 `RV_fun[]` 배열(`!NDEBUG`에서만 검증), `RCV_IS_*` 매크로를 함께 맞추도록 명시했다.
+  - 성능 민감 경로의 `ALWAYS_INLINE`(`src/base/porting_inline.hpp`)은 `NDEBUG`(`release`) 빌드에서만 확장되므로 `release` 프로파일 확인 시 `STATIC_INLINE ... __attribute__ ((ALWAYS_INLINE))`와 `nm -C`로 검증하도록 한정했다.
+  - `db_private_alloc`의 전달 `thread_p` 인자 힙 소유권, `PEEK` 비소유 계약, 스레드 간 에러 컨텍스트 인계, GNU `indent` 2.2.11 버전 핀, `./build.sh` 명시 타깃 및 CTP 격리 실행 경계를 반영했다.
+- **후속 이슈 분리**: PR `#8751` Greptile 리뷰에서 지적된 `unit_tests/` 내 `ctest`(`add_test()`) 미등록 타깃 정비는 별도 이슈 [CBRD-28388](https://jira.cubrid.org/browse/CBRD-28388)로 분리해 추적한다.

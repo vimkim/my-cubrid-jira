@@ -24,7 +24,7 @@
 2. **page buffer: 거절된 조건부 요청이 `waiter_exists` 를 남긴다.** `pgbuf_latch_bcb_upon_fix ()` 는 latch를 쥐지 않은 요청이면 조건부 요청이라도 CAS로 `waiter_exists = true` 를 먼저 기록하고([page_buffer.c:7117-7120](https://github.com/CUBRID/cubrid/blob/bfb59bdd133518da140f9af6c48bef5568df67af/src/storage/page_buffer.c#L7117-L7120)), 그다음 조건부 요청을 거절한다([7234-7264](https://github.com/CUBRID/cubrid/blob/bfb59bdd133518da140f9af6c48bef5568df67af/src/storage/page_buffer.c#L7234-L7264)). 거절할 때 이 표시를 지우지 않는다. CBRD-28163 수정(`3f48168311`)도 커밋 설명에서 이 출처를 그대로 두었다고 적었다.
 3. **page buffer: 놓을 때 표시가 있으면 LRU 배치를 건너뛴다.** `pgbuf_unlatch_bcb_upon_unfix ()` 는 fix 수가 0이 될 때 `waiter_exists` 가 서 있으면 영역별 처리 전체를 건너뛰고 깨우기만 한다([page_buffer.c:7357](https://github.com/CUBRID/cubrid/blob/bfb59bdd133518da140f9af6c48bef5568df67af/src/storage/page_buffer.c#L7357), [7399-7528](https://github.com/CUBRID/cubrid/blob/bfb59bdd133518da140f9af6c48bef5568df67af/src/storage/page_buffer.c#L7399-L7528)). 실제 대기자가 있으면 그 대기자가 나중에 놓을 때 처리하지만, 거절된 조건부 요청은 기다리지 않으므로 아무도 처리하지 않는다. 프레임이 이미 LRU 목록에 있으면 영향이 작다(승격만 빠진다). 그러나 할당하거나 디스크에서 막 읽어 아직 VOID 영역([page_buffer.c:207-209](https://github.com/CUBRID/cubrid/blob/bfb59bdd133518da140f9af6c48bef5568df67af/src/storage/page_buffer.c#L207-L209))에 있던 프레임은 어느 목록에도 들어가지 않는다.
 
-2와 3은 CBRD-26425(`58cef8e01f`, 2026-01, 원자 latch 도입)부터 develop에 있는 page buffer 동작이다. OOS 이전 develop에서는 VOID 영역의 페이지를 다른 스레드가 조건부로 노리는 경로가 드물어 드러나지 않았고, OOS의 1번 동작이 이를 INSERT마다 일으킨다. page buffer 쪽 결함은 OOS와 무관하게 남으므로 따로 다룬다(ANALYSIS 확인 사항 참고).
+2와 3은 CBRD-26425(`58cef8e01f`, 2026-01, 원자 latch 도입)부터 develop에 있는 page buffer 동작이다. OOS 이전 develop에서는 VOID 영역의 페이지를 다른 스레드가 조건부로 노리는 경로가 드물어 드러나지 않았고, OOS의 1번 동작이 이를 INSERT마다 일으킨다. page buffer 쪽 결함은 OOS와 무관하게 남으므로 [CBRD-28379](https://jira.cubrid.org/browse/CBRD-28379)에서 따로 다룬다.
 
 ### 확인한 근거
 
@@ -92,6 +92,6 @@ VOID 영역의 프레임 수는 gdb로 `pgbuf_Pool.BCB_table[i].flags` 의 영�
 
 - **ANALYSIS 확인 사항**
     1. OOS 쪽: 새 페이지를 chunk를 쓴 뒤의 빈 공간으로만 알리거나, latch를 놓은 뒤에 알리는지. 새 페이지 후보를 알리지 않을 때 단일 페이지 값의 페이지 공유가 줄어드는지.
-    2. page buffer 쪽: 거절된 조건부 요청이 `waiter_exists` 를 남기지 않게 하거나, 표시가 있어도 VOID 영역 프레임은 LRU에 넣는지. OOS와 무관한 develop 결함이므로 별도 이슈로 올린다. 이 경우 heap bestspace 등 다른 조건부 fix 경로도 같은 누수를 낼 수 있는지 함께 본다(위 집계에서 heap bestspace의 거절 1회는 LRU 영역 프레임이었다).
+    2. page buffer 쪽: 거절된 조건부 요청이 `waiter_exists` 를 남기지 않게 하거나, 표시가 있어도 VOID 영역 프레임은 LRU에 넣는지. OOS와 무관한 develop 결함이므로 CBRD-28379에서 다룬다. 그 이슈에서 heap bestspace 등 다른 조건부 fix 경로도 같은 누수를 낼 수 있는지 함께 본다(위 집계에서 heap bestspace의 거절 1회는 LRU 영역 프레임이었다).
     3. QA의 15.5시간은 버려진 프레임이 쌓이는 동안 latch·버퍼 대기가 300초 단위로 반복된 결과로 본다. 1번만 고친 빌드와 2번만 고친 빌드에서 bug_3627 전체 시간을 각각 확인한다.
-- **관련**: CBRD-28377(같은 고갈 상태에서 vacuum의 OOS 회수 fail-stop), CBRD-28163(latch 대기 시간 초과 뒤 남는 `waiter_exists`, 조건부 요청 출처는 제외), CBRD-28226·CBRD-28244(병렬 정렬의 다른 경로에서 VOID 영역 누수, 해결됨), CBRD-28278(OOS INSERT의 latch 비용 묶음).
+- **관련**: CBRD-28379(page buffer 쪽 결함), CBRD-28377(같은 고갈 상태에서 vacuum의 OOS 회수 fail-stop), CBRD-28163(latch 대기 시간 초과 뒤 남는 `waiter_exists`, 조건부 요청 출처는 제외), CBRD-28226·CBRD-28244(병렬 정렬의 다른 경로에서 VOID 영역 누수, 해결됨), CBRD-28278(OOS INSERT의 latch 비용 묶음).

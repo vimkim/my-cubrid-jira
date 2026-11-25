@@ -8,7 +8,7 @@
 
 **이슈 수행 이유**: OOS 회수는 실패하면 서버를 멈추는 fail-stop 정책을 따른다(OOS-ADR-0008). 회수 표시를 남긴 채 성공으로 처리하면 chain이 영원히 새기 때문이다. 그런데 vacuum이 `RVOOS_NOTIFY_VACUUM`(UPDATE가 버린 chain의 회수 요청)을 처리하는 경로는 오류를 돌려주기만 해도 그 블록이 완료로 표시되지 않고, vacuum이 나중에 다시 처리한다. 회수기는 다시 실행해도 안전하게 설계되었다(OOS-ADR-0008). 그런데도 이 경로는 `ER_INTERRUPTED` 와 영구 오류(손상된 chain)만 따로 처리하고, 나머지 오류는 모두 fail-stop한다. QA에서는 -1123이 그대로 서버 종료로 이어졌다.
 
-**영향**: OOS 테이블을 UPDATE하는 사용자의 서버가, 빈 버퍼 프레임이나 페이지 latch를 기다리는 시간이 한계(기본 300초)를 넘는 것만으로 FATAL로 종료되고 core를 남긴다. 재시작 복구가 끝나야 서비스가 돌아오고, HA에서는 failover가 일어난다. QA에서 1회 관찰했다. 이번 QA 사례에서 버퍼가 고갈된 원인(동시 OOS INSERT 중 flush daemon이 victim 후보를 찾지 못함)은 별도 이슈로 다룬다. 원인이 고쳐져도 버퍼나 latch 대기 시간 초과는 다른 부하에서 다시 생길 수 있으므로, 이 경로가 서버를 멈추는 문제는 따로 남는다. 운영 환경에서의 발생 빈도는 알 수 없다.
+**영향**: OOS 테이블을 UPDATE하는 사용자의 서버가, 빈 버퍼 프레임이나 페이지 latch를 기다리는 시간이 한계(기본 300초)를 넘는 것만으로 FATAL로 종료되고 core를 남긴다. 재시작 복구가 끝나야 서비스가 돌아오고, HA에서는 failover가 일어난다. QA에서 1회 관찰했다. 이번 QA 사례에서 버퍼가 고갈된 원인(동시 OOS INSERT가 버퍼 프레임을 LRU 밖에 남김)은 [CBRD-28378](https://jira.cubrid.org/browse/CBRD-28378)·[CBRD-28379](https://jira.cubrid.org/browse/CBRD-28379)에서 다룬다. 원인이 고쳐져도 버퍼나 latch 대기 시간 초과는 다른 부하에서 다시 생길 수 있으므로, 이 경로가 서버를 멈추는 문제는 따로 남는다. 운영 환경에서의 발생 빈도는 알 수 없다.
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 
@@ -20,7 +20,7 @@
 
 ### QA에서 관찰한 내용
 
-- 빌드: 11.5.0.2997-de4bb11, shell_long `longcase/shell/other/bug_3627`(CBRD-26357 댓글, 2026-11-25). 같은 실행에서 insert 단계도 크게 느려졌다(별도 이슈).
+- 빌드: 11.5.0.2997-de4bb11, shell_long `longcase/shell/other/bug_3627`(CBRD-26357 댓글, 2026-11-25). 같은 실행에서 insert 단계도 크게 느려졌다(CBRD-28378).
 - 서버 오류 로그(`pdb_20261123_2057.err`) 끝부분:
 
 ```text
@@ -50,7 +50,7 @@ LOG FATAL ERROR: oos_reclaim: committed reclaim failed with error -1123
 ### 다른 이슈와의 관계
 
 - [CBRD-28276](https://jira.cubrid.org/browse/CBRD-28276): vacuum 재시도와 fail-stop이 **영구** 오류를 만났을 때의 무한 반복과 재시작 실패를 다룬다. 이 이슈는 **일시적** 오류가 실행 중인 서버를 멈추는 문제로, 범위가 다르다. 다만 블록 재처리로 넘기면 CBRD-28276의 1초 주기 재시도에 들어가므로, 재시도 상한이나 back-off 결정은 CBRD-28276과 함께 본다.
-- 이번 QA 사례의 버퍼 고갈과 insert 단계 저하는 별도 이슈로 올린다.
+- 이번 QA 사례의 버퍼 고갈과 insert 단계 저하: CBRD-28378(OOS 쪽), CBRD-28379(page buffer 쪽).
 
 ## Test Build
 

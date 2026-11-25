@@ -1,0 +1,13 @@
+ts	phase	decision	why	evidence	result
+2026-11-05T05:21:09Z	frame	27944·27945의 중복과 브랜치 귀속을 독립 검토하고 댓글만 게시한다	사용자가 두 이슈 검토와 댓글을 요청했으며 DB 재현은 팀장 승인 대상이다	issues/oos-candidate-review-plan.md	댓글 게시 준비; 상태 변경 없음
+2026-11-05T05:21:09Z	source	가져온 develop과 OOS revision을 고정하고 Git 객체로 읽는다	더 오래된 로컬 develop의 관련 없는 변경을 보존한다	/tmp/oos-candidate-review-20261105/root/refs.json	be0a9ab1 vs d52b1889 고정
+2026-11-05T05:21:09Z	attribution	27944를 OOS 경로 후보로 분류한다	OOS의 알림·조건부 READ 실패·정산은 남아 있으며 develop에 해당 경로가 없다	/tmp/oos-candidate-review-20261105/develop-hint/report.md	소스 후보; native 미확인
+2026-11-05T05:21:09Z	attribution	27945의 공통 할당 코드와 OOS의 회수 요구를 구분한다	공통 함수가 같다는 사실만으로 develop 결함을 주장할 수 없다	issues/oos-candidate-branch-evidence.json	root가 6개 함수의 동일 해시 재확인
+2026-11-05T05:21:09Z	overlap	27944의 가설을 보존하여 27925로 통합하고 27945는 별도 유지할 것을 권고한다	27944는 기존 조사 범위에 들어가며 27945는 재귀 예약 시점의 별도 검증 조건이 있다	/tmp/oos-candidate-review-20261105/synthesis.md	권고만 기록; 이관·종료·삭제하지 않음
+2026-11-05T05:21:09Z	search	첫 100건 검색 한계를 모든 페이지 순회로 보완한다	오래된 후보를 누락한 채 비중복으로 결론 내리지 않는다	/tmp/oos-candidate-review-20261105/search-completion/report.md	156건 및150건 전체; 합집합277건; 키워드 밖은 미보장
+2026-11-05T05:21:09Z	freshness	예전 추출 실행을 최신 DB 재현으로 취급하지 않는다	bestspace 등 주변 경로가 바뀌어 핵심 함수 존재만으로 최신 전체 경로를 보장할 수 없다	/tmp/oos-candidate-review-20261105/develop-hint/report.md	최신 native 도달 가능성·영향 미확인
+2026-11-05T05:26:39Z	review	독립 검토에서 두 댓글의 게시를 막을 오류가 없음을 확인했다	7개 소스 링크와 18개 함수 해시·payload·기존 7개 결정 행을 대조했다	/home/vimkim/.local/state/oos-candidate-review-791/pre-publication-review.md	PASS; 모델 계열 다양성은 확보하지 못함
+2026-11-05T05:26:39Z	publication	27944와27945에 검토 댓글을 게시하고 정확한 본문을 재조회했다	사용자가 두 이슈 댓글을 요청했으며 실제 게시 결과를 확인해야 한다	issues/oos-candidate-comment-publication.json	4777946·4777947 본문 일치; Open과 본문 유지
+2026-11-05T05:26:39Z	retention	임시 원본을 영구 상태 디렉터리에 보관하고 해시를 대조했다	임시 디렉터리 정리 뒤에도 판단 근거를 찾아야 한다	/home/vimkim/.local/state/oos-candidate-review-791/archive-manifest.json	51개 파일 해시 일치
+2026-11-05T05:26:39Z	scope	팀장 승인 전 서버·DB 재현을 계속 대기한다	댓글 게시와 이슈의 Open 상태는 재현 승인이 아니다	/home/vimkim/gh/cb/oos-tlaplus-20261104/formal/oos/NATIVE-REPRO-APPROVAL.md	native 미실행; Work790 승인 대기 유지
+2026-11-05T05:28:44Z	audit	게시 이후 결정 기록과 읽기 검증을 점검하고 Work791을 완료했다	보고서와 실제 JIRA 결과를 대조한 뒤 완료로 기록해야 한다	/home/vimkim/.local/state/oos-candidate-review-791/root-final-audit.json	기존 행 보존·11행 근거 해소·본문 일치 PASS; Work790 승인 대기

@@ -80,6 +80,15 @@ Common commands:
   existing issue's context before editing.
 - **Formatting is applied in memory by `cubrid-jira`.** Do not pre-mangle the
   source file. Markdown bold/inline-code survive the md→wiki conversion.
+- **Pre-authorized Git integration to `main`:** For this repository
+  (`my-cubrid-jira`), once task checks pass and the diff is reviewed, agents
+  have standing approval to rebase the task branch onto `main`, fast-forward
+  merge with `git merge --ff-only`, push `origin main`, and clean up the task
+  worktree and branch without asking for separate merge approval. Stop and ask
+  if rebase conflicts occur, a squash fallback is needed, or checks fail. This
+  standing approval applies **only** to Git integration in `my-cubrid-jira`;
+  live JIRA writes (`--yes`, `cubrid-jira create/update/comment`) still require
+  explicit user authorization.
 
 ## Credentials
 

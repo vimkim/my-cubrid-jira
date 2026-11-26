@@ -1,4 +1,4 @@
-# [RESTOREDB] xboot_restart_from_backup이 db_name 없이 파라미터를 로드해 restoredb가 [@<db>] 섹션 설정을 무시한다
+# [RESTOREDB] xboot_restart_from_backup이 db_name 없이 파라미터를 로드해 restoredb가 `[@<db>]` 섹션 설정을 무시한다
 
 **한 줄 요약**: [CUBRID/cubrid PR #8721](https://github.com/CUBRID/cubrid/pull/8721)(CBRD-28142) 검증 프로브([리뷰 보고서](https://github.com/vimkim/my-cubrid-docs/blob/main/CBRD-28142/pr8721-review.md))에서 `cubrid restoredb` 가 `cubrid.conf` 의 `[@<db>]` 섹션을 무시하고 `[common]` 만 읽는 현상이 확인되어, `xboot_restart_from_backup ()` 의 `sysprm_load_and_init (NULL, ...)` 호출이 의도된 동작인지 검토하고 DB별 설정 일관성 또는 명시적 동작 기준을 확립하는 이슈다.
 

@@ -1,6 +1,6 @@
 # [BUILD] build.sh 도움말과 실제 옵션 불일치, pl_unittest의 빌드 디렉터리 전달 오류
 
-**한 줄 요약**: CBRD-27539 후속 감사에서 찾은 빌드 관련 불일치 두 가지를 다룬다. `build.sh -h` 가 처리하지 않는 옵션과 틀린 기본값을 안내하는 문제, `pl_unittest` 타깃이 Gradle에 빌드 디렉터리를 잘못된 방식으로 넘기는 문제다. 처음에 함께 묶었던 3번(컴파일되지 않는 `wait_for_graph.c` 와 정의 없는 `catalog_destroy` 선언)은 담당 범위가 달라 Joon Min의 요청에 따라 CBRD-XXXXX로 분리했다.
+**한 줄 요약**: CBRD-27539 후속 감사에서 찾은 빌드 관련 불일치 두 가지를 다룬다. `build.sh -h` 가 처리하지 않는 옵션과 틀린 기본값을 안내하는 문제, `pl_unittest` 타깃이 Gradle에 빌드 디렉터리를 잘못된 방식으로 넘기는 문제다. 처음에 함께 묶었던 3번(컴파일되지 않는 `wait_for_graph.c` 와 정의 없는 `catalog_destroy` 선언)은 담당 범위가 달라 Joon Min의 요청에 따라 [CBRD-28425](https://jira.cubrid.org/browse/CBRD-28425)로 분리했다.
 
 ## Issue Triage
 
@@ -47,5 +47,5 @@
 
 ## Related
 
-- CBRD-XXXXX: 이 이슈에서 분리한 3번(컴파일되지 않는 `wait_for_graph.c` 교착 그래프 코드와 정의 없는 `catalog_destroy` 선언 정리, transaction 범위)
+- [CBRD-28425](https://jira.cubrid.org/browse/CBRD-28425): 이 이슈에서 분리한 3번(컴파일되지 않는 `wait_for_graph.c` 교착 그래프 코드와 정의 없는 `catalog_destroy` 선언 정리, transaction 범위)
 - [CBRD-27539](https://jira.cubrid.org/browse/CBRD-27539): 에이전트 지침 감사 중 발견

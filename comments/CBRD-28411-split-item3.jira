@@ -1,0 +1,1 @@
+[~hornetmj] 요청하신 대로 3번(컴파일되지 않는 {{src/transaction/wait_for_graph.c}} 교착 그래프 코드와 정의 없는 {{system_catalog.h:159}} {{catalog_destroy}} 선언)을 CBRD-XXXXX로 분리했습니다. 두 이슈는 Relates로 연결했고, 이 이슈 설명은 1번({{build.sh}})과 2번({{pl_unittest}})만 남기도록 고쳤습니다. 행 번호는 {{develop}} {{0eec910fc1}} 기준으로 다시 확인했으며 코멘트에 적어 주신 위치와 같습니다. 두 이슈 모두 담당자를 민준 님으로 다시 지정했습니다.

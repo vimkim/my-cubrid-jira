@@ -37,7 +37,7 @@
 
 ## Test Build
 
-- `CUBRID 11.4.7 (11.4.7.2008-46e7117) (64bit debug build for Linux)`: PR #8690 head. PR은 `src/transaction/locator_sr.c` 만 바꾸므로 release/11.4 base(`065c452fe8`)도 같은 코드다.
+- `CUBRID 11.4.7 (11.4.7.2008-46e7117) (64bit debug build for Linux)`: PR #8690 head `46e71173c0`. 이 리비전의 PR은 `src/transaction/locator_sr.c` 만 바꾸므로 release/11.4 base(`065c452fe8`)도 같은 코드다. 이후 PR head `182431bea7` 은 `heap_file.c` 의 `heap_mvcc_log_redistribute ()` 도 바꾸지만 덤프 경로와 관계없고, `heap_attrinfo_dump ()` 의 해당 줄(`:10634-10635`)도 그대로다.
 - `CUBRID 11.5.0 (11.5.0.2704-cc94778) (64bit debug build for Linux)`: develop 빌드(2026-10-20). 현재 develop `6f5ac7a9f9` 소스에서도 같은 역참조를 확인했다(위 표).
 
 ## Repro

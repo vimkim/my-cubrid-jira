@@ -15,7 +15,7 @@
 - 교착이 생기면 `cubrid service stop`이 끝나지 않고, `cubrid server status`도 멈춘다. 마스터 포트도 계속 점유된다.
 - 서버 정지 메시지는 모니터 해제 뒤에 보내므로, DB 서버는 정지 요청을 받지 못하고 계속 실행된다.
 - 마스터를 강제 종료(`kill -9`)하기 전에는 풀리지 않는다.
-- 디버거로 순서를 고정하면 매번 재현된다. 디버거 없이 동시에 요청한 10회에서는 한 번도 발생하지 않았다. 열리는 시간 폭이 짧아 드물게 일어나는 것으로 보이며, 실제 빈도는 미상이다.
+- develop과 11.4 모두 영향을 받는다. 디버거로 순서를 고정하면 매번 재현된다. 디버거 없이 동시에 요청한 10회에서는 두 라인 모두 한 번도 발생하지 않았다. 열리는 시간 폭이 짧아 드물게 일어나는 것으로 보이며, 실제 빈도는 미상이다.
 
 **이슈 수행 방안**: TBD - ANALYSIS 단계에서 해결 방안과 구현 범위를 결정한다.
 
@@ -54,7 +54,9 @@ T가 SHUTDOWN_SERVER 작업을 꺼낸 뒤 잠금을 얻기 전에 M이 잠금을
 
 - 소스: CUBRID/cubrid#8792 head cc845fa345a8cdb0078881482f6d3c14706715dd(develop a921084ab7 기반), debug build, GCC, Linux x86_64. HA 꺼짐, `auto_restart_server=yes`, DB `testdb`.
 - 교착과 관련된 코드는 현재 develop 08f8185500과 같다. master.c와 master_request.c는 바뀌지 않았다. master_server_monitor.cpp의 `shutdown_server ()`, `~server_monitor ()`, `stop_monitoring_thread ()`도 바뀌지 않았다(`git diff`로 확인). PR #8792는 이 함수들을 바꾸지 않는다.
-- release 빌드와 11.4에서는 시험하지 않았다.
+- 11.4: release/11.4 065c452fe8 debug build, 같은 조건. 관련 함수는 develop과 같고(주석 끝 공백 한 곳 차이), 줄 번호만 다르다(잠금 master_request.c:621, `reset ()` master_request.c:773, join master_server_monitor.cpp:71). 서버 모니터는 CBRD-24741(#5740)로 들어와 v11.4부터 모든 11.4 패치에 포함되어 있다.
+- release/11.0~11.3에는 서버 모니터 코드(master_server_monitor.cpp)가 없어 해당하지 않는다.
+- release 빌드에서는 시험하지 않았다.
 
 ## Repro
 
@@ -107,7 +109,7 @@ cubrid service stop          # 이후는 위와 같다
 
 ## Actual Result
 
-두 방법 모두 재현했다. 디버거를 뗀 뒤에도 60초 넘게 상태가 그대로였고, 마스터를 `kill -9`로 끝냈다.
+develop(PR #8792 head)과 release/11.4에서 두 방법 모두 재현했다. 아래 스택은 develop 기준이며, 11.4는 같은 프레임에 줄 번호만 다르다(master_request.c:621, :773). 디버거를 뗀 뒤에도 60초 넘게 상태가 그대로였고, 마스터를 `kill -9`로 끝냈다.
 
 ```none
 Thread 1 (main):
@@ -133,7 +135,7 @@ Thread 2 (server monitor):
 - `cubrid service stop`이 실행한 `cub_commdb -A`는 마스터를 죽일 때까지 끝나지 않았고, 그 뒤 `master stop: fail`을 출력했다.
 - 마스터 포트는 계속 점유되었고, `cubrid server status`도 멈췄다.
 - DB 서버는 정지 요청을 받지 못해 계속 실행되었다. 새로 띄운 cub_master에 다시 등록되었다.
-- 디버거 없이 `cub_commdb --shutdown-reviving-server testdb`와 `cubrid service stop`을 동시에 실행한 10회에서는 교착이 0회였다. `cubrid service stop`은 먼저 broker를 정지하므로, 그사이에 모니터가 잠금을 잡았다가 풀었다.
+- 디버거 없이 `cub_commdb --shutdown-reviving-server testdb`와 `cubrid service stop`을 동시에 실행한 10회에서는 develop과 11.4 모두 교착이 0회였다. `cubrid service stop`은 먼저 broker를 정지하므로, 그사이에 모니터가 잠금을 잡았다가 풀었다.
 
 ## Expected Result
 

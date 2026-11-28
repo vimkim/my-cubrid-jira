@@ -43,9 +43,9 @@ SHUTDOWN_SERVER 작업은 `css_process_shutdown_reviving_server ()`가 만든다
 ## Analysis Questions
 
 - 실행으로 교착을 재현할 수 있는가? 제안 방법(미실행)은 다음과 같다. 그 뒤 마스터 프로세스가 끝나는지 확인한다.
-  1. 디버거로 모니터 스레드를 `server_monitor::shutdown_server ()`의 잠금 호출 직전에 멈춘다.
-  2. 재기동 중인 서버를 정지한다.
-  3. `cubrid service stop`을 실행한다.
+  1. 디버거로 cub_master의 `css_process_start_shutdown_by_name ()` 진입점에 중단점을 건다.
+  2. 재기동 중인 서버에 `cubrid server stop`을 실행해, 모니터 스레드가 중단점에서 멈추게 한다.
+  3. 모니터 스레드를 멈춘 채 `cubrid service stop`을 실행하고, 메인 스레드가 `reset ()`에 들어간 뒤 모니터 스레드를 계속 진행시킨다.
 - `css_process_kill_master ()` 뒤 메인 루프가 다시 서버 연결 종료를 처리하는 일이 실제로 일어나는가?
 
 ## Additional Information
